@@ -99,6 +99,8 @@ if(UHDR_USE_SYSTEM)
   target_include_directories(uhdr_repack PRIVATE "${_uhdr_vendor_include}")
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
 else()
+  # Vendored uhdr target does not always propagate public headers to dependents (seen on clean CI).
+  target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}/lib/include")
   target_link_libraries(uhdr_repack PRIVATE uhdr)
 endif()
 
