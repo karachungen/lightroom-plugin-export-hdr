@@ -1,25 +1,52 @@
 # uhdr_repack
 
-macOS command-line tool that builds an **Ultra HDR JPEG** (`.jpg` with embedded HDR gain map, ISO 21496-1 / Adobe `hdrgm` metadata) from:
+macOS CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** `**v1.4.0`**, `**UHDR_WRITE_XMP=ON`**.
 
-- A **Lightroom HDR TIFF** export (wide-gamut / PQ / HLG / extended dynamic range as written by Lightroom).
-- A matching **SDR base** image (typically JPEG from Lightroom or TIFF).
+## How it works
 
-Pipeline:
+```mermaid
+flowchart TB
+  subgraph files [What you pass in]
+    hdrPath["HDR TIFF path from Lightroom HDR export"]
+    sdrPath["SDR base path JPEG or TIFF at preview size"]
+  end
 
-1. Core Image loads the HDR TIFF with `expandToHDR` and renders **linear extended BT.2020** RGBA float → **RGBA half-float** for libultrahdr (`UHDR_IMG_FMT_64bppRGBAHalfFloat`, `UHDR_CT_LINEAR`, `UHDR_CG_BT_2100`).
-2. Core Image loads the SDR base, scales to match resolution, renders **RGBA8**, then the tool converts to **BT.709 full-range YCbCr 4:2:0** planar (`UHDR_IMG_FMT_12bppYCbCr420`, BT.709 / sRGB) so the primary JPEG is encoded as **4:2:0**.
-3. [google/libultrahdr](https://github.com/google/libultrahdr) is built **in-tree** via CMake **FetchContent** (pinned tag `v1.4.0`) with **`UHDR_WRITE_XMP=ON`** so the output includes primary XMP gain-map metadata (`GContainer` / `hdrgm`). It computes and embeds the gain map into a single JPEG.
+  subgraph hdrBranch [HDR side Core Image]
+    hdrLoad["Open TIFF with expandToHDR"]
+    hdrBuf["Linear extended BT2020 RGBA half-float for encoder"]
+    hdrLoad --> hdrBuf
+  end
 
-## Requirements
+  subgraph sdrBranch [SDR side Core Image]
+    sdrLoad["Open base decode to RGBA8"]
+    sdrMatch["Scale to match HDR width and height"]
+    sdrYcc["Convert to BT709 full range YCbCr 4:2:0 planes"]
+    sdrLoad --> sdrMatch --> sdrYcc
+  end
 
-- macOS (Core Image HDR ingest).
-- CMake 3.15+, C++17, Objective-C++.
-- **libjpeg-turbo** (or compatible libjpeg) via CMake `FindJPEG` — typically Homebrew `jpeg-turbo`.
+  subgraph libUhdr [libultrahdr]
+    compute["Derive gain map from HDR vs SDR relationship"]
+    mux["JPEG primary plus auxiliary gain map and XMP hdrgm block"]
+    compute --> mux
+  end
 
-You do **not** need a separate Homebrew install of libultrahdr unless you pass **`-DUHDR_USE_SYSTEM=ON`** to CMake.
+  hdrPath --> hdrLoad
+  sdrPath --> sdrLoad
+  hdrBuf --> compute
+  sdrYcc --> compute
+  mux --> outPath["Single output JPG at --out"]
+
+```
+
+
+
+- **HDR path** — Core Image + **linear BT.2020** half-float for libultrahdr.
+- **SDR path** — Resize to match, then **BT.709 YCbCr 4:2:0** for the SDR primary JPEG.
+- **Encode** — Gain map + **XMP** (`**hdrgm`** / GContainer-style).
 
 ## Build
+
+From `**tools/uhdr_repack`**. CMake 3.15+, C++17, Objective-C++; JPEG for `**FindJPEG`** (e.g. `**brew install jpeg-turbo`**). First configure downloads libultrahdr into `**build/_deps/`**.
 
 ```bash
 cd tools/uhdr_repack
@@ -27,85 +54,55 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Binary: `build/uhdr_repack`. First configure downloads and builds libultrahdr under `build/_deps/`.
+→ `**build/uhdr_repack**`
 
-Advanced (link against your own installed libultrahdr):
+System libultrahdr instead of vendored:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUHDR_USE_SYSTEM=ON -DUHDR_ROOT=/usr/local
 cmake --build build
 ```
 
-### Bundle for Lightroom plug-in (Apple Silicon arm64)
+→ same `**build/uhdr_repack**`
+
+## Lightroom bundle
+
+**Repository root:**
 
 ```bash
-# From repository root:
 ./scripts/bundle_uhdr_for_plugin.sh
 ```
 
-This configures CMake with **`-DCMAKE_OSX_ARCHITECTURES=arm64`** and **`CMAKE_OSX_DEPLOYMENT_TARGET=13.0`**, builds, copies `uhdr_repack` to **`ExportHDR.lrplugin/bin/`**, copies **`libuhdr*.dylib`** from the FetchContent build, rewrites `@rpath` to **`@loader_path`**, then bundles **libjpeg** (and other deps). Optional: `brew install dylibbundler` for the most reliable dependency copying.
-
-Intel (x86_64) Macs are **not** covered by that script; build `uhdr_repack` manually for x86_64 and place it at **`ExportHDR.lrplugin/bin/uhdr_repack`** if you maintain a custom Intel bundle.
-
-## Lightroom Classic plug-in (automated)
-
-The repo includes **`ExportHDR.lrplugin`** (macOS **arm64** bundle path, Lightroom Classic **13+**). It adds an **export filter** that:
-
-1. Uses your normal export (SDR base), preserving **Image Sizing**.
-2. Renders a temporary **HDR TIFF** with matching dimensions.
-3. Invokes **`ExportHDR.lrplugin/bin/uhdr_repack`** (after running **`scripts/bundle_uhdr_for_plugin.sh**`) to replace the exported file with an Ultra HDR JPEG.
-
-Install the bundle via **Plug-in Manager**, run the bundle script so **`bin/uhdr_repack`** exists, then enable **Ultra HDR (uhdr_repack)** in the export filters / post-processing section. See the [repository README](../../README.md) for setup, **codesigning**, troubleshooting, and release notes.
+**arm64** · **macOS 13.0** → `**ExportHDR.lrplugin/bin/`** + `**libuhdr*.dylib`**, `**@loader_path`**, libjpeg. Optional `**brew install dylibbundler**`. Intel: build yourself. Plug-in flow: **[../../README.md](../../README.md)**
 
 ## Usage
 
 ```bash
-./uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
+./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-Optional tuning:
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (100), `--target-display-peak` (1000 nits), `--monochrome-gainmap`
 
-```text
---base-quality 92
---gainmap-quality 85
---gainmap-scale 1
---min-content-boost 1.0
---max-content-boost 100
---target-display-peak 1000
---monochrome-gainmap
-```
-
-Default **`--gainmap-scale`** is **1** (gain map same pixel size as the base image).
-
-Inspect a JPEG:
+## `--inspect`
 
 ```bash
-./uhdr_repack --inspect output_uhdr.jpg
+./build/uhdr_repack --inspect output_uhdr.jpg
 ```
 
-Reports dimensions, libultrahdr recognition, rough JPEG subsampling (4:2:0 heuristic), and marker hints.
+**Prints** — dimensions, Ultra HDR yes/no, `**gainmap_size`**, 4:2:0 hints, MPF / `**primary_xmp`** / ISO APP2
 
-## Lightroom export notes
+## Lightroom inputs
 
-- Export **HDR TIFF** with HDR output enabled; disable **Maximum Compatibility** if you follow workflows from third-party HDR gain-map tools.
-- Export **SDR base** from a virtual copy or adjusted edit so creative intent matches the HDR edit.
-- Match pixel dimensions (the tool scales the SDR export to the HDR TIFF size).
+1. HDR TIFF with HDR output on; align HDR and SDR edits (e.g. same virtual copy).
+2. Same **pixel size** for both inputs (base is scaled to HDR if needed).
+3. Primary **4:2:0**; gain map may differ — `**--inspect`** → `**primary_jpeg_420`** / `**gainmap_jpeg_420`**
 
-## Chroma subsampling (4:2:0)
+## Test
 
-The **SDR base** path supplies **YCbCr 4:2:0** to libultrahdr, so the embedded primary JPEG is typically **4:2:0** (`--inspect` → `primary_jpeg_420: likely`). The **gain map** JPEG may be multi-channel **4:4:4** or **single-channel grayscale** (`--monochrome-gainmap`); grayscale has no chroma subsampling in the usual sense.
-
-## Automated test (`scripts/run_uhdr_test.sh`)
-
-Place **`test/hdr-raw.tif`** and **`test/sdr.jpg`** (see `test/README.md`). From the repo root:
+Fixtures: **[../../test/README.md](../../test/README.md)** · repo root:
 
 ```bash
 ./scripts/run_uhdr_test.sh
 ```
 
-Encodes with defaults, runs **`--inspect`**, and checks that **`gainmap_size`** matches **`dimensions`** and that **`primary_xmp`** is present.
-
-## References
-
-- [chemharuka/toGainMapHDR](https://github.com/chemharuka/toGainMapHDR) — Core Image HDR load / tone-map patterns.
-- [fengshenx/LR_GainMap_HDR_Export_Plugin](https://github.com/fengshenx/LR_GainMap_HDR_Export_Plugin) — Lightroom export hook calling `toGainMapHDR` (different defaults; this tool targets Ultra HDR via libultrahdr).
+Defaults → encode, `**--inspect**`, checks `**gainmap_size**` & `**primary_xmp**`
