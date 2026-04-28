@@ -5,9 +5,6 @@ tools/uhdr_repack/build/
 ExportHDR.lrplugin/bin/uhdr_repack
 ExportHDR.lrplugin/bin/*.dylib
 
-# Test outputs / large local fixtures (GitHub max ~100MB per file)
-test/out_uhdr.jpg
-test/hdr-raw.tif
 
 # macOS / editor
 .DS_Store
