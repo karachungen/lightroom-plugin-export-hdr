@@ -100,7 +100,8 @@ if(UHDR_USE_SYSTEM)
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
 else()
   # Vendored uhdr target does not always propagate public headers to dependents (seen on clean CI).
-  target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}/lib/include")
+  # ultrahdr_api.h lives at the libultrahdr tree root (EXPORT_INCLUDE_DIR upstream).
+  target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
   target_link_libraries(uhdr_repack PRIVATE uhdr)
 endif()
 
