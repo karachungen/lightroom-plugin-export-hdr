@@ -32,7 +32,7 @@ cmake -S "$UHDR_SRC" -B "$BUILD_DIR" \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_OSX_ARCHITECTURES=arm64 \
 	-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-	"${CMAKE_EXTRA[@]}"
+	"${CMAKE_EXTRA[@]+"${CMAKE_EXTRA[@]}"}"
 
 echo "==> Building uhdr_repack"
 cmake --build "$BUILD_DIR" --config Release
