@@ -51,7 +51,10 @@ jobs:
           file ExportHDR.lrplugin/bin/uhdr_repack | grep -q arm64
 
       - name: Create zip
-        run: zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin
+        run: |
+          zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin \
+            -x "ExportHDR.lrplugin/bin/.gitignore" \
+            -x "ExportHDR.lrplugin/bin/README.txt"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

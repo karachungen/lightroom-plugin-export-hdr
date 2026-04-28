@@ -11,7 +11,7 @@ struct EncodeOptions {
   int gainmap_quality = 85;
   int gainmap_scale = 1;
   float min_content_boost = 1.0f;
-  float max_content_boost = 100.0f;
+  float max_content_boost = 1000.0f;
   float target_display_peak_nits = 1000.0f;
   bool monochrome_gainmap = false;
 };

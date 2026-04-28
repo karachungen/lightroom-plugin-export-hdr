@@ -64,7 +64,7 @@ function CMD.buildEncodeCommand(o)
 		"--min-content-boost",
 		tostring(tonumber(o.props[K.minContentBoost]) or 1.0),
 		"--max-content-boost",
-		tostring(tonumber(o.props[K.maxContentBoost]) or 100.0),
+		tostring(tonumber(o.props[K.maxContentBoost]) or 1000.0),
 		"--target-display-peak",
 		tostring(tonumber(o.props[K.targetDisplayPeak]) or 1000.0),
 	}

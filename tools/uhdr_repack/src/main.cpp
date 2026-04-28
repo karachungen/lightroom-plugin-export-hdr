@@ -21,7 +21,7 @@ void PrintUsage() {
       << "  --gainmap-quality <0-100>    (default 85)\n"
       << "  --gainmap-scale <N>          gain-map downsample factor vs base (1 = full size; default 1)\n"
       << "  --min-content-boost <linear>   (default 1.0)\n"
-      << "  --max-content-boost <linear>   (default 100)\n"
+      << "  --max-content-boost <linear>   (default 1000)\n"
       << "  --target-display-peak <nits>   (default 1000)\n"
       << "  --monochrome-gainmap           single-channel gain map\n";
 }

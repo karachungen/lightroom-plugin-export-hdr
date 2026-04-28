@@ -81,7 +81,7 @@ cmake --build build
 ./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (100), `--target-display-peak` (1000 nits), `--monochrome-gainmap`
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`
 
 ## `--inspect`
 

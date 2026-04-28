@@ -26,7 +26,7 @@ function UHDR.defaults()
 		[UHDR.KEY.gainmapQuality] = 85,
 		[UHDR.KEY.gainmapScale] = 1,
 		[UHDR.KEY.minContentBoost] = 1.0,
-		[UHDR.KEY.maxContentBoost] = 100.0,
+		[UHDR.KEY.maxContentBoost] = 1000.0,
 		[UHDR.KEY.targetDisplayPeak] = 1000.0,
 		[UHDR.KEY.monochromeGainmap] = false,
 		[UHDR.KEY.keepIntermediates] = false,
