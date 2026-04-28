@@ -1,0 +1,108 @@
+# uhdr_repack
+
+**Requires macOS 26 (Tahoe), ARM64.** CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** `**v1.4.0`**, `**UHDR_WRITE_XMP=ON`**.
+
+## How it works
+
+```mermaid
+flowchart TB
+  subgraph files [What you pass in]
+    hdrPath["HDR TIFF path from Lightroom HDR export"]
+    sdrPath["SDR base path JPEG or TIFF at preview size"]
+  end
+
+  subgraph hdrBranch [HDR side Core Image]
+    hdrLoad["Open TIFF with expandToHDR"]
+    hdrBuf["Linear extended BT2020 RGBA half-float for encoder"]
+    hdrLoad --> hdrBuf
+  end
+
+  subgraph sdrBranch [SDR side Core Image]
+    sdrLoad["Open base decode to RGBA8"]
+    sdrMatch["Scale to match HDR width and height"]
+    sdrYcc["Convert to BT709 full range YCbCr 4:2:0 planes"]
+    sdrLoad --> sdrMatch --> sdrYcc
+  end
+
+  subgraph libUhdr [libultrahdr]
+    compute["Derive gain map from HDR vs SDR relationship"]
+    mux["JPEG primary plus auxiliary gain map and XMP hdrgm block"]
+    compute --> mux
+  end
+
+  hdrPath --> hdrLoad
+  sdrPath --> sdrLoad
+  hdrBuf --> compute
+  sdrYcc --> compute
+  mux --> outPath["Single output JPG at --out"]
+
+```
+
+
+
+- **HDR path** — Core Image + **linear BT.2020** half-float for libultrahdr.
+- **SDR path** — Resize to match, then **BT.709 YCbCr 4:2:0** for the SDR primary JPEG.
+- **Encode** — Gain map + **XMP** (`**hdrgm`** / GContainer-style).
+
+## Build
+
+From `**tools/uhdr_repack`**. CMake 3.15+, C++17, Objective-C++; JPEG for `**FindJPEG`** (e.g. `**brew install jpeg-turbo`**). First configure downloads libultrahdr into `**build/_deps/`**.
+
+```bash
+cd tools/uhdr_repack
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+→ `**build/uhdr_repack**`
+
+System libultrahdr instead of vendored:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUHDR_USE_SYSTEM=ON -DUHDR_ROOT=/usr/local
+cmake --build build
+```
+
+→ same `**build/uhdr_repack**`
+
+## Lightroom bundle
+
+**Repository root:**
+
+```bash
+./scripts/bundle_uhdr_for_plugin.sh
+```
+
+**Requires macOS 26 (Tahoe), ARM64.** → `**ExportHDR.lrplugin/bin/`** + `**libuhdr*.dylib`**, `**@loader_path`**, libjpeg. Optional `**brew install dylibbundler**`. Plug-in flow: **[../../README.md](../../README.md)**
+
+## Usage
+
+```bash
+./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
+```
+
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (100), `--target-display-peak` (1000 nits), `--monochrome-gainmap`
+
+## `--inspect`
+
+```bash
+./build/uhdr_repack --inspect output_uhdr.jpg
+```
+
+**Prints** — dimensions, Ultra HDR yes/no, `**gainmap_size`**, 4:2:0 hints, MPF / `**primary_xmp`** / ISO APP2
+
+## Lightroom inputs
+
+1. HDR TIFF with HDR output on; align HDR and SDR edits (e.g. same virtual copy).
+2. Same **pixel size** for both inputs (base is scaled to HDR if needed).
+3. Primary **4:2:0**; gain map may differ — `**--inspect`** → `**primary_jpeg_420`** / `**gainmap_jpeg_420`**
+
+## Test
+
+Fixtures: **[../../test/README.md](../../test/README.md)** · repo root:
+
+```bash
+./scripts/run_uhdr_test.sh
+```
+
+Defaults → encode, `**--inspect**`, checks `**gainmap_size**` & `**primary_xmp**`

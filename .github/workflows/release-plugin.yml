@@ -1,0 +1,72 @@
+name: Release Lightroom plugin (macOS 26 Tahoe, ARM64)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "ExportHDR.lrplugin/**"
+      - "tools/uhdr_repack/**"
+      - "scripts/bundle_uhdr_for_plugin.sh"
+  workflow_dispatch:
+
+concurrency:
+  group: release-plugin
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse version from Info.lua
+        id: ver
+        run: |
+          set -euo pipefail
+          line=$(grep 'VERSION = {' ExportHDR.lrplugin/Info.lua)
+          major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
+          minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
+          revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: brew install cmake jpeg-turbo dylibbundler
+
+      - name: Bundle uhdr_repack into plugin
+        run: ./scripts/bundle_uhdr_for_plugin.sh
+
+      - name: Verify arm64 binary
+        run: |
+          set -euo pipefail
+          file ExportHDR.lrplugin/bin/uhdr_repack
+          file ExportHDR.lrplugin/bin/uhdr_repack | grep -q arm64
+
+      - name: Create zip
+        run: zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (macOS 26 Tahoe, ARM64, build ${{ github.run_number }})
+          body: |
+            **Platform:** **macOS 26 (Tahoe), ARM64.** Built on GitHub `macos-26`.
+
+            **Lightroom:** Classic **14+** (`LrSdkMinimumVersion` in `Info.lua`).
+
+            **Install:** unzip the archive, then in Lightroom **File → Plug-in Manager → Add** and select the `ExportHDR.lrplugin` folder.
+
+            **Commit:** [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+            **Workflow run:** [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          files: ExportHDR.lrplugin-macos-arm64.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: false

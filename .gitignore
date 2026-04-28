@@ -1,0 +1,18 @@
+# CMake / encoder build (FetchContent, nested deps, absolute paths in generated files)
+tools/uhdr_repack/build/
+
+# Bundled helper inside plugin (rebuild via scripts/bundle_uhdr_for_plugin.sh)
+ExportHDR.lrplugin/bin/uhdr_repack
+ExportHDR.lrplugin/bin/*.dylib
+
+# Test outputs / large local fixtures (GitHub max ~100MB per file)
+test/out_uhdr.jpg
+test/hdr-raw.tif
+
+# macOS / editor
+.DS_Store
+*.swp
+.vscode/
+
+# Runtime logs if created next to working copy
+uhdr_export_*.log
