@@ -1,0 +1,3 @@
+# Built artifacts — populate via scripts/bundle_uhdr_for_plugin.sh (see bin/README.txt).
+uhdr_repack
+*.dylib
