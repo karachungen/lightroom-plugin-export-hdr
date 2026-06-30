@@ -43,7 +43,7 @@ flowchart TD
 
 ## How to use
 
-1. **Bundle** — Repo root: `./scripts/bundle_uhdr_for_plugin.sh` → `**ExportHDR.lrplugin/bin/uhdr_repack`** + `**.dylib`** (gitignored). Optional: `brew install dylibbundler`. Pre-built zips (**macOS 26 (Tahoe), ARM64**, same bundle) ship from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases) when CI runs on relevant changes.
+1. **Bundle** — Repo root: `./scripts/bundle_uhdr_for_plugin.sh` → `**ExportHDR.lrplugin/bin/uhdr_repack`** + `**.dylib`** (gitignored). Optional: `brew install dylibbundler`. Pre-built zips (**macOS 26 (Tahoe), ARM64**, same bundle) ship from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases) when CI runs on relevant changes. Per-build changes are listed in [CHANGELOG.md](CHANGELOG.md).
 2. **Install** — **File → Plug-in Manager → Add** → `[ExportHDR.lrplugin](ExportHDR.lrplugin)`
 3. **Export** — Set **Destination** and **Image Sizing** as usual, then wire up the filter:
   - In the Export dialog, open **Post-Process Actions** (wording may vary slightly by Lightroom version; same area as post-processing / export filters).

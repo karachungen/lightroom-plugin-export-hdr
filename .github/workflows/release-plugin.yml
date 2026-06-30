@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Parse version from Info.lua
         id: ver
@@ -31,12 +33,32 @@ jobs:
           major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
           minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
           revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
+          build=$(echo "$line" | sed -E 's/.*build *= *([0-9]+).*/\1/')
+          if [[ -z "$major" || -z "$minor" || -z "$revision" || -z "$build" ]]; then
+            echo "Failed to parse VERSION from Info.lua" >&2
+            exit 1
+          fi
+          if [[ "$build" -eq 0 ]]; then
+            echo "VERSION.build must be > 0 before publishing a release." >&2
+            exit 1
+          fi
+          tag="v${major}.${minor}.${revision}-r${build}"
           echo "major=$major" >> "$GITHUB_OUTPUT"
           echo "minor=$minor" >> "$GITHUB_OUTPUT"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate tag and changelog
+        run: |
+          set -euo pipefail
+          if git rev-parse "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${{ steps.ver.outputs.tag }}" >&2
+            exit 1
+          fi
+          chmod +x ./scripts/build_release_notes.sh
+          ./scripts/build_release_notes.sh --check-only
 
       - name: Install build dependencies
         run: brew install cmake jpeg-turbo dylibbundler
@@ -56,20 +78,19 @@ jobs:
             -x "ExportHDR.lrplugin/bin/.gitignore" \
             -x "ExportHDR.lrplugin/bin/README.txt"
 
+      - name: Build release notes
+        run: |
+          ./scripts/build_release_notes.sh \
+            --commit "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --repository "${{ github.repository }}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (macOS 26 Tahoe, ARM64, build ${{ github.run_number }})
-          body: |
-            **Platform:** **macOS 26 (Tahoe), ARM64.** Built on GitHub `macos-26`.
-
-            **Lightroom:** Classic **14+** (`LrSdkMinimumVersion` in `Info.lua`).
-
-            **Install:** unzip the archive, then in Lightroom **File → Plug-in Manager → Add** and select the `ExportHDR.lrplugin` folder.
-
-            **Commit:** [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            **Workflow run:** [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (macOS 26 Tahoe, ARM64, build ${{ steps.ver.outputs.build }})
+          body_path: RELEASE_NOTES.md
           files: ExportHDR.lrplugin-macos-arm64.zip
           fail_on_unmatched_files: true
           generate_release_notes: false
