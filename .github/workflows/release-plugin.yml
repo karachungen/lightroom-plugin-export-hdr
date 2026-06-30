@@ -8,6 +8,7 @@ on:
       - "tools/uhdr_repack/**"
       - "scripts/bundle_uhdr_for_plugin.sh"
       - "scripts/bundle_uhdr_for_plugin_windows.ps1"
+      - "scripts/run_uhdr_test.ps1"
   workflow_dispatch:
 
 concurrency:

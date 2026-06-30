@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r17
+
+### Fixed
+
+- Windows smoke test inspect parsing: join `--inspect` output to a string before regex checks (pwsh returns string arrays).
+
 ## v1.0.0-r16
 
 ### Fixed

@@ -43,11 +43,11 @@ if (-not (Test-Path -LiteralPath $Hdr) -or -not (Test-Path -LiteralPath $Base)) 
 
 function Assert-InspectOk {
 	param([string]$Path)
-	$inspect = & $Bin --inspect $Path
+	$inspect = (& $Bin --inspect $Path | Out-String)
 	$inspect | Write-Output
 
-	$dims = ($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$').Matches
-	$gm = ($inspect | Select-String -Pattern '^gainmap_size: (\d+)x(\d+)$').Matches
+	$dims = ($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches
+	$gm = ($inspect | Select-String -Pattern '^gainmap_size: (\d+)x(\d+)$' -AllMatches).Matches
 	$xmpLine = ($inspect | Select-String -Pattern '^markers:').Line
 
 	if (-not $dims -or -not $gm) {
@@ -61,7 +61,7 @@ function Assert-InspectOk {
 	if ($xmpLine -notmatch 'primary_xmp=(yes|1)') {
 		throw "FAIL: expected primary_xmp=yes or primary_xmp=1 for $Path"
 	}
-	if ($inspect -notmatch '(?m)^is_ultra_hdr: yes') {
+	if ($inspect -notmatch '(?m)^is_ultra_hdr: yes\s*$') {
 		throw "FAIL: expected is_ultra_hdr: yes for $Path"
 	}
 }
@@ -106,9 +106,9 @@ try {
 	foreach ($p in $slices4x5) {
 		Write-Host "==> inspect slice $($p.FullName)"
 		Assert-InspectOk $p.FullName
-		$inspect = & $Bin --inspect $p.FullName
-		$localH = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$').Matches[0].Groups[2].Value)
-		$localW = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$').Matches[0].Groups[1].Value)
+		$inspect = (& $Bin --inspect $p.FullName | Out-String)
+		$localH = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches[0].Groups[2].Value)
+		$localW = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches[0].Groups[1].Value)
 		$expectedW = [math]::Floor(($localH * 4 / 5) / 2) * 2
 		if ($localW -ne $expectedW) {
 			throw "FAIL: 4x5 slice width $localW != expected even floor(H*4/5)=$expectedW"
@@ -120,3 +120,4 @@ try {
 finally {
 	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
 }
+exit 0
