@@ -9,12 +9,26 @@ $UhdrSrc = Join-Path $RepoRoot "tools\uhdr_repack"
 $BuildDir = Join-Path $UhdrSrc "build"
 $PluginBin = Join-Path $RepoRoot "ExportHDR.lrplugin\bin"
 
+function Test-CommandAvailable {
+	param([string]$Name)
+	return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
 $CmakeExtra = @()
 if ($env:UHDR_USE_SYSTEM -eq "1" -or $env:UHDR_USE_SYSTEM -eq "ON") {
 	$CmakeExtra += "-DUHDR_USE_SYSTEM=ON"
 }
 if ($env:UHDR_ROOT) {
 	$CmakeExtra += "-DUHDR_ROOT=$($env:UHDR_ROOT)"
+}
+
+$script:CmakeBuildUsesConfig = $true
+
+function Reset-BuildDir {
+	param([string]$BuildDir)
+	if (Test-Path -LiteralPath $BuildDir) {
+		Remove-Item -LiteralPath $BuildDir -Recurse -Force
+	}
 }
 
 function Invoke-CmakeConfigure {
@@ -24,20 +38,30 @@ function Invoke-CmakeConfigure {
 		[string[]]$ExtraArgs
 	)
 
-	# Plain `cmake -S -B` on Windows picks NMake without a VS dev shell; use a VS generator.
+	# GitHub windows-latest (VS 2026) + pinned CMake 3.31.x: use Ninja with MSVC in PATH.
+	if ((Test-CommandAvailable "cl.exe") -and (Test-CommandAvailable "ninja")) {
+		Reset-BuildDir $BuildDir
+		Write-Host "    using Ninja + MSVC (CMAKE_BUILD_TYPE=Release)"
+		& cmake -S $SourceDir -B $BuildDir -G Ninja -DCMAKE_BUILD_TYPE=Release @ExtraArgs
+		if ($LASTEXITCODE -eq 0) {
+			$script:CmakeBuildUsesConfig = $false
+			return $true
+		}
+	}
+
+	# Full Visual Studio installs: multi-config generators (VS 18 2026 needs CMake 4.2+).
 	$generatorCandidates = @(
-		@{ G = "Visual Studio 18 2025"; A = "x64" },
+		@{ G = "Visual Studio 18 2026"; A = "x64" },
 		@{ G = "Visual Studio 17 2022"; A = "x64" },
 		@{ G = "Visual Studio 16 2019"; A = "x64" }
 	)
 
 	foreach ($candidate in $generatorCandidates) {
-		if (Test-Path -LiteralPath $BuildDir) {
-			Remove-Item -LiteralPath $BuildDir -Recurse -Force
-		}
+		Reset-BuildDir $BuildDir
 		Write-Host "    trying generator $($candidate.G) -A $($candidate.A)"
 		& cmake -S $SourceDir -B $BuildDir -G $candidate.G -A $candidate.A @ExtraArgs
 		if ($LASTEXITCODE -eq 0) {
+			$script:CmakeBuildUsesConfig = $true
 			return $true
 		}
 	}
@@ -47,11 +71,15 @@ function Invoke-CmakeConfigure {
 
 Write-Host "==> Configuring CMake (Release, Windows x64)"
 if (-not (Invoke-CmakeConfigure -SourceDir $UhdrSrc -BuildDir $BuildDir -ExtraArgs $CmakeExtra)) {
-	Write-Error "CMake configure failed. Install Visual Studio 2022+ with the C++ workload (x64)."
+	throw "CMake configure failed. On CI, MSVC must be on PATH (Ninja). Locally, install Visual Studio 2022+ with the C++ workload (x64) or open a Developer shell."
 }
 
 Write-Host "==> Building uhdr_repack"
-& cmake --build $BuildDir --config Release
+if ($CmakeBuildUsesConfig) {
+	& cmake --build $BuildDir --config Release
+} else {
+	& cmake --build $BuildDir
+}
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $BuildExeCandidates = @(

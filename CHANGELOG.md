@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r12
+
+### Fixed
+
+- Windows CI on `windows-latest` (VS 2026): activate MSVC via `ilammy/msvc-dev-cmd` and configure with **Ninja** under pinned CMake 3.31.6 (VS 18 generator requires CMake 4.2+, which breaks vendored libjpeg-turbo).
+
 ## v1.0.0-r11
 
 ### Fixed

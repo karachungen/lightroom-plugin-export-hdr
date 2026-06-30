@@ -60,6 +60,12 @@ jobs:
         with:
           cmakeVersion: "3.31.6"
 
+      - name: Setup MSVC (Windows)
+        if: matrix.id == 'windows-x64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Bundle uhdr_repack into plugin (macOS)
         if: matrix.id == 'macos-arm64'
         run: ./scripts/bundle_uhdr_for_plugin.sh

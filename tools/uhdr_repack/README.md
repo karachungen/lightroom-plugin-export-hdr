@@ -63,11 +63,16 @@ cmake --build build
 
 ```powershell
 cd tools\uhdr_repack
+# Developer shell or CI (Ninja + cl.exe on PATH):
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+
+# Or with a full Visual Studio install:
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-→ **`build/Release/uhdr_repack.exe`**
+→ **`build/uhdr_repack.exe`** (Ninja) or **`build/Release/uhdr_repack.exe`** (VS generator)
 
 System libultrahdr instead of vendored:
 
