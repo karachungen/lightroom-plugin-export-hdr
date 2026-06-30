@@ -758,6 +758,9 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		})
 
 		Log.append(logPath, "Command: " .. cmdLine .. "\n")
+		if CMD.isWindows() then
+			Log.append(logPath, "Execute: " .. CMD.resolveWindowsCommand(cmdLine) .. "\n")
+		end
 		local st = CMD.runShell(cmdLine, logPath)
 		if st ~= 0 then
 			local sx = shellExitStatus(st)

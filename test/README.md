@@ -14,7 +14,7 @@ Outputs (`out_uhdr.jpg`) are gitignored; the script writes them when run.
 
 The smoke scripts include a Cyrillic folder path test (`test/тест/`). Lightroom exports with Cyrillic filenames use ASCII staging inside the plug-in temp folder before calling `uhdr_repack`; the final JPEG is copied to the export path via `LrFileUtils` after encode.
 
-**Windows cmd quoting:** `.\scripts\test_windows_cmd_quote.ps1` verifies the plug-in shell layer against a synthetic path containing space and `(1)` (requires built `uhdr_repack.exe` and test inputs).
+**Windows cmd quoting:** `.\scripts\test_windows_cmd_quote.ps1` verifies full-path shell invocation under a synthetic path containing space and `(N)`, and asserts the legacy `cd` + relative-exe pattern fails.
 
 If these files are missing, the script exits with a clear message.
 

@@ -7,6 +7,12 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.2
+
+### Fixed
+
+- Windows export filter: stop using `cmd /c cd /d … && uhdr_repack.exe` (double cmd layer broke paths with parentheses); invoke the encoder via a single quoted absolute path so DLLs load from the plug-in `bin` folder without `cd`.
+
 ## v2.0.1
 
 ### Fixed

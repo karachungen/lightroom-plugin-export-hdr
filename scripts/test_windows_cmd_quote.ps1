@@ -1,5 +1,5 @@
-# Regression test: Windows cmd.exe quoting for plug-in paths with spaces and "(1)".
-# Mirrors ExportHDR.lrplugin/Command.lua runShell + buildEncodeCommand (fixed, no nested quote).
+# Regression test: Windows shell invocation for plug-in paths with spaces and "(N)".
+# Mirrors ExportHDR.lrplugin/Command.lua runShell (full quoted exe path, no cmd /c cd).
 #Requires -Version 5.1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -31,6 +31,23 @@ function Get-UhdrBinary {
 	return $null
 }
 
+function Invoke-CmdCapture {
+	param(
+		[string]$CommandLine,
+		[string]$CapturePath
+	)
+	if (Test-Path -LiteralPath $CapturePath) {
+		Remove-Item -LiteralPath $CapturePath -Force
+	}
+	# Lightroom LrTasks.execute: one cmd.exe /c layer (system()), not nested cmd /c.
+	$proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $CommandLine -Wait -PassThru -NoNewWindow
+	$capture = ""
+	if (Test-Path -LiteralPath $CapturePath) {
+		$capture = Get-Content -LiteralPath $CapturePath -Raw -ErrorAction SilentlyContinue
+	}
+	return @{ ExitCode = $proc.ExitCode; Capture = $capture }
+}
+
 $Bin = Get-UhdrBinary
 if (-not $Bin) {
 	Write-Error @"
@@ -43,13 +60,14 @@ if (-not (Test-Path -LiteralPath $Hdr) -or -not (Test-Path -LiteralPath $Base)) 
 	Write-Error ("Missing test inputs. See test/README.md - need:" + [Environment]::NewLine + "  $Hdr" + [Environment]::NewLine + "  $Base")
 }
 
-$stagingRoot = Join-Path $env:TEMP ("uhdr_cmd_quote_test (1)_" + [guid]::NewGuid().ToString("N"))
+$stagingRoot = Join-Path $env:TEMP ("uhdr_cmd_quote_test (2)_" + [guid]::NewGuid().ToString("N"))
 $pluginBin = Join-Path $stagingRoot "ExportHDR.lrplugin\bin"
 New-Item -ItemType Directory -Force -Path $pluginBin | Out-Null
 
+$workDir = $null
 try {
 	Copy-Item -LiteralPath $Bin -Destination (Join-Path $pluginBin "uhdr_repack.exe") -Force
-	$binDir = $pluginBin
+	$stagedExe = Join-Path $pluginBin "uhdr_repack.exe"
 	Get-ChildItem -LiteralPath (Split-Path -Parent $Bin) -Filter "*.dll" -File -ErrorAction SilentlyContinue |
 		ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $pluginBin -Force }
 
@@ -61,8 +79,7 @@ try {
 	Copy-Item -LiteralPath $Hdr -Destination $encodeHdr -Force
 	Copy-Item -LiteralPath $Base -Destination $encodeBase -Force
 
-	$inner = @(
-		"uhdr_repack.exe",
+	$argsTail = @(
 		"--hdr-tiff", (Invoke-LuaShellQuote $encodeHdr),
 		"--base", (Invoke-LuaShellQuote $encodeBase),
 		"--out", (Invoke-LuaShellQuote $encodeOut),
@@ -75,42 +92,45 @@ try {
 	) -join " "
 
 	$capturePath = Join-Path $workDir "uhdr_run_capture.txt"
-	$inner = $inner + " > " + (Invoke-LuaShellQuote $capturePath) + " 2>&1"
-	$wrapped = 'cd /d ' + (Invoke-LuaShellQuote $binDir) + ' && ' + $inner
-	$cmdLine = 'cmd /c ' + $wrapped
+	$redirect = " > " + (Invoke-LuaShellQuote $capturePath) + " 2>&1"
 
-	Write-Host '==> Staged plug-in bin under path with (1):'
-	Write-Host "    $binDir"
-	Write-Host "==> Command: $cmdLine"
+	Write-Host '==> Staged plug-in bin under path with (2):'
+	Write-Host "    $pluginBin"
 
-	$proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $wrapped -Wait -PassThru -NoNewWindow
-	$exitCode = $proc.ExitCode
+	# Current plug-in behavior: full quoted exe path, single shell layer.
+	$resolved = (Invoke-LuaShellQuote $stagedExe) + " " + $argsTail + $redirect
+	Write-Host "==> Execute (resolved): $resolved"
+	$ok = Invoke-CmdCapture -CommandLine $resolved -CapturePath $capturePath
+	if ($ok.Capture) { Write-Host $ok.Capture }
 
-	$capture = ""
-	if (Test-Path -LiteralPath $capturePath) {
-		$capture = Get-Content -LiteralPath $capturePath -Raw -ErrorAction SilentlyContinue
-		if ($capture) {
-			Write-Host $capture
-		}
+	if ($ok.Capture -match "internal or external command") {
+		throw ("FAIL: shell could not run quoted uhdr_repack.exe." + [Environment]::NewLine + $ok.Capture)
 	}
-
-	if ($capture -match "internal or external command") {
-		throw ("FAIL: cmd.exe mangled the command (shell could not run uhdr_repack.exe)." + [Environment]::NewLine + $capture)
+	if ($ok.ExitCode -ne 0) {
+		throw ("FAIL: uhdr_repack exited $($ok.ExitCode) (expected 0)." + [Environment]::NewLine + $ok.Capture)
 	}
-
-	if ($exitCode -ne 0) {
-		throw ("FAIL: uhdr_repack exited $exitCode (expected 0)." + [Environment]::NewLine + $capture)
-	}
-
 	if (-not (Test-Path -LiteralPath $encodeOut)) {
 		throw "FAIL: staged output JPEG missing: $encodeOut"
 	}
-
-	if ($capture -notmatch "dimensions:") {
-		throw ("FAIL: encoder output missing expected dimensions line." + [Environment]::NewLine + $capture)
+	if ($ok.Capture -notmatch "dimensions:") {
+		throw ("FAIL: encoder output missing expected dimensions line." + [Environment]::NewLine + $ok.Capture)
 	}
+	Write-Host "OK: full-path invocation works with plug-in path containing space and (2)."
 
-	Write-Host 'OK: cmd /c quoting works with plug-in path containing space and (1).'
+	# Legacy v2.0.1 pattern: cmd /c cd /d ... && relative exe (should fail without encoder output).
+	$legacyCapturePath = Join-Path $workDir "uhdr_run_legacy_capture.txt"
+	$legacyInner = "uhdr_repack.exe " + $argsTail + " > " + (Invoke-LuaShellQuote $legacyCapturePath) + " 2>&1"
+	$legacyWrapped = 'cd /d ' + (Invoke-LuaShellQuote $pluginBin) + ' && ' + $legacyInner
+	$legacyCmd = 'cmd /c ' + $legacyWrapped
+	Write-Host '==> Legacy pattern (cd + relative exe + nested cmd /c): expect failure'
+	$legacy = Invoke-CmdCapture -CommandLine $legacyCmd -CapturePath $legacyCapturePath
+	if ($legacy.Capture) { Write-Host $legacy.Capture }
+
+	$legacyBroken = ($legacy.ExitCode -ne 0) -or ($legacy.Capture -match "internal or external command")
+	if (-not $legacyBroken) {
+		throw "FAIL: legacy cd/relative/cmd pattern unexpectedly succeeded; regression guard is stale."
+	}
+	Write-Host "OK: legacy cd/relative/cmd pattern fails as expected (documents why plug-in avoids it)."
 }
 finally {
 	if (Test-Path -LiteralPath $stagingRoot) {

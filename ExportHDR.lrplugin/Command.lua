@@ -64,7 +64,7 @@ function CMD.bundledBinaryPath()
 	return p
 end
 
---- Encoder token for shell lines (relative on Windows after cd to bin; absolute on macOS).
+--- Encoder token for shell lines (relative name on Windows for logs; resolved in runShell).
 function CMD.shellBinary(binary)
 	if CMD.isWindows() then
 		return CMD.binaryFileName()
@@ -217,6 +217,18 @@ function CMD.pluginBinDir()
 	return LrPathUtils.parent(CMD.bundledBinaryPath())
 end
 
+--- Replace leading uhdr_repack.exe with quoted absolute path (Windows LrTasks.execute).
+function CMD.resolveWindowsCommand(line)
+	if not line or line == "" then
+		return line
+	end
+	local binName = CMD.binaryFileName()
+	if string.sub(line, 1, #binName) == binName then
+		return CMD.shellQuote(CMD.bundledBinaryPath()) .. string.sub(line, #binName + 1)
+	end
+	return line
+end
+
 local function appendCaptureToLog(logPath, capturePath)
 	if not logPath or logPath == "" or not capturePath then
 		return
@@ -249,19 +261,16 @@ end
 --- Run via shell; returns exit status (number). Optional logPath appends stdout/stderr.
 function CMD.runShell(line, logPath)
 	if CMD.isWindows() then
-		local binDir = CMD.pluginBinDir()
 		local tempRoot = LrPathUtils.getStandardFilePath("temp") or "."
 		local capturePath = LrPathUtils.child(
 			tempRoot,
 			"uhdr_run_" .. tostring(os.time()) .. "_" .. tostring(math.random(100000, 999999)) .. ".txt"
 		)
-		local inner = line
+		local inner = CMD.resolveWindowsCommand(line)
 		if logPath and logPath ~= "" then
 			inner = inner .. " > " .. CMD.shellQuote(capturePath) .. " 2>&1"
 		end
-		local wrapped = "cd /d " .. CMD.shellQuote(binDir) .. " && " .. inner
-		local cmdLine = "cmd /c " .. wrapped
-		local st = LrTasks.execute(cmdLine)
+		local st = LrTasks.execute(inner)
 		if logPath and logPath ~= "" then
 			appendCaptureToLog(logPath, capturePath)
 		end
