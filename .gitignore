@@ -7,6 +7,15 @@ ExportHDR.lrplugin/bin/uhdr_repack.exe
 ExportHDR.lrplugin/bin/*.dylib
 ExportHDR.lrplugin/bin/*.dll
 
+# Packaged release archives (scripts/build_plugin.* package)
+ExportHDR.lrplugin-*.zip
+
+# Manual unzip / local staging of release archives
+ExportHDR.lrplugin-macos-arm64/
+ExportHDR.lrplugin-windows-x64/
+
+# Local CI release dry-run downloads
+release-assets/
 
 # macOS / editor
 .DS_Store

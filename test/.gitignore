@@ -1,1 +1,2 @@
-/out_*.jpg
+# Smoke-test outputs (test/out_uhdr.jpg is kept tracked as reference)
+out_*.jpg
