@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r11
+
+### Fixed
+
+- Windows CI configure failure (`nmake` not found / `CMAKE_CXX_COMPILER` unset): bundle script selects a Visual Studio CMake generator instead of defaulting to NMake Makefiles outside a dev shell.
+
 ## v1.0.0-r10
 
 ### Fixed

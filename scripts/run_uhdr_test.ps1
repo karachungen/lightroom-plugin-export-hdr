@@ -25,9 +25,10 @@ foreach ($candidate in $BinCandidates) {
 if (-not $Bin) {
 	Write-Error @"
 uhdr_repack.exe not found. Build with:
-  cmake -S tools/uhdr_repack -B tools/uhdr_repack/build -DCMAKE_BUILD_TYPE=Release
+  .\scripts\bundle_uhdr_for_plugin_windows.ps1
+or manually (Visual Studio generator, not NMake):
+  cmake -S tools/uhdr_repack -B tools/uhdr_repack/build -G "Visual Studio 17 2022" -A x64
   cmake --build tools/uhdr_repack/build --config Release
-or: .\scripts\bundle_uhdr_for_plugin_windows.ps1
 "@
 }
 

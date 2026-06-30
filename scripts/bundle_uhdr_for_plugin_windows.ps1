@@ -17,9 +17,38 @@ if ($env:UHDR_ROOT) {
 	$CmakeExtra += "-DUHDR_ROOT=$($env:UHDR_ROOT)"
 }
 
+function Invoke-CmakeConfigure {
+	param(
+		[string]$SourceDir,
+		[string]$BuildDir,
+		[string[]]$ExtraArgs
+	)
+
+	# Plain `cmake -S -B` on Windows picks NMake without a VS dev shell; use a VS generator.
+	$generatorCandidates = @(
+		@{ G = "Visual Studio 18 2025"; A = "x64" },
+		@{ G = "Visual Studio 17 2022"; A = "x64" },
+		@{ G = "Visual Studio 16 2019"; A = "x64" }
+	)
+
+	foreach ($candidate in $generatorCandidates) {
+		if (Test-Path -LiteralPath $BuildDir) {
+			Remove-Item -LiteralPath $BuildDir -Recurse -Force
+		}
+		Write-Host "    trying generator $($candidate.G) -A $($candidate.A)"
+		& cmake -S $SourceDir -B $BuildDir -G $candidate.G -A $candidate.A @ExtraArgs
+		if ($LASTEXITCODE -eq 0) {
+			return $true
+		}
+	}
+
+	return $false
+}
+
 Write-Host "==> Configuring CMake (Release, Windows x64)"
-& cmake -S $UhdrSrc -B $BuildDir -DCMAKE_BUILD_TYPE=Release @CmakeExtra
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if (-not (Invoke-CmakeConfigure -SourceDir $UhdrSrc -BuildDir $BuildDir -ExtraArgs $CmakeExtra)) {
+	Write-Error "CMake configure failed. Install Visual Studio 2022+ with the C++ workload (x64)."
+}
 
 Write-Host "==> Building uhdr_repack"
 & cmake --build $BuildDir --config Release
