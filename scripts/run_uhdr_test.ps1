@@ -85,7 +85,7 @@ try {
 	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 	Assert-InspectOk $SliceOut
 
-	$slices1x1 = Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_1x1_*.jpg" -File
+	$slices1x1 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_1x1_*.jpg" -File)
 	if ($slices1x1.Count -lt 1) {
 		throw "FAIL: expected at least one 1x1 slice next to $SliceOut"
 	}
@@ -99,7 +99,7 @@ try {
 	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 	Assert-InspectOk $SliceOut
 
-	$slices4x5 = Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_4x5_*.jpg" -File
+	$slices4x5 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_4x5_*.jpg" -File)
 	if ($slices4x5.Count -lt 1) {
 		throw "FAIL: expected at least one 4x5 slice next to $SliceOut"
 	}

@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r19
+
+### Fixed
+
+- Windows smoke test slice glob: wrap `Get-ChildItem` in `@()` so `.Count` works when exactly one slice file is returned.
+
 ## v1.0.0-r18
 
 ### Fixed
