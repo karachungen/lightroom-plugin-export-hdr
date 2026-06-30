@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r15
+
+### Fixed
+
+- Windows bundle script exit code: explicitly `exit 0` after success so pwsh does not propagate the usage smoke test's exit code 1.
+
 ## v1.0.0-r14
 
 ### Fixed

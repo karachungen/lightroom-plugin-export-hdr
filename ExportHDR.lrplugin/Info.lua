@@ -8,7 +8,7 @@ return {
 	LrSdkMinimumVersion = 14.0,
 	LrToolkitIdentifier = "com.karachungen.lightroom.export.ultrahdr",
 	LrPluginName = "Ultra HDR Export",
-	VERSION = { major = 1, minor = 0, revision = 0, build = 14 },
+	VERSION = { major = 1, minor = 0, revision = 0, build = 15 },
 
 	LrExportFilterProvider = {
 		{

@@ -138,3 +138,4 @@ Write-Host "==> Done. Bundled encoder: $PluginExe"
 if ($CopiedDlls.Count -gt 0) {
 	Write-Host "    DLLs: $($CopiedDlls.Keys -join ', ')"
 }
+exit 0
