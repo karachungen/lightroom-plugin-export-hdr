@@ -12,9 +12,9 @@ namespace wic {
 
 namespace {
 
-HRESULT hr_or_error(HRESULT hr, std::string* error, const char* msg) {
+HRESULT hr_or_error(HRESULT hr, std::string* error, const std::string& msg) {
   if (FAILED(hr) && error) {
-    *error = std::string(msg) + " (HRESULT=" + std::to_string(static_cast<unsigned long>(hr)) + ")";
+    *error = msg + " (HRESULT=" + std::to_string(static_cast<unsigned long>(hr)) + ")";
   }
   return hr;
 }
@@ -283,6 +283,13 @@ bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
   Microsoft::WRL::ComPtr<IWICBitmapSource> rgba_source;
   if (!convert_frame_to_format(factory.Get(), frame.Get(), GUID_WICPixelFormat32bppRGBA,
                                rgba_source, error)) {
+    return false;
+  }
+
+  Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+  hr = factory->CreateBitmapScaler(&scaler);
+  if (FAILED(hr)) {
+    hr_or_error(hr, error, "WIC CreateBitmapScaler failed");
     return false;
   }
 

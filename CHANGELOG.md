@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r13
+
+### Fixed
+
+- Windows MSVC build of `wic_utils.cpp`: accept `std::string` error messages and create `IWICBitmapScaler` before scale/crop.
+
 ## v1.0.0-r12
 
 ### Fixed
