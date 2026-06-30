@@ -43,7 +43,7 @@ if [[ -z "$major" || -z "$minor" || -z "$revision" || -z "$build" ]]; then
 fi
 
 semver="${major}.${minor}.${revision}"
-tag="v${semver}-r${build}"
+tag="v${semver}"
 
 emit() {
 	local key="$1"

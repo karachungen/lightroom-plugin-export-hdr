@@ -236,10 +236,27 @@ local function shellExitStatus(st)
 	return math.floor(st / 256)
 end
 
-local function uhdrFailureHint(sx, rawSt)
+local function uhdrFailureHint(sx, rawSt, logPath)
 	if CMD.isWindows() then
 		if sx == 1 then
-			return "\n\nEncoder exited with code 1 (usage or shell error). Check the log above for uhdr_repack output — if the log has no encoder lines after Command:, the command line may have been mangled (common with non-ASCII paths before staging). Update to the latest plug-in build."
+			local logTail = ""
+			if logPath and logPath ~= "" then
+				local f = io.open(logPath, "rb")
+				if f then
+					logTail = f:read("*a") or ""
+					f:close()
+				end
+			end
+			local shellNotFound = string.find(logTail, "internal or external command", 1, true)
+				or string.find(logTail, "внутренней или внешней", 1, true)
+				or string.find(logTail, "не является", 1, true)
+			local noEncoderOutput = string.find(logTail, "Command:", 1, true)
+				and not string.find(logTail, "dimensions:", 1, true)
+				and not string.find(logTail, "Wrote ", 1, true)
+			if shellNotFound or noEncoderOutput then
+				return "\n\nThe encoder likely never ran (Windows cmd.exe mangled the command). Common causes: plug-in installed under a folder with spaces or parentheses (e.g. Downloads\\… (1)), or non-ASCII characters in paths passed through cmd. This build stages HDR/SDR/output through ASCII temp paths and uses a relative uhdr_repack.exe — update the plug-in if you still see this."
+			end
+			return "\n\nEncoder exited with code 1 (usage or shell error). Check the log above for uhdr_repack output."
 		end
 		if sx == 3 or sx == 4 then
 			return "\n\nCould not read HDR TIFF or SDR base. Check the log for WIC or file errors (paths with non-ASCII characters such as Cyrillic are supported when the encoder receives them correctly)."
@@ -697,7 +714,7 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 
 		local outPath = basePath
 
-		-- ASCII-only staging paths for cmd.exe (avoids Cyrillic mangling in LrTasks.execute).
+		-- ASCII-only staging paths for cmd.exe (avoids Cyrillic / special-char mangling in LrTasks.execute).
 		local encodeHdrPath = LrPathUtils.child(tempDir, "uhdr_hdr_encode.tif")
 		local hdrCopyOk = pcall(function()
 			LrFileUtils.copy(hdrPath, encodeHdrPath)
@@ -719,6 +736,10 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 		Log.append(logPath, "Encode staging SDR: " .. tostring(encodeBasePath) .. "\n")
 
+		local encodeOutPath = LrPathUtils.child(tempDir, "uhdr_out_encode.jpg")
+		Log.append(logPath, "Encode staging OUT: " .. tostring(encodeOutPath) .. "\n")
+		Log.append(logPath, "Final OUT: " .. tostring(outPath) .. "\n")
+
 		if UHDR.sliceAspectEnabled(propertyTable) then
 			Log.append(
 				logPath,
@@ -732,7 +753,7 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			binary = binary,
 			hdrTiff = encodeHdrPath,
 			basePath = encodeBasePath,
-			outPath = outPath,
+			outPath = encodeOutPath,
 			props = propertyTable,
 		})
 
@@ -740,7 +761,7 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		local st = CMD.runShell(cmdLine, logPath)
 		if st ~= 0 then
 			local sx = shellExitStatus(st)
-			local hint = uhdrFailureHint(sx, st)
+			local hint = uhdrFailureHint(sx, st, logPath)
 			Log.append(
 				logPath,
 				"uhdr_repack exit status: raw=" .. tostring(st) .. " exit≈" .. tostring(sx) .. "\n"
@@ -758,6 +779,41 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 					.. tostring(logPath)
 					.. hint
 			)
+		end
+
+		if not LrFileUtils.exists(encodeOutPath) then
+			safeDeleteTree(tempDir)
+			error("Ultra HDR: encoder did not write staged output: " .. tostring(encodeOutPath))
+		end
+
+		local outCopyOk = pcall(function()
+			LrFileUtils.copy(encodeOutPath, outPath)
+		end)
+		if not outCopyOk or not LrFileUtils.exists(outPath) then
+			safeDeleteTree(tempDir)
+			error("Ultra HDR: could not copy encoded JPEG to export path: " .. tostring(outPath))
+		end
+		Log.append(logPath, "Copied staged output to: " .. tostring(outPath) .. "\n")
+
+		if UHDR.sliceAspectEnabled(propertyTable) then
+			local aspect = propertyTable[UHDR.KEY.sliceAspect]
+			local stagedSlices = CMD.listSliceOutputs(encodeOutPath, aspect)
+			Log.append(logPath, "Promoting " .. tostring(#stagedSlices) .. " slice file(s) to export folder\n")
+			for _, stagedSlice in ipairs(stagedSlices) do
+				local finalSlice = CMD.promoteStagedSlicePath(stagedSlice, encodeOutPath, outPath)
+				if not finalSlice then
+					safeDeleteTree(tempDir)
+					error("Ultra HDR: could not map staged slice path: " .. tostring(stagedSlice))
+				end
+				local sliceCopyOk = pcall(function()
+					LrFileUtils.copy(stagedSlice, finalSlice)
+				end)
+				if not sliceCopyOk or not LrFileUtils.exists(finalSlice) then
+					safeDeleteTree(tempDir)
+					error("Ultra HDR: could not copy slice to: " .. tostring(finalSlice))
+				end
+				Log.append(logPath, "Copied slice to: " .. tostring(finalSlice) .. "\n")
+			end
 		end
 
 		if propertyTable[UHDR.KEY.runInspect] then

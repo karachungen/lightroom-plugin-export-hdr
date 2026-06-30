@@ -61,13 +61,8 @@ if [[ -z "$major" || -z "$minor" || -z "$revision" || -z "$build" ]]; then
   exit 1
 fi
 
-if [[ "$build" -eq 0 && "$dry_run" -eq 0 && -z "$override_tag" ]]; then
-  echo "VERSION.build must be > 0 before publishing a release (currently 0 in Info.lua)." >&2
-  exit 1
-fi
-
 semver="${major}.${minor}.${revision}"
-tag="${override_tag:-v${semver}-r${build}}"
+tag="${override_tag:-v${semver}}"
 
 if [[ "$dry_run" -eq 0 && -z "$override_tag" ]] && git -C "$repo_root" rev-parse "$tag" >/dev/null 2>&1; then
   echo "Tag already exists: $tag" >&2
@@ -89,7 +84,7 @@ if [[ -z "${changelog_section//[[:space:]]/}" ]]; then
 fi
 
 if [[ "$check_only" -eq 1 ]]; then
-  echo "OK: version ${semver} build ${build}, tag ${tag}, changelog section present"
+  echo "OK: version ${semver}, tag ${tag}, changelog section present"
   exit 0
 fi
 

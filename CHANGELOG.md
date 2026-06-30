@@ -3,11 +3,17 @@
 All notable changes to **Ultra HDR Export** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` semver fields and `N` from `VERSION.build`.
+Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `major` / `minor` / `revision`. Older releases used a `-rN` build suffix (see historical sections below).
 
 ## Unreleased
 
-## v2.0.0-r20
+## v2.0.1
+
+### Fixed
+
+- Windows export filter: fix nested `cmd /c` quoting so `uhdr_repack.exe` runs when the plug-in lives under paths with spaces or parentheses (e.g. `Downloads\… (1)`); stage `--out` through ASCII temp before copying to the final export path (including numbered slices).
+
+## v2.0.0
 
 ### Added
 

@@ -64,11 +64,19 @@ function CMD.bundledBinaryPath()
 	return p
 end
 
+--- Encoder token for shell lines (relative on Windows after cd to bin; absolute on macOS).
+function CMD.shellBinary(binary)
+	if CMD.isWindows() then
+		return CMD.binaryFileName()
+	end
+	return binary or CMD.bundledBinaryPath()
+end
+
 --- Build main encode command string (returns full line for LrTasks.execute).
 function CMD.buildEncodeCommand(o)
 	local K = UHDR.KEY
 	local parts = {
-		CMD.shellQuote(o.binary),
+		CMD.shellBinary(o.binary),
 		"--hdr-tiff",
 		CMD.shellQuote(o.hdrTiff),
 		"--base",
@@ -184,10 +192,25 @@ end
 
 function CMD.buildInspectCommand(binary, jpegPath)
 	return table.concat({
-		CMD.shellQuote(binary),
+		CMD.shellBinary(binary),
 		"--inspect",
 		CMD.shellQuote(jpegPath),
 	}, " ")
+end
+
+--- Map a staged slice path (next to stagedOutPath) to the final export folder/name.
+function CMD.promoteStagedSlicePath(stagedSlicePath, stagedOutPath, finalOutPath)
+	local stagedLeaf = LrPathUtils.leafName(stagedOutPath) or ""
+	local stagedNoExt = LrPathUtils.removeExtension(stagedLeaf) or stagedLeaf
+	local sliceLeaf = LrPathUtils.leafName(stagedSlicePath) or ""
+	if string.sub(sliceLeaf, 1, #stagedNoExt) ~= stagedNoExt then
+		return nil
+	end
+	local suffix = string.sub(sliceLeaf, #stagedNoExt + 1)
+	local finalLeaf = LrPathUtils.leafName(finalOutPath) or ""
+	local finalNoExt = LrPathUtils.removeExtension(finalLeaf) or finalLeaf
+	local finalFolder = LrPathUtils.parent(finalOutPath) or "."
+	return LrPathUtils.child(finalFolder, finalNoExt .. suffix)
 end
 
 function CMD.pluginBinDir()
@@ -237,7 +260,7 @@ function CMD.runShell(line, logPath)
 			inner = inner .. " > " .. CMD.shellQuote(capturePath) .. " 2>&1"
 		end
 		local wrapped = "cd /d " .. CMD.shellQuote(binDir) .. " && " .. inner
-		local cmdLine = "cmd /c " .. CMD.shellQuote(wrapped)
+		local cmdLine = "cmd /c " .. wrapped
 		local st = LrTasks.execute(cmdLine)
 		if logPath and logPath ~= "" then
 			appendCaptureToLog(logPath, capturePath)

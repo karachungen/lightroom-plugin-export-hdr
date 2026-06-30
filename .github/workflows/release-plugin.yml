@@ -90,9 +90,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (build ${{ github.run_number }})
+          name: Ultra HDR Export v${{ steps.ver.outputs.semver }}
           body: |
-            ## 🎉 Ultra HDR Export v2.0.0
+            ## 🎉 Ultra HDR Export v${{ steps.ver.outputs.semver }}
 
             ### ✨ Highlights
             - 🪟 **Windows x64** — full plug-in + `uhdr_repack.exe` (WIC loader, colocated DLLs)

@@ -1,21 +1,21 @@
 # Releasing Ultra HDR Export
 
-Public builds are tagged `vX.Y.Z-rN` and published as GitHub Releases with a zip of `ExportHDR.lrplugin`.
+Public releases are tagged `vX.Y.Z` and published as GitHub Releases with platform-specific zip archives.
 
 ## Version source of truth
 
 [`ExportHDR.lrplugin/Info.lua`](ExportHDR.lrplugin/Info.lua):
 
 ```lua
-VERSION = { major = 1, minor = 0, revision = 0, build = 8 }
+VERSION = { major = 2, minor = 0, revision = 0, build = 0 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `major` / `minor` / `revision` | User-facing semver shown in release titles and Lightroom Plug-in Manager |
-| `build` | Monotonic build number used in the Git tag suffix (`-r8`) |
+| `major` / `minor` / `revision` | Semver shown in release titles, Git tags, and Lightroom Plug-in Manager |
+| `build` | Keep at `0` (Lightroom SDK 4-field `VERSION` table; not used for tagging) |
 
-The GitHub Actions workflow run number is metadata only. It is **not** the public build id.
+Git tags use **pure semver**: `v` + `major.minor.revision` (e.g. `v2.0.0`).
 
 ## Changelog
 
@@ -26,12 +26,14 @@ Before each release:
 1. Move notes from `## Unreleased` into a new exact section header:
 
    ```markdown
-   ## v1.0.0-r8
+   ## v2.0.1
    ```
 
-2. Use the same tag string the workflow will publish (`v` + semver + `-r` + `VERSION.build`).
+2. Use the same tag string the workflow will publish (`v` + semver from `Info.lua`).
 
 3. Leave `## Unreleased` in place for the next cycle (it can be empty).
+
+Older changelog sections may use the legacy `v1.0.0-rN` format; keep them as historical archive.
 
 CI fails if the matching changelog section is missing.
 
@@ -39,11 +41,11 @@ CI fails if the matching changelog section is missing.
 
 1. Land user-facing changes on `master` / `main`.
 2. Bump `VERSION` in `Info.lua`:
-   - Increment `build` for every published build.
-   - Bump `revision` (or `minor` / `major`) when behavior warrants a new semver.
-3. Add the matching `## vX.Y.Z-rN` section to `CHANGELOG.md`.
+   - Increment `revision` for patch releases.
+   - Bump `minor` or `major` when behavior warrants it.
+   - Keep `build = 0`.
+3. Add the matching `## vX.Y.Z` section to `CHANGELOG.md`.
 4. Push. When relevant paths change, [`.github/workflows/release-plugin.yml`](.github/workflows/release-plugin.yml) will:
-   - validate `build > 0`
    - ensure the tag does not already exist
    - extract the changelog section
    - build the plugin zip
@@ -60,10 +62,10 @@ chmod +x ./scripts/build_release_notes.sh
 ./scripts/build_release_notes.sh --check-only
 
 # Dry-run release notes for an existing historical tag
-./scripts/build_release_notes.sh --check-only --tag v1.0.0-r7
+./scripts/build_release_notes.sh --check-only --tag v2.0.0
 
 # Dry-run release notes for an existing historical tag
-./scripts/build_release_notes.sh --dry-run --tag v1.0.0-r7 --commit "$(git rev-parse HEAD)" --run-id local
+./scripts/build_release_notes.sh --dry-run --tag v2.0.0 --commit "$(git rev-parse HEAD)" --run-id local
 cat RELEASE_NOTES.md
 ```
 
