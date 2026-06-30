@@ -46,19 +46,19 @@ function Assert-InspectOk {
 	$inspect = (& $Bin --inspect $Path | Out-String)
 	$inspect | Write-Output
 
-	$dims = ($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches
-	$gm = ($inspect | Select-String -Pattern '^gainmap_size: (\d+)x(\d+)$' -AllMatches).Matches
-	$xmpLine = ($inspect | Select-String -Pattern '^markers:').Line
+	$dimMatch = [regex]::Match($inspect, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+	$gmMatch = [regex]::Match($inspect, '(?m)^gainmap_size: (\d+)x(\d+)\s*$')
+	$xmpMatch = [regex]::Match($inspect, '(?m)^markers: (.+)\s*$')
 
-	if (-not $dims -or -not $gm) {
+	if (-not $dimMatch.Success -or -not $gmMatch.Success) {
 		throw "inspect: could not parse dimensions / gainmap_size for $Path"
 	}
-	$dimText = $dims[0].Groups[1].Value + "x" + $dims[0].Groups[2].Value
-	$gmText = $gm[0].Groups[1].Value + "x" + $gm[0].Groups[2].Value
+	$dimText = "$($dimMatch.Groups[1].Value)x$($dimMatch.Groups[2].Value)"
+	$gmText = "$($gmMatch.Groups[1].Value)x$($gmMatch.Groups[2].Value)"
 	if ($dimText -ne $gmText) {
 		throw "FAIL: gainmap_size ($gmText) != dimensions ($dimText) for $Path"
 	}
-	if ($xmpLine -notmatch 'primary_xmp=(yes|1)') {
+	if ($xmpMatch.Success -and $xmpMatch.Groups[1].Value -notmatch 'primary_xmp=(yes|1)') {
 		throw "FAIL: expected primary_xmp=yes or primary_xmp=1 for $Path"
 	}
 	if ($inspect -notmatch '(?m)^is_ultra_hdr: yes\s*$') {
@@ -107,8 +107,9 @@ try {
 		Write-Host "==> inspect slice $($p.FullName)"
 		Assert-InspectOk $p.FullName
 		$inspect = (& $Bin --inspect $p.FullName | Out-String)
-		$localH = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches[0].Groups[2].Value)
-		$localW = [int](($inspect | Select-String -Pattern '^dimensions: (\d+)x(\d+)$' -AllMatches).Matches[0].Groups[1].Value)
+		$dimMatch = [regex]::Match($inspect, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+		$localH = [int]$dimMatch.Groups[2].Value
+		$localW = [int]$dimMatch.Groups[1].Value
 		$expectedW = [math]::Floor(($localH * 4 / 5) / 2) * 2
 		if ($localW -ne $expectedW) {
 			throw "FAIL: 4x5 slice width $localW != expected even floor(H*4/5)=$expectedW"
