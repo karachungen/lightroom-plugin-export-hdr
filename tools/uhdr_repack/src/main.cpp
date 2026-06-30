@@ -10,6 +10,10 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <objbase.h>
+#endif
+
 namespace {
 
 void PrintUsage() {
@@ -62,7 +66,30 @@ bool EncodePair(const uhdr_repack::RawImageHolder& hdr, const uhdr_repack::RawIm
 
 }  // namespace
 
+#ifdef _WIN32
+namespace {
+
+struct ComInit {
+  HRESULT hr;
+  ComInit() : hr(CoInitializeEx(nullptr, COINIT_MULTITHREADED)) {}
+  ~ComInit() {
+    if (SUCCEEDED(hr)) {
+      CoUninitialize();
+    }
+  }
+};
+
+}  // namespace
+#endif
+
 int main(int argc, char** argv) {
+#ifdef _WIN32
+  ComInit com;
+  if (FAILED(com.hr)) {
+    std::cerr << "CoInitializeEx failed\n";
+    return 1;
+  }
+#endif
   if (argc < 2) {
     PrintUsage();
     return 1;

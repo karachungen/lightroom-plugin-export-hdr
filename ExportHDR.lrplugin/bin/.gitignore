@@ -1,3 +1,5 @@
-# Built artifacts — populate via scripts/bundle_uhdr_for_plugin.sh (see bin/README.txt).
+# Built artifacts — populate via platform bundle scripts (see bin/README.txt).
 uhdr_repack
+uhdr_repack.exe
 *.dylib
+*.dll

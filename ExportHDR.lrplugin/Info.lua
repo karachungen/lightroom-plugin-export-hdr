@@ -1,5 +1,5 @@
 --[[----------------------------------------------------------------------------
-  Ultra HDR Export — Lightroom Classic export filter (macOS 26 (Tahoe), ARM64 + uhdr_repack CLI).
+  Ultra HDR Export — Lightroom Classic export filter (macOS + Windows + uhdr_repack CLI).
   https://github.com/karachungen/lightroom-plugin-export-hdr
 ----------------------------------------------------------------------------]]
 
@@ -8,7 +8,7 @@ return {
 	LrSdkMinimumVersion = 14.0,
 	LrToolkitIdentifier = "com.karachungen.lightroom.export.ultrahdr",
 	LrPluginName = "Ultra HDR Export",
-	VERSION = { major = 1, minor = 0, revision = 0, build = 0 },
+	VERSION = { major = 1, minor = 0, revision = 0, build = 8 },
 
 	LrExportFilterProvider = {
 		{

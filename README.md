@@ -1,11 +1,11 @@
 # lightroom-plugin-export-hdr
 
-Lightroom Classic **export filter** (**Requires macOS 26 (Tahoe), ARM64**) plus `**uhdr_repack`**: one Ultra HDR (gain-map) **JPEG** from your normal export and an internal HDR TIFF, using [google/libultrahdr](https://github.com/google/libultrahdr).
+Lightroom Classic **export filter** for **macOS 26 (Tahoe), ARM64** and **Windows x64**, plus **`uhdr_repack`**: one Ultra HDR (gain-map) **JPEG** from your normal export and an internal HDR TIFF, using [google/libultrahdr](https://github.com/google/libultrahdr).
 
 ## What it does
 
 - Keeps **Image Sizing** and most export options for the main pass (SDR base, often JPEG).
-- Runs a **second internal export** → temporary **HDR TIFF**, then `**ExportHDR.lrplugin/bin/uhdr_repack`** merges into one `**.jpg`** (Ultra HDR).
+- Runs a **second internal export** → temporary **HDR TIFF**, then **`ExportHDR.lrplugin/bin/uhdr_repack`** (or **`uhdr_repack.exe`** on Windows) merges into one **`.jpg`** (Ultra HDR).
 - Optional **Slicing** (`1:1` or `4:5`) keeps the full exported height, preserves the original Ultra HDR file, and writes numbered Ultra HDR slice JPEGs next to it (each with its own gain map).
 - **Lightroom Classic 14+** — `[Info.lua](ExportHDR.lrplugin/Info.lua)` (`LrSdkMinimumVersion = 14.0`). Export filter: **Encode Ultra HDR JPEG (uhdr_repack)** (under plug-in **Ultra HDR Export**).
 
@@ -43,7 +43,12 @@ flowchart TD
 
 ## How to use
 
-1. **Bundle** — Repo root: `./scripts/bundle_uhdr_for_plugin.sh` → `**ExportHDR.lrplugin/bin/uhdr_repack`** + `**.dylib`** (gitignored). Optional: `brew install dylibbundler`. Pre-built zips (**macOS 26 (Tahoe), ARM64**, same bundle) ship from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases) when CI runs on relevant changes. Per-build changes are listed in [CHANGELOG.md](CHANGELOG.md).
+1. **Bundle** — Build the encoder for your OS (binaries are gitignored):
+   - **macOS:** `./scripts/bundle_uhdr_for_plugin.sh` → `ExportHDR.lrplugin/bin/uhdr_repack` + `.dylib`
+   - **Windows:** `.\scripts\bundle_uhdr_for_plugin_windows.ps1` → `ExportHDR.lrplugin\bin\uhdr_repack.exe` + `.dll`
+   - Pre-built zips ship separately from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases):
+     - `ExportHDR.lrplugin-macos-arm64.zip`
+     - `ExportHDR.lrplugin-windows-x64.zip`
 2. **Install** — **File → Plug-in Manager → Add** → `[ExportHDR.lrplugin](ExportHDR.lrplugin)`
 3. **Export** — Set **Destination** and **Image Sizing** as usual, then wire up the filter:
   - In the Export dialog, open **Post-Process Actions** (wording may vary slightly by Lightroom version; same area as post-processing / export filters).
@@ -55,13 +60,19 @@ flowchart TD
 
 ## Build locally
 
-**Plug-in** — from repo root:
+**Plug-in (macOS)** — from repo root:
 
 ```bash
 ./scripts/bundle_uhdr_for_plugin.sh
 ```
 
-CMake **FetchContent** → `**tools/uhdr_repack/build/_deps/`** · **libjpeg** via `**FindJPEG`** (e.g. Homebrew **jpeg-turbo**) · optional `UHDR_USE_SYSTEM=1`, `UHDR_ROOT=...` · ship: **codesign** `**bin/uhdr_repack`** and `**bin/*.dylib`**
+**Plug-in (Windows x64)** — from repo root in PowerShell:
+
+```powershell
+.\scripts\bundle_uhdr_for_plugin_windows.ps1
+```
+
+CMake **FetchContent** → `tools/uhdr_repack/build/_deps/` · **libjpeg** via **FindJPEG** (e.g. Homebrew **jpeg-turbo** on macOS) · optional `UHDR_USE_SYSTEM=1`, `UHDR_ROOT=...` · macOS ships **codesign** for `bin/uhdr_repack` and `bin/*.dylib`
 
 **Encoder** — from `tools/uhdr_repack`:
 
@@ -71,4 +82,6 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-→ `**build/uhdr_repack**` · flags & `**--inspect**`: [tools/uhdr_repack/README.md](tools/uhdr_repack/README.md)
+On Windows with MSVC, add `--config Release` to the build step.
+
+→ `build/uhdr_repack` (macOS) or `build/Release/uhdr_repack.exe` (Windows) · flags & `--inspect`: [tools/uhdr_repack/README.md](tools/uhdr_repack/README.md)

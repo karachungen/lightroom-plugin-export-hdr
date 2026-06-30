@@ -51,7 +51,7 @@ fi
 mkdir -p "$PLUGIN_BIN"
 echo "==> Cleaning old bundle in $PLUGIN_BIN"
 # shellcheck disable=SC2015
-find "$PLUGIN_BIN" -maxdepth 1 -type f \( -name "uhdr_repack" -o -name "*.dylib" \) -exec rm -f {} + 2>/dev/null || true
+find "$PLUGIN_BIN" -maxdepth 1 -type f \( -name "uhdr_repack" -o -name "uhdr_repack.exe" -o -name "*.dylib" -o -name "*.dll" \) -exec rm -f {} + 2>/dev/null || true
 
 cp "$BUILD_EXE" "$PLUGIN_BIN/uhdr_repack"
 chmod +x "$PLUGIN_BIN/uhdr_repack"

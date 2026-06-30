@@ -1,5 +1,6 @@
 --[[----------------------------------------------------------------------------
   Shell command construction and execution helpers for uhdr_repack.
+  macOS: bin/uhdr_repack   Windows: bin/uhdr_repack.exe
 ----------------------------------------------------------------------------]]
 
 local LrFileUtils = import "LrFileUtils"
@@ -11,25 +12,45 @@ local UHDR = loadPluginModule("UHDRSettings")
 
 local CMD = {}
 
---- Escape a single argument for /bin/sh -c style quoting (macOS).
+--- True when running in Lightroom Classic on Windows.
+function CMD.isWindows()
+	if WIN_ENV == true then
+		return true
+	end
+	local sep = package.config:sub(1, 1)
+	return sep == "\\"
+end
+
+function CMD.binaryFileName()
+	if CMD.isWindows() then
+		return "uhdr_repack.exe"
+	end
+	return "uhdr_repack"
+end
+
+--- Escape a single argument for the host shell (POSIX sh or Windows cmd).
 function CMD.shellQuote(path)
 	if not path then
+		if CMD.isWindows() then
+			return '""'
+		end
 		return "''"
+	end
+	if CMD.isWindows() then
+		return '"' .. string.gsub(path, '"', '""') .. '"'
 	end
 	return "'" .. string.gsub(path, "'", "'\\''") .. "'"
 end
 
---[[
-  Bundled encoder (macOS 26 (Tahoe), ARM64); see scripts/bundle_uhdr_for_plugin.sh.
-]]
+--- Bundled encoder under ExportHDR.lrplugin/bin (platform-specific name).
 function CMD.defaultBinaryPath()
+	local name = CMD.binaryFileName()
 	if not _PLUGIN or not _PLUGIN.path then
-		return "bin/uhdr_repack"
+		return "bin/" .. name
 	end
-	return LrPathUtils.child(_PLUGIN.path, "bin/uhdr_repack")
+	return LrPathUtils.child(_PLUGIN.path, "bin/" .. name)
 end
 
---- Always use bundled `bin/uhdr_repack` under the plugin bundle.
 function CMD.bundledBinaryPath()
 	local p = CMD.defaultBinaryPath()
 	if LrPathUtils.normalize then
@@ -45,7 +66,6 @@ end
 
 --- Build main encode command string (returns full line for LrTasks.execute).
 function CMD.buildEncodeCommand(o)
-	-- o: { binary, hdrTiff, basePath, outPath, props from UHDRSettings keys }
 	local K = UHDR.KEY
 	local parts = {
 		CMD.shellQuote(o.binary),
@@ -79,6 +99,38 @@ function CMD.buildEncodeCommand(o)
 	return table.concat(parts, " ")
 end
 
+local function normalizeFolderPath(folder)
+	if not folder or folder == "" then
+		return "."
+	end
+	if LrPathUtils.normalize then
+		local ok, n = pcall(function()
+			return LrPathUtils.normalize(folder)
+		end)
+		if ok and n and n ~= "" then
+			return n
+		end
+	end
+	return folder
+end
+
+local function fileMatchesSlicePattern(filePath, folder, prefix, extLower)
+	if not filePath or filePath == "" then
+		return false
+	end
+	local parent = LrPathUtils.parent(filePath)
+	if normalizeFolderPath(parent) ~= normalizeFolderPath(folder) then
+		return false
+	end
+	local leaf = LrPathUtils.leafName(filePath) or ""
+	if string.sub(leaf, 1, #prefix) ~= prefix then
+		return false
+	end
+	local fileExt = string.lower(LrPathUtils.extension(filePath) or "")
+	fileExt = string.gsub(fileExt, "^%.", "")
+	return fileExt == extLower
+end
+
 --- List numbered Ultra HDR slice outputs next to baseOutPath (e.g. photo_1x1_01.jpg).
 function CMD.listSliceOutputs(baseOutPath, aspect)
 	local paths = {}
@@ -91,17 +143,44 @@ function CMD.listSliceOutputs(baseOutPath, aspect)
 	end
 	local leaf = LrPathUtils.leafName(baseOutPath)
 	local baseNoExt = LrPathUtils.removeExtension(leaf)
-	local ext = LrPathUtils.extension(baseOutPath) or "jpg"
-	local glob = LrPathUtils.child(folder, baseNoExt .. "_" .. aspect .. "_*." .. ext)
-	local handle = io.popen("/bin/ls -1 " .. CMD.shellQuote(glob) .. " 2>/dev/null")
-	if handle then
-		for line in handle:lines() do
-			if line and line ~= "" then
-				paths[#paths + 1] = line
+	local ext = string.lower(LrPathUtils.extension(baseOutPath) or "jpg")
+	ext = string.gsub(ext, "^%.", "")
+	local prefix = baseNoExt .. "_" .. aspect .. "_"
+
+	if LrFileUtils.recursiveFiles then
+		local ok, files = pcall(function()
+			return LrFileUtils.recursiveFiles(folder)
+		end)
+		if ok and files then
+			for _, filePath in ipairs(files) do
+				if fileMatchesSlicePattern(filePath, folder, prefix, ext) then
+					paths[#paths + 1] = filePath
+				end
 			end
 		end
-		handle:close()
+	else
+		local glob = LrPathUtils.child(folder, prefix .. "*." .. ext)
+		local cmd
+		if CMD.isWindows() then
+			cmd = 'cmd /c dir /b ' .. CMD.shellQuote(glob) .. " 2>nul"
+		else
+			cmd = "/bin/ls -1 " .. CMD.shellQuote(glob) .. " 2>/dev/null"
+		end
+		local handle = io.popen(cmd)
+		if handle then
+			for line in handle:lines() do
+				if line and line ~= "" then
+					local full = line
+					if not string.find(line, "[/\\]", 1) then
+						full = LrPathUtils.child(folder, line)
+					end
+					paths[#paths + 1] = full
+				end
+			end
+			handle:close()
+		end
 	end
+
 	table.sort(paths)
 	return paths
 end
@@ -117,14 +196,24 @@ end
 --- Run via shell; returns exit status (number). Optional logPath appends stdout/stderr.
 function CMD.runShell(line, logPath)
 	if logPath and logPath ~= "" then
-		local redir = " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
-		line = line .. redir
+		if CMD.isWindows() then
+			line = line .. " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
+		else
+			line = line .. " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
+		end
 	end
 	return LrTasks.execute(line)
 end
 
 function CMD.binaryExists(path)
 	return path and path ~= "" and LrFileUtils.exists(path)
+end
+
+function CMD.bundleInstructions()
+	if CMD.isWindows() then
+		return "Run scripts\\bundle_uhdr_for_plugin_windows.ps1 (Windows x64) to install bin\\uhdr_repack.exe inside the plug-in bundle."
+	end
+	return "Run scripts/bundle_uhdr_for_plugin.sh (macOS 26 (Tahoe), ARM64) to install bin/uhdr_repack inside the plug-in bundle."
 end
 
 return CMD

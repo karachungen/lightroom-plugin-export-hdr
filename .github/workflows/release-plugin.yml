@@ -1,4 +1,4 @@
-name: Release Lightroom plugin (macOS 26 Tahoe, ARM64)
+name: Release Lightroom plugin (macOS + Windows)
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - "ExportHDR.lrplugin/**"
       - "tools/uhdr_repack/**"
       - "scripts/bundle_uhdr_for_plugin.sh"
+      - "scripts/bundle_uhdr_for_plugin_windows.ps1"
   workflow_dispatch:
 
 concurrency:
@@ -17,13 +18,94 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: macos-26
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: macos-arm64
+            runner: macos-26
+            artifact: ExportHDR.lrplugin-macos-arm64.zip
+          - id: windows-x64
+            runner: windows-latest
+            artifact: ExportHDR.lrplugin-windows-x64.zip
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Parse version from Info.lua
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          line=$(grep 'VERSION = {' ExportHDR.lrplugin/Info.lua)
+          major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
+          minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
+          revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies (macOS)
+        if: matrix.id == 'macos-arm64'
+        run: brew install cmake jpeg-turbo dylibbundler
+
+      - name: Bundle uhdr_repack into plugin (macOS)
+        if: matrix.id == 'macos-arm64'
+        run: ./scripts/bundle_uhdr_for_plugin.sh
+
+      - name: Verify arm64 binary (macOS)
+        if: matrix.id == 'macos-arm64'
+        run: |
+          set -euo pipefail
+          file ExportHDR.lrplugin/bin/uhdr_repack
+          file ExportHDR.lrplugin/bin/uhdr_repack | grep -q arm64
+
+      - name: Bundle uhdr_repack into plugin (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: pwsh
+        run: ./scripts/bundle_uhdr_for_plugin_windows.ps1
+
+      - name: Verify x64 binary (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ExportHDR.lrplugin/bin/uhdr_repack.exe)) { throw "missing uhdr_repack.exe" }
+
+      - name: Create zip (macOS)
+        if: matrix.id == 'macos-arm64'
+        run: |
+          rm -f ExportHDR.lrplugin/bin/uhdr_repack.exe
+          rm -f ExportHDR.lrplugin/bin/*.dll
+          zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin \
+            -x "ExportHDR.lrplugin/bin/.gitignore" \
+            -x "ExportHDR.lrplugin/bin/README.txt"
+
+      - name: Create zip (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: pwsh
+        run: |
+          if (Test-Path ExportHDR.lrplugin/bin/uhdr_repack) { Remove-Item ExportHDR.lrplugin/bin/uhdr_repack -Force }
+          Get-ChildItem ExportHDR.lrplugin/bin -Filter *.dylib -ErrorAction SilentlyContinue | Remove-Item -Force
+          Compress-Archive -Path ExportHDR.lrplugin -DestinationPath ExportHDR.lrplugin-windows-x64.zip -Force
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Parse version from Info.lua
         id: ver
@@ -33,64 +115,37 @@ jobs:
           major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
           minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
           revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
-          build=$(echo "$line" | sed -E 's/.*build *= *([0-9]+).*/\1/')
-          if [[ -z "$major" || -z "$minor" || -z "$revision" || -z "$build" ]]; then
-            echo "Failed to parse VERSION from Info.lua" >&2
-            exit 1
-          fi
-          if [[ "$build" -eq 0 ]]; then
-            echo "VERSION.build must be > 0 before publishing a release." >&2
-            exit 1
-          fi
-          tag="v${major}.${minor}.${revision}-r${build}"
-          echo "major=$major" >> "$GITHUB_OUTPUT"
-          echo "minor=$minor" >> "$GITHUB_OUTPUT"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          echo "build=$build" >> "$GITHUB_OUTPUT"
+          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
 
-      - name: Validate tag and changelog
-        run: |
-          set -euo pipefail
-          if git rev-parse "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
-            echo "Tag already exists: ${{ steps.ver.outputs.tag }}" >&2
-            exit 1
-          fi
-          chmod +x ./scripts/build_release_notes.sh
-          ./scripts/build_release_notes.sh --check-only
-
-      - name: Install build dependencies
-        run: brew install cmake jpeg-turbo dylibbundler
-
-      - name: Bundle uhdr_repack into plugin
-        run: ./scripts/bundle_uhdr_for_plugin.sh
-
-      - name: Verify arm64 binary
-        run: |
-          set -euo pipefail
-          file ExportHDR.lrplugin/bin/uhdr_repack
-          file ExportHDR.lrplugin/bin/uhdr_repack | grep -q arm64
-
-      - name: Create zip
-        run: |
-          zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin \
-            -x "ExportHDR.lrplugin/bin/.gitignore" \
-            -x "ExportHDR.lrplugin/bin/README.txt"
-
-      - name: Build release notes
-        run: |
-          ./scripts/build_release_notes.sh \
-            --commit "${{ github.sha }}" \
-            --run-id "${{ github.run_id }}" \
-            --repository "${{ github.repository }}"
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (macOS 26 Tahoe, ARM64, build ${{ steps.ver.outputs.build }})
-          body_path: RELEASE_NOTES.md
-          files: ExportHDR.lrplugin-macos-arm64.zip
+          name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (build ${{ github.run_number }})
+          body: |
+            **Platforms:** separate plug-in archives per OS (no mixed binaries).
+
+            | Platform | Archive |
+            |----------|---------|
+            | macOS 26 (Tahoe), ARM64 | `ExportHDR.lrplugin-macos-arm64.zip` |
+            | Windows x64 | `ExportHDR.lrplugin-windows-x64.zip` |
+
+            **Lightroom:** Classic **14+** (`LrSdkMinimumVersion` in `Info.lua`).
+
+            **Install:** unzip the archive for your OS, then in Lightroom **File → Plug-in Manager → Add** and select the `ExportHDR.lrplugin` folder.
+
+            **Commit:** [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
+            **Workflow run:** [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          files: |
+            release-assets/ExportHDR.lrplugin-macos-arm64.zip
+            release-assets/ExportHDR.lrplugin-windows-x64.zip
           fail_on_unmatched_files: true
           generate_release_notes: false

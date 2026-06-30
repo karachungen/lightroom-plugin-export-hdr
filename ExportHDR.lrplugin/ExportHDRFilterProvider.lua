@@ -190,17 +190,47 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 	}
 end
 
---- macOS-only plug-in: recursive delete of temp HDR folder.
+--- Recursive delete of temp HDR folder (LrFileUtils, no shell rm).
 local function safeDeleteTree(dir)
 	if not dir or not LrFileUtils.exists(dir) then
 		return
 	end
-	LrTasks.execute("/bin/rm -rf " .. CMD.shellQuote(dir))
+	if LrFileUtils.recursiveFiles then
+		local ok, files = pcall(function()
+			return LrFileUtils.recursiveFiles(dir)
+		end)
+		if ok and files then
+			for _, filePath in ipairs(files) do
+				pcall(function()
+					LrFileUtils.delete(filePath)
+				end)
+			end
+		end
+	end
+	pcall(function()
+		LrFileUtils.delete(dir)
+	end)
 end
 
---- POSIX-style status from LrTasks.execute (e.g. exit 3 often appears as 3*256 = 768).
+local function taskSleep(seconds)
+	if LrTasks.sleep then
+		LrTasks.sleep(seconds)
+	elseif CMD.isWindows() then
+		LrTasks.execute("ping -n 1 127.0.0.1 >nul")
+	else
+		LrTasks.execute("/bin/sleep " .. tostring(seconds))
+	end
+end
+
+--- Normalize LrTasks.execute status (POSIX often returns exit*256; Windows returns exit directly).
 local function shellExitStatus(st)
 	if type(st) ~= "number" then
+		return st
+	end
+	if CMD.isWindows() then
+		if st > 0 and st <= 255 then
+			return st
+		end
 		return st
 	end
 	if st > 0 and st <= 255 then
@@ -209,8 +239,13 @@ local function shellExitStatus(st)
 	return math.floor(st / 256)
 end
 
---- 137 / 35072: process often killed (SIGKILL, e.g. system out-of-memory) -- no stderr in log.
 local function uhdrFailureHint(sx, rawSt)
+	if CMD.isWindows() then
+		if sx == 137 or sx == -1073741571 then
+			return "\n\nThe encoder may have been stopped by the system (memory pressure is common for large HDR TIFFs). Try reducing Image Sizing, closing other apps, or run the same command from Command Prompt to see a live error."
+		end
+		return ""
+	end
 	if sx == 137 or rawSt == 35072 then
 		return "\n\nThis exit code often means the encoder was stopped by the system (memory pressure is common for large HDR TIFFs). Try reducing Image Sizing, closing other apps, or run the same command from Terminal to see a live error. You can also use Activity Monitor to check memory while encoding."
 	end
@@ -305,7 +340,7 @@ local function waitForSettledHdrTiff(path, logPath)
 			stable = 0
 			lastSz = sz
 		end
-		LrTasks.execute("/bin/sleep 0.15")
+		taskSleep(0.15)
 	end
 	if logPath then
 		local sz = fileSizeBytes(path)
@@ -498,7 +533,8 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 	if not CMD.binaryExists(binary) then
 		local msg = "uhdr_repack not found at:\n"
 			.. binary
-			.. "\n\nRun scripts/bundle_uhdr_for_plugin.sh (macOS 26 (Tahoe), ARM64) to install bin/uhdr_repack inside the plug-in bundle."
+			.. "\n\n"
+			.. CMD.bundleInstructions()
 		LrDialogs.message("Ultra HDR", msg, "critical")
 		error(msg)
 	end

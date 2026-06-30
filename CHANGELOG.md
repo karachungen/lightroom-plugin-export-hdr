@@ -7,9 +7,19 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r8
+
 ### Added
 
+- **Windows x64** support: WIC-based `uhdr_repack.exe` encoder, portable Lua plug-in layer (`uhdr_repack.exe`, `LrFileUtils` file ops), and `scripts/bundle_uhdr_for_plugin_windows.ps1`.
+- Windows smoke test: `scripts/run_uhdr_test.ps1`.
+- Separate GitHub Release assets per OS: `ExportHDR.lrplugin-macos-arm64.zip` and `ExportHDR.lrplugin-windows-x64.zip` (no mixed binaries in one archive).
 - Per-build changelog and release notes sourced from this file.
+
+### Changed
+
+- CI release workflow builds macOS and Windows in parallel, then publishes both zips on one release.
+- `uhdr_repack` CMake selects platform-specific image loaders (Core Image on macOS, WIC on Windows) with shared encode/slice/verify code.
 
 ## v1.0.0-r7
 
