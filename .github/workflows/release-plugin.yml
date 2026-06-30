@@ -43,7 +43,8 @@ jobs:
 
       - name: Install build dependencies (macOS)
         if: matrix.id == 'macos-arm64'
-        run: ./scripts/build_plugin.sh install-deps
+        shell: bash
+        run: bash scripts/build_plugin.sh install-deps
 
       - name: Setup CMake 3.31 (Windows)
         if: matrix.id == 'windows-x64'
@@ -59,7 +60,7 @@ jobs:
 
       - name: Build, test, and package plugin
         shell: bash
-        run: ./scripts/build_plugin.sh all
+        run: bash scripts/build_plugin.sh all
 
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4
@@ -77,7 +78,7 @@ jobs:
 
       - name: Parse version from Info.lua
         id: ver
-        run: ./scripts/parse_plugin_version.sh --github-output
+        run: bash scripts/parse_plugin_version.sh --github-output
 
       - name: Download platform artifacts
         uses: actions/download-artifact@v4
