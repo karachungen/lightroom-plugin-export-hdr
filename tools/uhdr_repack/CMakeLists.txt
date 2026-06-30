@@ -72,10 +72,11 @@ else()
   set(UHDR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
+  if(WIN32)
+    set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr on Windows" FORCE)
+  endif()
   FetchContent_MakeAvailable(libultrahdr)
 endif()
-
-find_package(JPEG REQUIRED)
 
 set(_UHDR_COMMON_SOURCES
   src/main.cpp
@@ -115,8 +116,6 @@ else()
   target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
   target_link_libraries(uhdr_repack PRIVATE uhdr)
 endif()
-
-target_link_libraries(uhdr_repack PRIVATE JPEG::JPEG)
 
 if(APPLE)
   find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)

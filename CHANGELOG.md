@@ -7,6 +7,16 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r9
+
+### Fixed
+
+- Windows CI configure failure: enable libultrahdr `UHDR_BUILD_DEPS` on Windows to vendor libjpeg-turbo; remove redundant `find_package(JPEG)` from `uhdr_repack`.
+
+### Changed
+
+- Windows release workflow runs `run_uhdr_test.ps1` after bundling the encoder.
+
 ## v1.0.0-r8
 
 ### Added

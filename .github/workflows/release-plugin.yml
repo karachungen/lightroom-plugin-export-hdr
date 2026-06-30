@@ -76,6 +76,11 @@ jobs:
         run: |
           if (-not (Test-Path ExportHDR.lrplugin/bin/uhdr_repack.exe)) { throw "missing uhdr_repack.exe" }
 
+      - name: Smoke test encoder (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: pwsh
+        run: ./scripts/run_uhdr_test.ps1
+
       - name: Create zip (macOS)
         if: matrix.id == 'macos-arm64'
         run: |
