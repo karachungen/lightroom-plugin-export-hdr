@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r14
+
+### Fixed
+
+- Windows bundle script false failure: disable `$PSNativeCommandUseErrorActionPreference` so the usage smoke test (expected exit code 1) does not abort the script on pwsh 7+.
+
 ## v1.0.0-r13
 
 ### Fixed
