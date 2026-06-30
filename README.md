@@ -6,6 +6,7 @@ Lightroom Classic **export filter** (**Requires macOS 26 (Tahoe), ARM64**) plus 
 
 - Keeps **Image Sizing** and most export options for the main pass (SDR base, often JPEG).
 - Runs a **second internal export** → temporary **HDR TIFF**, then `**ExportHDR.lrplugin/bin/uhdr_repack`** merges into one `**.jpg`** (Ultra HDR).
+- Optional **Slicing** (`1:1` or `4:5`) keeps the full exported height, preserves the original Ultra HDR file, and writes numbered Ultra HDR slice JPEGs next to it (each with its own gain map).
 - **Lightroom Classic 14+** — `[Info.lua](ExportHDR.lrplugin/Info.lua)` (`LrSdkMinimumVersion = 14.0`). Export filter: **Encode Ultra HDR JPEG (uhdr_repack)** (under plug-in **Ultra HDR Export**).
 
 ## How it works
@@ -48,7 +49,7 @@ flowchart TD
   - In the Export dialog, open **Post-Process Actions** (wording may vary slightly by Lightroom version; same area as post-processing / export filters).
   - Click **Add** and choose **Ultra HDR Export** → **Encode Ultra HDR JPEG (uhdr_repack)**.
   - If Lightroom shows **Install** for that action, click it so the plug-in’s options load for this export.
-  - Expand or select the new action so the **Encode Ultra HDR JPEG (uhdr_repack)** section appears; adjust **Base quality**, **Gain map Q**, and other options there.
+  - Expand or select the new action so the **Encode Ultra HDR JPEG (uhdr_repack)** section appears; adjust **Base quality**, **Gain map Q**, **Slicing**, and other options there.
   - For `**.jpg`**, use **JPEG** in **File Settings**; do not use a manual 32-bit HDR TIFF as the main file.
 4. **Develop** — **HDR** mode when the photo supports it.
 

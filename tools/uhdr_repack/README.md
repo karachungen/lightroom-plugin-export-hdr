@@ -81,7 +81,13 @@ cmake --build build
 ./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
+
+### Optional slicing (`--slice-aspect`)
+
+When set to `1x1` or `4x5`, the encoder still writes the full-frame Ultra HDR JPEG to `--out`, then creates **numbered slice files** next to it (e.g. `photo_1x1_01.jpg`, `photo_4x5_02.jpg`). Each slice keeps the **full exported height**; tile width is `H` (1:1) or `even floor(H×4/5)` (4:5). Equal-width tiles are packed left-to-right and **centered** when the image is wider than `n × tileWidth`.
+
+Gain maps are **re-derived per slice** from identically cropped HDR TIFF + SDR base buffers (never by cutting an existing Ultra HDR JPEG). Pass a preserved SDR copy as `--base` if `--out` overwrites the original base file (the Lightroom plug-in does this automatically).
 
 ## `--inspect`
 
@@ -96,6 +102,7 @@ cmake --build build
 1. HDR TIFF with HDR output on; align HDR and SDR edits (e.g. same virtual copy).
 2. Same **pixel size** for both inputs (base is scaled to HDR if needed).
 3. Primary **4:2:0**; gain map may differ — `**--inspect`** → `**primary_jpeg_420`** / `**gainmap_jpeg_420`**
+4. **Odd dimensions** — If Lightroom exports an odd width or height (e.g. from Image Sizing or crop), the encoder crops one pixel from the right and/or bottom so both HDR and SDR match even dimensions required for 4:2:0. A line is written to stderr, e.g. `HDR dimensions cropped from 1291x1614 to 1290x1614 for 4:2:0 compatibility`.
 
 ## Test
 

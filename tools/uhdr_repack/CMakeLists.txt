@@ -84,6 +84,7 @@ find_library(CORE_GRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
 
 add_executable(uhdr_repack
   src/main.cpp
+  src/slice_plan.cpp
   src/uhdr_encode.cpp
   src/gainmap_metadata.cpp
   src/verify.cpp

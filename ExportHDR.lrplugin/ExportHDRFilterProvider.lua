@@ -131,6 +131,22 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 				},
 				f:row {
 					f:static_text {
+						title = "Slicing",
+						width_in_chars = LW,
+					},
+					f:popup_menu {
+						value = bind { key = K.sliceAspect, object = propertyTable },
+						width_in_chars = 12,
+						items = {
+							{ title = "Off", value = "none" },
+							{ title = "1:1", value = "1x1" },
+							{ title = "4:5", value = "4x5" },
+						},
+						tooltip = "Optional full-height slices at 1:1 or 4:5. Keeps the original Ultra HDR file and writes numbered slices next to it.",
+					},
+				},
+				f:row {
+					f:static_text {
 						title = "Options",
 						width_in_chars = LW,
 					},
@@ -169,16 +185,6 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 						value = bind { key = K.runInspect, object = propertyTable },
 					},
 				},
-				f:row {
-					f:static_text {
-						title = " ",
-						width_in_chars = LW,
-					},
-					f:checkbox {
-						title = "Verbose shell logging (encoder stderr is always written to the log)",
-						value = bind { key = K.verboseLog, object = propertyTable },
-					},
-				},
 			},
 		},
 	}
@@ -194,7 +200,7 @@ end
 
 --- POSIX-style status from LrTasks.execute (e.g. exit 3 often appears as 3*256 = 768).
 local function shellExitStatus(st)
-	if type(st) ~= "number" or st == nil then
+	if type(st) ~= "number" then
 		return st
 	end
 	if st > 0 and st <= 255 then
@@ -248,6 +254,21 @@ local function tiffHeaderLooksValid(path)
 	return false
 end
 
+--- JPEG SOI marker (first bytes).
+local function jpegHeaderLooksValid(path)
+	local f = io.open(path, "rb")
+	if not f then
+		return false
+	end
+	local h = f:read(3)
+	f:close()
+	if not h or #h < 3 then
+		return false
+	end
+	local a, b, c = string.byte(h, 1, 3)
+	return a == 0xFF and b == 0xD8 and c == 0xFF
+end
+
 --[[
   Lightroom sometimes returns from waitForRender before the file is fully flushed.
   Wait until byte size is stable across two reads and the TIFF header is valid.
@@ -288,13 +309,18 @@ local function waitForSettledHdrTiff(path, logPath)
 	end
 	if logPath then
 		local sz = fileSizeBytes(path)
+		local jpegHint = ""
+		if sz and sz >= 3 and jpegHeaderLooksValid(path) then
+			jpegHint = " (file starts with JPEG markers — internal pass wrote JPEG, not TIFF)\n"
+		end
 		Log.append(
 			logPath,
 			"HDR TIFF settle failed (last size="
 				.. tostring(sz)
 				.. ", header_ok="
 				.. tostring(sz and sz >= 8 and tiffHeaderLooksValid(path))
-				.. ")\n"
+				.. ")"
+				.. jpegHint
 		)
 	end
 	return false
@@ -329,16 +355,44 @@ local function isTiffPath(p)
 	return string.sub(leaf, -4) == ".tif" or string.sub(leaf, -5) == ".tiff"
 end
 
+local function isJpegPath(p)
+	if not p or type(p) ~= "string" then
+		return false
+	end
+	local ext = string.lower(LrPathUtils.extension(p) or "")
+	ext = string.gsub(ext, "^%.", "")
+	if ext == "jpg" or ext == "jpeg" then
+		return true
+	end
+	local leaf = string.lower(LrPathUtils.leafName(p) or "")
+	return string.sub(leaf, -4) == ".jpg" or string.sub(leaf, -5) == ".jpeg"
+end
+
 local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 	local hdrSettings = UHDR.mergeHdrTiffSettings(propertyTable, tempDir)
 	if logPath then
+		pcall(function()
+			if photo and photo.getDevelopSettings then
+				local d = photo:getDevelopSettings()
+				if d then
+					Log.append(
+						logPath,
+						"Develop HDREditMode="
+							.. tostring(d.HDREditMode)
+							.. " (HDR editing must be on for HDR TIFF export)\n"
+					)
+				end
+			end
+		end)
 		Log.append(
 			logPath,
 			string.format(
-				"HDR pass settings: format=%s dest=%s colorSpace=%s\n",
+				"HDR pass settings: format=%s destType=%s dest=%s colorSpace=%s provider=%s\n",
 				tostring(hdrSettings.LR_format),
+				tostring(hdrSettings.LR_export_destinationType),
 				tostring(hdrSettings.LR_export_destinationPathPrefix),
-				tostring(hdrSettings.LR_export_colorSpace)
+				tostring(hdrSettings.LR_export_colorSpace),
+				tostring(hdrSettings.LR_exportServiceProvider)
 			)
 		)
 	end
@@ -350,6 +404,7 @@ local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 
 	local hdrPath
 	local tried = {}
+	local renderErrors = {}
 	for _, rendition in sess:renditions() do
 		local ok, pth = rendition:waitForRender()
 		if ok and pth and pth ~= "" then
@@ -358,17 +413,46 @@ local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 				hdrPath = pth
 				break
 			end
+		elseif not ok then
+			local err = tostring(pth)
+			renderErrors[#renderErrors + 1] = err
+			if logPath then
+				Log.append(logPath, "HDR TIFF waitForRender failed: " .. err .. "\n")
+			end
+		elseif logPath then
+			Log.append(
+				logPath,
+				"HDR TIFF waitForRender: ok but empty path (ok=" .. tostring(ok) .. ").\n"
+			)
 		end
-	end
-	if not hdrPath and #tried > 0 then
-		hdrPath = tried[1]
 	end
 
 	if not hdrPath then
+		if logPath and #tried > 0 then
+			Log.append(
+				logPath,
+				"HDR TIFF pass found no .tif rendition; paths returned: "
+					.. table.concat(tried, "; ")
+					.. "\n"
+			)
+		end
+		if #tried > 0 then
+			local first = tried[1]
+			if isJpegPath(first) then
+				return nil,
+					"Internal HDR pass saved JPEG ("
+						.. tostring(LrPathUtils.leafName(first))
+						.. ") instead of TIFF. In Develop, turn HDR ON (Basics panel). Check the log line Develop HDREditMode= — it must indicate HDR editing is active. Otherwise Lightroom exports SDR JPEG even when the plug-in requests Rec2020 HDR TIFF."
+			end
+			return nil, "Internal HDR pass returned no TIFF file (got " .. tostring(first) .. ")."
+		end
 		if logPath then
 			Log.append(logPath, "HDR TIFF session produced no rendition path.\n")
 		end
-		return nil
+		if #renderErrors > 0 then
+			return nil, table.concat(renderErrors, " ")
+		end
+		return nil, ""
 	end
 
 	if logPath then
@@ -378,11 +462,21 @@ local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 		end
 	end
 
+	if not LrFileUtils.exists(hdrPath) then
+		if logPath then
+			Log.append(logPath, "ERROR: HDR TIFF path missing on disk: " .. tostring(hdrPath) .. "\n")
+		end
+		if #renderErrors > 0 then
+			return nil, table.concat(renderErrors, " ")
+		end
+		return nil, "exported path not found: " .. tostring(hdrPath)
+	end
+
 	if not waitForSettledHdrTiff(hdrPath, logPath) then
 		if logPath then
 			Log.append(logPath, "ERROR: HDR TIFF did not settle with a valid TIFF header (incomplete write?).\n")
 		end
-		return nil
+		return nil, "TIFF file did not finish writing or has an invalid header."
 	end
 
 	return hdrPath
@@ -522,12 +616,17 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		)
 		LrFileUtils.createDirectory(tempDir)
 
-		local hdrPath = renderHdrTiff(photo, propertyTable, tempDir, logPath)
+		local hdrPath, hdrFailDetail = renderHdrTiff(photo, propertyTable, tempDir, logPath)
 		if not hdrPath or not LrFileUtils.exists(hdrPath) then
 			safeDeleteTree(tempDir)
+			local detail = ""
+			if hdrFailDetail and hdrFailDetail ~= "" then
+				detail = "\nLightroom said: " .. hdrFailDetail .. "\n"
+			end
 			error(
 				"Ultra HDR: HDR TIFF render failed. Requires Lightroom Classic 14+ with HDR editing/export support.\n"
 					.. "If your catalog photo is not an HDR edit, enable HDR in Develop or adjust export compatibility.\n"
+					.. detail
 					.. "See plug-in README troubleshooting."
 			)
 		end
@@ -558,10 +657,32 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 
 		local outPath = basePath
+		local encodeBasePath = basePath
+		if UHDR.sliceAspectEnabled(propertyTable) then
+			local baseExt = LrPathUtils.extension(basePath) or "jpg"
+			local sdrCopyPath = LrPathUtils.child(tempDir, "uhdr_sdr_base_copy." .. baseExt)
+			local copyOk = pcall(function()
+				LrFileUtils.copy(basePath, sdrCopyPath)
+			end)
+			if not copyOk or not LrFileUtils.exists(sdrCopyPath) then
+				safeDeleteTree(tempDir)
+				error("Ultra HDR: could not copy SDR base for slice encoding.")
+			end
+			encodeBasePath = sdrCopyPath
+			Log.append(
+				logPath,
+				"Slicing enabled ("
+					.. tostring(propertyTable[UHDR.KEY.sliceAspect])
+					.. "): SDR base copy for encode: "
+					.. tostring(sdrCopyPath)
+					.. "\n"
+			)
+		end
+
 		local cmdLine = CMD.buildEncodeCommand({
 			binary = binary,
 			hdrTiff = hdrPath,
-			basePath = basePath,
+			basePath = encodeBasePath,
 			outPath = outPath,
 			props = propertyTable,
 		})
@@ -594,6 +715,16 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			local ins = CMD.buildInspectCommand(binary, outPath)
 			Log.append(logPath, "Inspect: " .. ins .. "\n")
 			CMD.runShell(ins, logPath)
+			if UHDR.sliceAspectEnabled(propertyTable) then
+				local aspect = propertyTable[UHDR.KEY.sliceAspect]
+				local slicePaths = CMD.listSliceOutputs(outPath, aspect)
+				Log.append(logPath, "Slice inspect: found " .. tostring(#slicePaths) .. " file(s)\n")
+				for _, slicePath in ipairs(slicePaths) do
+					local sliceIns = CMD.buildInspectCommand(binary, slicePath)
+					Log.append(logPath, "Inspect slice: " .. sliceIns .. "\n")
+					CMD.runShell(sliceIns, logPath)
+				end
+			end
 		end
 
 		if not propertyTable[UHDR.KEY.keepIntermediates] then

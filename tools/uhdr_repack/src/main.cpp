@@ -1,4 +1,5 @@
 #include "sdr_input.h"
+#include "slice_plan.h"
 #include "tiff_input.h"
 #include "uhdr_encode.h"
 #include "verify.h"
@@ -7,6 +8,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -23,13 +25,16 @@ void PrintUsage() {
       << "  --min-content-boost <linear>   (default 1.0)\n"
       << "  --max-content-boost <linear>   (default 1000)\n"
       << "  --target-display-peak <nits>   (default 1000)\n"
-      << "  --monochrome-gainmap           single-channel gain map\n";
+      << "  --monochrome-gainmap           single-channel gain map\n"
+      << "  --slice-aspect <none|1x1|4x5>  optional full-height slices (numbered files next to --out)\n";
 }
 
 bool ParseInt(const char* s, int* out) {
   char* end = nullptr;
   long v = std::strtol(s, &end, 10);
-  if (end == s || *end != '\0' || v < 0 || v > 1000000) return false;
+  if (end == s || *end != '\0' || v < 0 || v > 1000000) {
+    return false;
+  }
   *out = static_cast<int>(v);
   return true;
 }
@@ -37,8 +42,21 @@ bool ParseInt(const char* s, int* out) {
 bool ParseFloat(const char* s, float* out) {
   char* end = nullptr;
   float v = std::strtof(s, &end);
-  if (end == s || *end != '\0') return false;
+  if (end == s || *end != '\0') {
+    return false;
+  }
   *out = v;
+  return true;
+}
+
+bool EncodePair(const uhdr_repack::RawImageHolder& hdr, const uhdr_repack::RawImageHolder& sdr,
+                const uhdr_repack::EncodeOptions& opt, const std::string& out_path,
+                std::string* err) {
+  if (!uhdr_repack::encode_ultra_hdr_jpeg(hdr, sdr, opt, out_path, err)) {
+    std::cerr << "encode: " << *err << "\n";
+    return false;
+  }
+  std::cout << "Wrote " << out_path << "\n";
   return true;
 }
 
@@ -77,6 +95,7 @@ int main(int argc, char** argv) {
   std::string base_path;
   std::string out_path;
   uhdr_repack::EncodeOptions opt;
+  uhdr_repack::SliceAspect slice_aspect = uhdr_repack::SliceAspect::kNone;
 
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
@@ -86,6 +105,11 @@ int main(int argc, char** argv) {
       base_path = argv[++i];
     } else if (a == "--out" && i + 1 < argc) {
       out_path = argv[++i];
+    } else if (a == "--slice-aspect" && i + 1 < argc) {
+      if (!uhdr_repack::parse_slice_aspect(argv[++i], &slice_aspect)) {
+        std::cerr << "bad --slice-aspect (use none, 1x1, or 4x5)\n";
+        return 1;
+      }
     } else if (a == "--base-quality" && i + 1 < argc) {
       int q = 0;
       if (!ParseInt(argv[++i], &q)) {
@@ -151,19 +175,54 @@ int main(int argc, char** argv) {
     return 3;
   }
 
-  unsigned w = hdr.ref().w;
-  unsigned h = hdr.ref().h;
+  const unsigned master_w = hdr.ref().w;
+  const unsigned master_h = hdr.ref().h;
 
-  if (!uhdr_repack::load_sdr_base_raw(base_path, w, h, &sdr, &err)) {
+  if (!uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr, &err)) {
     std::cerr << "SDR base: " << err << "\n";
     return 4;
   }
 
-  if (!uhdr_repack::encode_ultra_hdr_jpeg(hdr, sdr, opt, out_path, &err)) {
-    std::cerr << "encode: " << err << "\n";
+  if (!EncodePair(hdr, sdr, opt, out_path, &err)) {
     return 5;
   }
 
-  std::cout << "Wrote " << out_path << "\n";
+  if (slice_aspect == uhdr_repack::SliceAspect::kNone) {
+    return 0;
+  }
+
+  std::vector<uhdr_repack::CropRect> slices;
+  if (!uhdr_repack::compute_slices(master_w, master_h, slice_aspect, &slices, &err)) {
+    std::cerr << "slice plan: " << err << "\n";
+    return 6;
+  }
+
+  std::cerr << "Slicing " << master_w << "x" << master_h << " into " << slices.size() << " "
+            << uhdr_repack::slice_aspect_label(slice_aspect) << " tile(s)\n";
+
+  unsigned idx = 1;
+  for (const auto& crop : slices) {
+    uhdr_repack::RawImageHolder hdr_slice;
+    uhdr_repack::RawImageHolder sdr_slice;
+
+    if (!uhdr_repack::load_hdr_tiff_raw(hdr_tiff, &hdr_slice, &err, master_w, master_h, &crop)) {
+      std::cerr << "HDR slice " << idx << ": " << err << "\n";
+      return 7;
+    }
+    if (!uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr_slice, &err, &crop)) {
+      std::cerr << "SDR slice " << idx << ": " << err << "\n";
+      return 8;
+    }
+
+    const std::string slice_out = uhdr_repack::make_slice_output_path(out_path, slice_aspect, idx);
+    std::cerr << "Slice " << idx << ": crop " << crop.x << "," << crop.y << " " << crop.w << "x"
+              << crop.h << " -> " << slice_out << "\n";
+
+    if (!EncodePair(hdr_slice, sdr_slice, opt, slice_out, &err)) {
+      return 9;
+    }
+    ++idx;
+  }
+
   return 0;
 }

@@ -71,7 +71,39 @@ function CMD.buildEncodeCommand(o)
 	if o.props[K.monochromeGainmap] then
 		table.insert(parts, "--monochrome-gainmap")
 	end
+	local sliceAspect = o.props[K.sliceAspect]
+	if sliceAspect and sliceAspect ~= "none" and sliceAspect ~= "" then
+		table.insert(parts, "--slice-aspect")
+		table.insert(parts, sliceAspect)
+	end
 	return table.concat(parts, " ")
+end
+
+--- List numbered Ultra HDR slice outputs next to baseOutPath (e.g. photo_1x1_01.jpg).
+function CMD.listSliceOutputs(baseOutPath, aspect)
+	local paths = {}
+	if not baseOutPath or not aspect or aspect == "none" then
+		return paths
+	end
+	local folder = LrPathUtils.parent(baseOutPath)
+	if not folder or folder == "" then
+		folder = "."
+	end
+	local leaf = LrPathUtils.leafName(baseOutPath)
+	local baseNoExt = LrPathUtils.removeExtension(leaf)
+	local ext = LrPathUtils.extension(baseOutPath) or "jpg"
+	local glob = LrPathUtils.child(folder, baseNoExt .. "_" .. aspect .. "_*." .. ext)
+	local handle = io.popen("/bin/ls -1 " .. CMD.shellQuote(glob) .. " 2>/dev/null")
+	if handle then
+		for line in handle:lines() do
+			if line and line ~= "" then
+				paths[#paths + 1] = line
+			end
+		end
+		handle:close()
+	end
+	table.sort(paths)
+	return paths
 end
 
 function CMD.buildInspectCommand(binary, jpegPath)
