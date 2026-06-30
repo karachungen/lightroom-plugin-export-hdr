@@ -47,7 +47,7 @@ flowchart TB
 
 ## Build
 
-From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. On macOS, libjpeg is provided by the system or Homebrew (**`brew install jpeg-turbo`**). On Windows, libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`**. First configure downloads libultrahdr into **`build/_deps/`**.
+From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. On macOS, libjpeg is provided by the system or Homebrew (**`brew install jpeg-turbo`**). On Windows, libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`**. Use **CMake 3.15–3.31.x** on Windows (CMake 4.x fails on vendored libjpeg-turbo 3.0.1 until upstream updates; CI pins **3.31.6**). First configure downloads libultrahdr into **`build/_deps/`**.
 
 **macOS:**
 

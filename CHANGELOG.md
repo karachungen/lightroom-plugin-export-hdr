@@ -7,6 +7,16 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r10
+
+### Fixed
+
+- Windows CI turbojpeg configure failure on CMake 4.x: pin CMake **3.31.6** on the Windows release job (libultrahdr vendored libjpeg-turbo 3.0.1 requires CMake 3.x).
+
+### Added
+
+- Docker repro for the CMake 4 policy regression: `scripts/docker/repro-cmake4-turbojpeg/run.sh`.
+
 ## v1.0.0-r9
 
 ### Fixed

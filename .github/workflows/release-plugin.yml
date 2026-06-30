@@ -54,6 +54,12 @@ jobs:
         if: matrix.id == 'macos-arm64'
         run: brew install cmake jpeg-turbo dylibbundler
 
+      - name: Setup CMake 3.31 (Windows)
+        if: matrix.id == 'windows-x64'
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: "3.31.6"
+
       - name: Bundle uhdr_repack into plugin (macOS)
         if: matrix.id == 'macos-arm64'
         run: ./scripts/bundle_uhdr_for_plugin.sh

@@ -22,8 +22,10 @@ GitHub Releases ship separate archives (no mixed OS binaries in one zip):
 macOS requires: Xcode CLT, CMake, libjpeg-turbo (e.g. Homebrew: jpeg-turbo).
 Optional on macOS: brew install dylibbundler (otherwise an otool-based fallback copies deps).
 
-Windows requires: CMake and MSVC Build Tools. libjpeg-turbo is built automatically
-via libultrahdr (UHDR_BUILD_DEPS) during configure — no separate JPEG install needed.
+Windows requires: CMake 3.15–3.31.x and MSVC Build Tools. libjpeg-turbo is built
+automatically via libultrahdr (UHDR_BUILD_DEPS) during configure — no separate
+JPEG install needed. CMake 4.x currently breaks vendored libjpeg-turbo 3.0.1;
+GitHub Actions pins CMake 3.31.6 on Windows.
 
 Optional override: UHDR_USE_SYSTEM=1 to link against a preinstalled libultrahdr
 (and UHDR_ROOT=... if CMake cannot find headers/libs).
