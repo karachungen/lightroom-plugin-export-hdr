@@ -11,15 +11,27 @@ BASE="$TEST_DIR/sdr.jpg"
 OUT="$TEST_DIR/out_uhdr.jpg"
 
 BIN=""
-if [[ -x "$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack" ]]; then
-	BIN="$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack"
-elif [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack" ]]; then
+if [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack" ]]; then
 	BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack"
+elif [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe" ]]; then
+	BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe"
+elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack" ]]; then
+	BIN="$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack"
+elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack.exe" ]]; then
+	BIN="$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack.exe"
+elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/Release/uhdr_repack.exe" ]]; then
+	BIN="$REPO_ROOT/tools/uhdr_repack/build/Release/uhdr_repack.exe"
 else
 	echo "uhdr_repack not found. Build with:" >&2
-	echo "  cmake -S tools/uhdr_repack -B tools/uhdr_repack/build -DCMAKE_BUILD_TYPE=Release && cmake --build tools/uhdr_repack/build" >&2
-	echo "or: ./scripts/bundle_uhdr_for_plugin.sh" >&2
+	echo "  ./scripts/build_plugin.sh" >&2
+	echo "or: ./scripts/bundle_uhdr_for_plugin.sh (macOS) / .\\scripts\\build_plugin.ps1 (Windows)" >&2
 	exit 2
+fi
+
+# Windows: bundled plugin binary has uhdr.dll next to exe.
+if [[ "$BIN" == *.exe ]]; then
+	BIN_DIR="$(dirname "$BIN")"
+	export PATH="$BIN_DIR:$PATH"
 fi
 
 if [[ ! -f "$HDR" ]] || [[ ! -f "$BASE" ]]; then
@@ -66,6 +78,15 @@ rm -f "$OUT" "$TEST_DIR"/out_uhdr_*.jpg
 "$BIN" --hdr-tiff "$HDR" --base "$BASE" --out "$OUT"
 assert_inspect_ok "$OUT"
 echo "OK: default encode — gain map matches dimensions and primary_xmp is present."
+
+CYR_DIR="$TEST_DIR/тест"
+CYR_OUT="$CYR_DIR/out_uhdr.jpg"
+mkdir -p "$CYR_DIR"
+rm -f "$CYR_OUT"
+echo "==> Cyrillic folder path test ($CYR_DIR)"
+"$BIN" --hdr-tiff "$HDR" --base "$BASE" --out "$CYR_OUT"
+assert_inspect_ok "$CYR_OUT"
+echo "OK: Cyrillic folder encode — UTF-8 paths work."
 
 SLICE_OUT="$TEST_DIR/out_slice_uhdr.jpg"
 SDR_COPY="$(mktemp -t uhdr_sdr_copy.XXXXXX).jpg"

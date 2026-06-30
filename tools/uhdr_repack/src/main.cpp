@@ -12,6 +12,7 @@
 
 #ifdef _WIN32
 #include <objbase.h>
+#include <windows.h>
 #endif
 
 namespace {
@@ -79,17 +80,24 @@ struct ComInit {
   }
 };
 
+std::string wide_to_utf8(const wchar_t* wide) {
+  if (!wide || wide[0] == L'\0') {
+    return std::string();
+  }
+  const int needed =
+      WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
+  if (needed <= 0) {
+    return std::string();
+  }
+  std::string utf8(static_cast<size_t>(needed - 1), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8.data(), needed, nullptr, nullptr);
+  return utf8;
+}
+
 }  // namespace
 #endif
 
-int main(int argc, char** argv) {
-#ifdef _WIN32
-  ComInit com;
-  if (FAILED(com.hr)) {
-    std::cerr << "CoInitializeEx failed\n";
-    return 1;
-  }
-#endif
+static int run(int argc, char** argv) {
   if (argc < 2) {
     PrintUsage();
     return 1;
@@ -253,3 +261,28 @@ int main(int argc, char** argv) {
 
   return 0;
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** wargv) {
+  ComInit com;
+  if (com.hr != S_OK && com.hr != S_FALSE && FAILED(com.hr)) {
+    std::cerr << "CoInitializeEx failed\n";
+    return 1;
+  }
+
+  std::vector<std::string> utf8_args;
+  std::vector<char*> argv_ptrs;
+  utf8_args.reserve(static_cast<size_t>(argc));
+  argv_ptrs.reserve(static_cast<size_t>(argc) + 1);
+  for (int i = 0; i < argc; ++i) {
+    utf8_args.push_back(wide_to_utf8(wargv[i]));
+    argv_ptrs.push_back(utf8_args.back().data());
+  }
+  argv_ptrs.push_back(nullptr);
+  return run(argc, argv_ptrs.data());
+}
+#else
+int main(int argc, char** argv) {
+  return run(argc, argv);
+}
+#endif

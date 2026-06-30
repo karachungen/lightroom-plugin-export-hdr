@@ -6,9 +6,15 @@ on:
     paths:
       - "ExportHDR.lrplugin/**"
       - "tools/uhdr_repack/**"
+      - "scripts/build_plugin.sh"
+      - "scripts/build_plugin.ps1"
+      - "scripts/package_plugin.sh"
+      - "scripts/parse_plugin_version.sh"
       - "scripts/bundle_uhdr_for_plugin.sh"
       - "scripts/bundle_uhdr_for_plugin_windows.ps1"
-      - "scripts/run_uhdr_test.ps1"
+      - "scripts/run_uhdr_test.sh"
+      - "scripts/windows_build_common.ps1"
+      - "scripts/setup_windows_build.ps1"
   workflow_dispatch:
 
 concurrency:
@@ -35,25 +41,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Parse version from Info.lua
-        id: ver
-        shell: bash
-        run: |
-          set -euo pipefail
-          line=$(grep 'VERSION = {' ExportHDR.lrplugin/Info.lua)
-          major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
-          minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
-          revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
-          echo "major=$major" >> "$GITHUB_OUTPUT"
-          echo "minor=$minor" >> "$GITHUB_OUTPUT"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
-
       - name: Install build dependencies (macOS)
         if: matrix.id == 'macos-arm64'
-        run: brew install cmake jpeg-turbo dylibbundler
+        run: ./scripts/build_plugin.sh install-deps
 
       - name: Setup CMake 3.31 (Windows)
         if: matrix.id == 'windows-x64'
@@ -67,49 +57,9 @@ jobs:
         with:
           arch: x64
 
-      - name: Bundle uhdr_repack into plugin (macOS)
-        if: matrix.id == 'macos-arm64'
-        run: ./scripts/bundle_uhdr_for_plugin.sh
-
-      - name: Verify arm64 binary (macOS)
-        if: matrix.id == 'macos-arm64'
-        run: |
-          set -euo pipefail
-          file ExportHDR.lrplugin/bin/uhdr_repack
-          file ExportHDR.lrplugin/bin/uhdr_repack | grep -q arm64
-
-      - name: Bundle uhdr_repack into plugin (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: ./scripts/bundle_uhdr_for_plugin_windows.ps1
-
-      - name: Verify x64 binary (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: |
-          if (-not (Test-Path ExportHDR.lrplugin/bin/uhdr_repack.exe)) { throw "missing uhdr_repack.exe" }
-
-      - name: Smoke test encoder (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: ./scripts/run_uhdr_test.ps1
-
-      - name: Create zip (macOS)
-        if: matrix.id == 'macos-arm64'
-        run: |
-          rm -f ExportHDR.lrplugin/bin/uhdr_repack.exe
-          rm -f ExportHDR.lrplugin/bin/*.dll
-          zip -r ExportHDR.lrplugin-macos-arm64.zip ExportHDR.lrplugin \
-            -x "ExportHDR.lrplugin/bin/.gitignore" \
-            -x "ExportHDR.lrplugin/bin/README.txt"
-
-      - name: Create zip (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: |
-          if (Test-Path ExportHDR.lrplugin/bin/uhdr_repack) { Remove-Item ExportHDR.lrplugin/bin/uhdr_repack -Force }
-          Get-ChildItem ExportHDR.lrplugin/bin -Filter *.dylib -ErrorAction SilentlyContinue | Remove-Item -Force
-          Compress-Archive -Path ExportHDR.lrplugin -DestinationPath ExportHDR.lrplugin-windows-x64.zip -Force
+      - name: Build, test, and package plugin
+        shell: bash
+        run: ./scripts/build_plugin.sh all
 
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4
@@ -127,15 +77,7 @@ jobs:
 
       - name: Parse version from Info.lua
         id: ver
-        run: |
-          set -euo pipefail
-          line=$(grep 'VERSION = {' ExportHDR.lrplugin/Info.lua)
-          major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
-          minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
-          revision=$(echo "$line" | sed -E 's/.*revision *= *([0-9]+).*/\1/')
-          tag="v${major}.${minor}.${revision}-r${GITHUB_RUN_NUMBER}"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "semver=${major}.${minor}.${revision}" >> "$GITHUB_OUTPUT"
+        run: ./scripts/parse_plugin_version.sh --github-output
 
       - name: Download platform artifacts
         uses: actions/download-artifact@v4
@@ -149,6 +91,12 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: Ultra HDR Export v${{ steps.ver.outputs.semver }} (build ${{ github.run_number }})
           body: |
+            ## 🎉 Ultra HDR Export v2.0.0
+
+            ### ✨ Highlights
+            - 🪟 **Windows x64** — full plug-in + `uhdr_repack.exe` (WIC loader, colocated DLLs)
+            - ✂️ **Slice images** — optional `1:1` or `4:5` tiles; keeps the master Ultra HDR file and writes numbered slices beside it
+
             **Platforms:** separate plug-in archives per OS (no mixed binaries).
 
             | Platform | Archive |

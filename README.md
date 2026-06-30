@@ -44,8 +44,9 @@ flowchart TD
 ## How to use
 
 1. **Bundle** — Build the encoder for your OS (binaries are gitignored):
-   - **macOS:** `./scripts/bundle_uhdr_for_plugin.sh` → `ExportHDR.lrplugin/bin/uhdr_repack` + `.dylib`
-   - **Windows:** `.\scripts\bundle_uhdr_for_plugin_windows.ps1` → `ExportHDR.lrplugin\bin\uhdr_repack.exe` + `.dll`
+   - **macOS:** `./scripts/build_plugin.sh` → `ExportHDR.lrplugin/bin/uhdr_repack` + `.dylib`
+   - **Windows:** `.\scripts\build_plugin.ps1` → `ExportHDR.lrplugin\bin\uhdr_repack.exe` + `.dll`
+   - Legacy aliases: `bundle_uhdr_for_plugin.sh` / `bundle_uhdr_for_plugin_windows.ps1` (build + bundle only)
    - Pre-built zips ship separately from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases):
      - `ExportHDR.lrplugin-macos-arm64.zip`
      - `ExportHDR.lrplugin-windows-x64.zip`
@@ -60,28 +61,45 @@ flowchart TD
 
 ## Build locally
 
-**Plug-in (macOS)** — from repo root:
+Local builds use the same orchestrator as [GitHub Actions](.github/workflows/release-plugin.yml): CMake presets in `tools/uhdr_repack/CMakePresets.json`, then bundle, smoke test, and zip.
+
+**macOS (ARM64)** — from repo root:
 
 ```bash
-./scripts/bundle_uhdr_for_plugin.sh
+./scripts/build_plugin.sh install-deps   # once: brew install cmake jpeg-turbo dylibbundler
+./scripts/build_plugin.sh all            # build → bundle → test → package
 ```
 
-**Plug-in (Windows x64)** — from repo root in PowerShell:
+**Windows (x64)** — from repo root in PowerShell:
 
 ```powershell
-.\scripts\bundle_uhdr_for_plugin_windows.ps1
+# One-time: Git, CMake 3.31.6, Ninja, VS 2022 Build Tools (MSVC x64)
+.\scripts\setup_windows_build.ps1
+
+# Same pipeline as CI
+.\scripts\build_plugin.ps1 all
 ```
+
+Or install deps automatically on first build:
+
+```powershell
+.\scripts\build_plugin.ps1 -InstallDeps all
+```
+
+Individual steps: `build`, `bundle`, `test`, `package` (see `./scripts/build_plugin.sh --help`).
 
 CMake **FetchContent** → `tools/uhdr_repack/build/_deps/` · **libjpeg** via **FindJPEG** (e.g. Homebrew **jpeg-turbo** on macOS) · optional `UHDR_USE_SYSTEM=1`, `UHDR_ROOT=...` · macOS ships **codesign** for `bin/uhdr_repack` and `bin/*.dylib`
 
-**Encoder** — from `tools/uhdr_repack`:
+**Encoder only** — from `tools/uhdr_repack` (same presets as the plug-in build):
 
 ```bash
-cd tools/uhdr_repack
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake --preset macos-arm64-release -S tools/uhdr_repack
+cmake --build tools/uhdr_repack/build
 ```
 
-On Windows with MSVC, add `--config Release` to the build step.
+```powershell
+cmake --preset windows-x64-release -S tools/uhdr_repack
+cmake --build tools/uhdr_repack/build
+```
 
-→ `build/uhdr_repack` (macOS) or `build/Release/uhdr_repack.exe` (Windows) · flags & `--inspect`: [tools/uhdr_repack/README.md](tools/uhdr_repack/README.md)
+→ `build/uhdr_repack` (macOS) or `build/uhdr_repack.exe` (Windows, Ninja) · flags & `--inspect`: [tools/uhdr_repack/README.md](tools/uhdr_repack/README.md)

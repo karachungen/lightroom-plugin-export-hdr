@@ -1,21 +1,29 @@
-# Smoke-test uhdr_repack on Windows: encode defaults + --inspect (+ optional slices).
+# Smoke-test uhdr_repack on Windows — prefers run_uhdr_test.sh via Git Bash (same as CI).
 #Requires -Version 5.1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $ScriptDir "windows_build_common.ps1")
+
+$bash = Get-BashExe
+if ($bash) {
+	& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
+	exit $LASTEXITCODE
+}
+
 $RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
 $TestDir = Join-Path $RepoRoot "test"
 $Hdr = Join-Path $TestDir "hdr-raw.tif"
 $Base = Join-Path $TestDir "sdr.jpg"
 $Out = Join-Path $TestDir "out_uhdr.jpg"
 
-# Prefer bundled plugin binary (uhdr.dll next to exe); build-tree exe alone often lacks DLLs on Windows.
 $BinCandidates = @(
 	(Join-Path $RepoRoot "ExportHDR.lrplugin\bin\uhdr_repack.exe"),
-	(Join-Path $RepoRoot "tools\uhdr_repack\build\Release\uhdr_repack.exe"),
-	(Join-Path $RepoRoot "tools\uhdr_repack\build\uhdr_repack.exe")
+	(Join-Path $RepoRoot "ExportHDR.lrplugin\bin\uhdr_repack"),
+	(Join-Path $RepoRoot "tools\uhdr_repack\build\uhdr_repack.exe"),
+	(Join-Path $RepoRoot "tools\uhdr_repack\build\Release\uhdr_repack.exe")
 )
 $Bin = $null
 foreach ($candidate in $BinCandidates) {
@@ -27,10 +35,7 @@ foreach ($candidate in $BinCandidates) {
 if (-not $Bin) {
 	Write-Error @"
 uhdr_repack.exe not found. Build with:
-  .\scripts\bundle_uhdr_for_plugin_windows.ps1
-or manually (Visual Studio generator, not NMake):
-  cmake -S tools/uhdr_repack -B tools/uhdr_repack/build -G "Visual Studio 17 2022" -A x64
-  cmake --build tools/uhdr_repack/build --config Release
+  .\scripts\build_plugin.ps1
 "@
 }
 
@@ -74,6 +79,18 @@ if ($LASTEXITCODE -ne 0) {
 }
 Assert-InspectOk $Out
 Write-Host "OK: default encode — gain map matches dimensions and primary_xmp is present."
+
+$CyrDir = Join-Path $TestDir "тест"
+New-Item -ItemType Directory -Force -Path $CyrDir | Out-Null
+$CyrOut = Join-Path $CyrDir "out_uhdr.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $CyrOut
+Write-Host "==> Cyrillic folder path test ($CyrDir)"
+& $Bin --hdr-tiff $Hdr --base $Base --out $CyrOut
+if ($LASTEXITCODE -ne 0) {
+	throw "Cyrillic folder encode failed (exit $LASTEXITCODE): $Bin --hdr-tiff $Hdr --base $Base --out $CyrOut"
+}
+Assert-InspectOk $CyrOut
+Write-Host "OK: Cyrillic folder encode — UTF-8 paths work."
 
 $SliceOut = Join-Path $TestDir "out_slice_uhdr.jpg"
 $SdrCopy = [System.IO.Path]::GetTempFileName() + ".jpg"

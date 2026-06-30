@@ -1,5 +1,7 @@
 #include "verify.h"
 
+#include "path_io.h"
+
 #include <ultrahdr_api.h>
 
 #include <cstdint>
@@ -144,7 +146,7 @@ bool inspect_ultra_hdr_file(const std::string& path, InspectReport* report, std:
   }
   *report = InspectReport{};
 
-  std::ifstream ifs(path, std::ios::binary);
+  std::ifstream ifs = open_input_binary(path);
   if (!ifs) {
     if (error) *error = "Cannot read file: " + path;
     return false;

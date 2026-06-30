@@ -196,16 +196,13 @@ local function safeDeleteTree(dir)
 		return
 	end
 	if LrFileUtils.recursiveFiles then
-		local ok, files = pcall(function()
-			return LrFileUtils.recursiveFiles(dir)
-		end)
-		if ok and files then
-			for _, filePath in ipairs(files) do
+		pcall(function()
+			for filePath in LrFileUtils.recursiveFiles(dir) do
 				pcall(function()
 					LrFileUtils.delete(filePath)
 				end)
 			end
-		end
+		end)
 	end
 	pcall(function()
 		LrFileUtils.delete(dir)
@@ -241,6 +238,12 @@ end
 
 local function uhdrFailureHint(sx, rawSt)
 	if CMD.isWindows() then
+		if sx == 1 then
+			return "\n\nEncoder exited with code 1 (usage or shell error). Check the log above for uhdr_repack output — if the log has no encoder lines after Command:, the command line may have been mangled (common with non-ASCII paths before staging). Update to the latest plug-in build."
+		end
+		if sx == 3 or sx == 4 then
+			return "\n\nCould not read HDR TIFF or SDR base. Check the log for WIC or file errors (paths with non-ASCII characters such as Cyrillic are supported when the encoder receives them correctly)."
+		end
 		if sx == 137 or sx == -1073741571 then
 			return "\n\nThe encoder may have been stopped by the system (memory pressure is common for large HDR TIFFs). Try reducing Image Sizing, closing other apps, or run the same command from Command Prompt to see a live error."
 		end
@@ -693,31 +696,41 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 
 		local outPath = basePath
-		local encodeBasePath = basePath
+
+		-- ASCII-only staging paths for cmd.exe (avoids Cyrillic mangling in LrTasks.execute).
+		local encodeHdrPath = LrPathUtils.child(tempDir, "uhdr_hdr_encode.tif")
+		local hdrCopyOk = pcall(function()
+			LrFileUtils.copy(hdrPath, encodeHdrPath)
+		end)
+		if not hdrCopyOk or not LrFileUtils.exists(encodeHdrPath) then
+			safeDeleteTree(tempDir)
+			error("Ultra HDR: could not copy HDR TIFF for encoding.")
+		end
+		Log.append(logPath, "Encode staging HDR: " .. tostring(encodeHdrPath) .. "\n")
+
+		local baseExt = LrPathUtils.extension(basePath) or "jpg"
+		local encodeBasePath = LrPathUtils.child(tempDir, "uhdr_sdr_base_copy." .. baseExt)
+		local sdrCopyOk = pcall(function()
+			LrFileUtils.copy(basePath, encodeBasePath)
+		end)
+		if not sdrCopyOk or not LrFileUtils.exists(encodeBasePath) then
+			safeDeleteTree(tempDir)
+			error("Ultra HDR: could not copy SDR base for encoding.")
+		end
+		Log.append(logPath, "Encode staging SDR: " .. tostring(encodeBasePath) .. "\n")
+
 		if UHDR.sliceAspectEnabled(propertyTable) then
-			local baseExt = LrPathUtils.extension(basePath) or "jpg"
-			local sdrCopyPath = LrPathUtils.child(tempDir, "uhdr_sdr_base_copy." .. baseExt)
-			local copyOk = pcall(function()
-				LrFileUtils.copy(basePath, sdrCopyPath)
-			end)
-			if not copyOk or not LrFileUtils.exists(sdrCopyPath) then
-				safeDeleteTree(tempDir)
-				error("Ultra HDR: could not copy SDR base for slice encoding.")
-			end
-			encodeBasePath = sdrCopyPath
 			Log.append(
 				logPath,
 				"Slicing enabled ("
 					.. tostring(propertyTable[UHDR.KEY.sliceAspect])
-					.. "): SDR base copy for encode: "
-					.. tostring(sdrCopyPath)
-					.. "\n"
+					.. ")\n"
 			)
 		end
 
 		local cmdLine = CMD.buildEncodeCommand({
 			binary = binary,
-			hdrTiff = hdrPath,
+			hdrTiff = encodeHdrPath,
 			basePath = encodeBasePath,
 			outPath = outPath,
 			props = propertyTable,

@@ -1,16 +1,21 @@
 Bundled encoder directory (platform-specific binaries)
 
-After cloning the repo, this folder is empty of binaries until you run the bundle script for your OS:
+After cloning the repo, this folder is empty of binaries until you build for your OS:
 
   macOS (26 Tahoe, ARM64):
-    ./scripts/bundle_uhdr_for_plugin.sh
+    ./scripts/build_plugin.sh
 
   Windows (x64):
+    .\scripts\build_plugin.ps1
+
+  Legacy (build + bundle only, no test/zip):
+    ./scripts/bundle_uhdr_for_plugin.sh
     .\scripts\bundle_uhdr_for_plugin_windows.ps1
 
-Each script builds google/libultrahdr (vendored via CMake FetchContent) inside
-tools/uhdr_repack/build, copies the encoder here, and bundles runtime libraries
-next to the binary:
+The build scripts use CMake presets (tools/uhdr_repack/CMakePresets.json) — the same
+logic as GitHub Actions. They build google/libultrahdr (vendored via FetchContent) inside
+tools/uhdr_repack/build, copy the encoder here, and bundle runtime libraries next to
+the binary:
 
   macOS:  bin/uhdr_repack + *.dylib
   Windows: bin/uhdr_repack.exe + *.dll
@@ -22,15 +27,20 @@ GitHub Releases ship separate archives (no mixed OS binaries in one zip):
 macOS requires: Xcode CLT, CMake, libjpeg-turbo (e.g. Homebrew: jpeg-turbo).
 Optional on macOS: brew install dylibbundler (otherwise an otool-based fallback copies deps).
 
-Windows requires: CMake 3.15–3.31.x and MSVC (Visual Studio 2022+ or Build Tools, x64).
-The bundle script uses Ninja when MSVC is on PATH (CI), otherwise a Visual Studio CMake
-generator. libjpeg-turbo is built
-automatically via libultrahdr (UHDR_BUILD_DEPS) during configure — no separate
-JPEG install needed. CMake 4.x currently breaks vendored libjpeg-turbo 3.0.1;
-GitHub Actions pins CMake 3.31.6 on Windows.
+Windows requires: Git, CMake 3.31.x, Ninja, and MSVC (Visual Studio 2022 Build Tools, x64).
+One-time setup from repo root:
+
+  .\scripts\setup_windows_build.ps1
+
+(MSVC install prompts for Administrator.) Then:
+
+  .\scripts\build_plugin.ps1 all
+
+libjpeg-turbo is built automatically via libultrahdr (UHDR_BUILD_DEPS) during configure.
+CMake 4.x currently breaks vendored libjpeg-turbo 3.0.1; pin CMake 3.31.x on Windows.
 
 Optional override: UHDR_USE_SYSTEM=1 to link against a preinstalled libultrahdr
 (and UHDR_ROOT=... if CMake cannot find headers/libs).
 
-macOS only: if ./uhdr_repack exits immediately with "killed", re-run the bundle
-script (it ad-hoc re-signs after rewriting library paths).
+macOS only: if ./uhdr_repack exits immediately with "killed", re-run the build
+(it ad-hoc re-signs after rewriting library paths).

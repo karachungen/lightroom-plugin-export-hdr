@@ -148,16 +148,13 @@ function CMD.listSliceOutputs(baseOutPath, aspect)
 	local prefix = baseNoExt .. "_" .. aspect .. "_"
 
 	if LrFileUtils.recursiveFiles then
-		local ok, files = pcall(function()
-			return LrFileUtils.recursiveFiles(folder)
-		end)
-		if ok and files then
-			for _, filePath in ipairs(files) do
+		pcall(function()
+			for filePath in LrFileUtils.recursiveFiles(folder) do
 				if fileMatchesSlicePattern(filePath, folder, prefix, ext) then
 					paths[#paths + 1] = filePath
 				end
 			end
-		end
+		end)
 	else
 		local glob = LrPathUtils.child(folder, prefix .. "*." .. ext)
 		local cmd
@@ -193,14 +190,62 @@ function CMD.buildInspectCommand(binary, jpegPath)
 	}, " ")
 end
 
+function CMD.pluginBinDir()
+	return LrPathUtils.parent(CMD.bundledBinaryPath())
+end
+
+local function appendCaptureToLog(logPath, capturePath)
+	if not logPath or logPath == "" or not capturePath then
+		return
+	end
+	local cap = io.open(capturePath, "rb")
+	if not cap then
+		return
+	end
+	local content = cap:read("*a")
+	cap:close()
+	if not content or content == "" then
+		pcall(function()
+			LrFileUtils.delete(capturePath)
+		end)
+		return
+	end
+	local log = io.open(logPath, "a")
+	if log then
+		log:write(content)
+		if string.sub(content, -1) ~= "\n" then
+			log:write("\n")
+		end
+		log:close()
+	end
+	pcall(function()
+		LrFileUtils.delete(capturePath)
+	end)
+end
+
 --- Run via shell; returns exit status (number). Optional logPath appends stdout/stderr.
 function CMD.runShell(line, logPath)
-	if logPath and logPath ~= "" then
-		if CMD.isWindows() then
-			line = line .. " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
-		else
-			line = line .. " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
+	if CMD.isWindows() then
+		local binDir = CMD.pluginBinDir()
+		local tempRoot = LrPathUtils.getStandardFilePath("temp") or "."
+		local capturePath = LrPathUtils.child(
+			tempRoot,
+			"uhdr_run_" .. tostring(os.time()) .. "_" .. tostring(math.random(100000, 999999)) .. ".txt"
+		)
+		local inner = line
+		if logPath and logPath ~= "" then
+			inner = inner .. " > " .. CMD.shellQuote(capturePath) .. " 2>&1"
 		end
+		local wrapped = "cd /d " .. CMD.shellQuote(binDir) .. " && " .. inner
+		local cmdLine = "cmd /c " .. CMD.shellQuote(wrapped)
+		local st = LrTasks.execute(cmdLine)
+		if logPath and logPath ~= "" then
+			appendCaptureToLog(logPath, capturePath)
+		end
+		return st
+	end
+	if logPath and logPath ~= "" then
+		line = line .. " >> " .. CMD.shellQuote(logPath) .. " 2>&1"
 	end
 	return LrTasks.execute(line)
 end

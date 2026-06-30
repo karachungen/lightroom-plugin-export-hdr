@@ -1,6 +1,7 @@
 #include "uhdr_encode.h"
 
 #include "gainmap_metadata.h"
+#include "path_io.h"
 
 #include <ultrahdr_api.h>
 
@@ -67,7 +68,7 @@ bool encode_ultra_hdr_jpeg(const RawImageHolder& hdr_holder, const RawImageHolde
     return false;
   }
 
-  std::ofstream ofs(output_path, std::ios::binary);
+  std::ofstream ofs = open_output_binary(output_path);
   if (!ofs) {
     uhdr_release_encoder(enc);
     if (error) *error = "Could not open output file: " + output_path;

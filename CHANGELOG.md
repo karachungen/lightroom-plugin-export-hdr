@@ -7,6 +7,18 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v2.0.0-r20
+
+### Added
+
+- 🪟 **Windows x64** — WIC-based `uhdr_repack.exe`, portable plug-in layer, and `ExportHDR.lrplugin-windows-x64.zip` release asset.
+- ✂️ **Slice images** — optional `1:1` or `4:5` slicing in the export filter; numbered Ultra HDR JPEGs with per-slice gain maps.
+- 🛠️ Unified build orchestrator (`scripts/build_plugin.sh` / `build_plugin.ps1`) for local + CI.
+
+### Changed
+
+- 🚀 Major version **2.0.0** — Windows + slicing are now first-class, documented features.
+
 ## v1.0.0-r19
 
 ### Fixed

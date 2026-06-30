@@ -7,8 +7,13 @@ Place sample inputs here for the smoke-test scripts:
 
 Outputs (`out_uhdr.jpg`) are gitignored; the script writes them when run.
 
-**Run:**
-- macOS/Linux: `./scripts/run_uhdr_test.sh`
-- Windows: `.\scripts\run_uhdr_test.ps1`
+**Run** (after `./scripts/build_plugin.sh bundle` or `all`):
+
+- macOS / Git Bash: `./scripts/run_uhdr_test.sh` or `./scripts/build_plugin.sh test`
+- Windows PowerShell: `.\scripts\build_plugin.ps1 test` (uses Git Bash when available)
+
+The smoke scripts include a Cyrillic folder path test (`test/тест/`). Lightroom exports with Cyrillic filenames use ASCII staging inside the plug-in temp folder before calling `uhdr_repack`; the final `--out` path may still contain Cyrillic.
 
 If these files are missing, the script exits with a clear message.
+
+**Unicode paths:** the smoke scripts also encode to `test/тест/out_uhdr.jpg` (Cyrillic folder name, normal output filename) to verify UTF-8 path handling on Windows and macOS. Inputs stay ASCII (`hdr-raw.tif`, `sdr.jpg`).

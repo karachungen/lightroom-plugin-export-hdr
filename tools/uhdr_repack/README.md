@@ -49,51 +49,44 @@ flowchart TB
 
 From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. On macOS, libjpeg is provided by the system or Homebrew (**`brew install jpeg-turbo`**). On Windows, libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`**. Use **CMake 3.15–3.31.x** on Windows (CMake 4.x fails on vendored libjpeg-turbo 3.0.1 until upstream updates; CI pins **3.31.6**). First configure downloads libultrahdr into **`build/_deps/`**.
 
-**macOS:**
+**Canonical configure/build** (shared by local builds and GitHub Actions) — use [CMakePresets.json](CMakePresets.json):
 
 ```bash
 cd tools/uhdr_repack
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --preset macos-arm64-release -S .
 cmake --build build
 ```
-
-→ **`build/uhdr_repack`**
-
-**Windows (x64, MSVC):**
 
 ```powershell
 cd tools\uhdr_repack
-# Developer shell or CI (Ninja + cl.exe on PATH):
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --preset windows-x64-release -S .
 cmake --build build
-
-# Or with a full Visual Studio install:
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
 ```
 
-→ **`build/uhdr_repack.exe`** (Ninja) or **`build/Release/uhdr_repack.exe`** (VS generator)
+→ **`build/uhdr_repack`** (macOS) or **`build/uhdr_repack.exe`** (Windows, Ninja)
 
 System libultrahdr instead of vendored:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUHDR_USE_SYSTEM=ON -DUHDR_ROOT=/usr/local
-cmake --build build
+cmake --preset macos-arm64-release -S . -DUHDR_USE_SYSTEM=ON -DUHDR_ROOT=/usr/local
+cmake --build --preset macos-arm64-release
 ```
 
 ## Lightroom bundle
 
-**Repository root (platform-specific):**
+**Repository root** — full pipeline (build, bundle, smoke test, release zip):
 
 ```bash
-./scripts/bundle_uhdr_for_plugin.sh          # macOS arm64
+./scripts/build_plugin.sh all          # macOS arm64
 ```
 
 ```powershell
-.\scripts\bundle_uhdr_for_plugin_windows.ps1  # Windows x64
+.\scripts\build_plugin.ps1 all       # Windows x64
 ```
 
-Each script copies only that platform's binary and runtime libraries into **`ExportHDR.lrplugin/bin/`**. Plug-in flow: **[../../README.md](../../README.md)**
+Legacy aliases (build + bundle only): `bundle_uhdr_for_plugin.sh` / `bundle_uhdr_for_plugin_windows.ps1`.
+
+Each platform copies only that OS binary and runtime libraries into **`ExportHDR.lrplugin/bin/`**. Plug-in flow: **[../../README.md](../../README.md)**
 
 ## Usage
 
@@ -129,11 +122,12 @@ Gain maps are **re-derived per slice** from identically cropped HDR TIFF + SDR b
 Fixtures: **[../../test/README.md](../../test/README.md)** · repo root:
 
 ```bash
-./scripts/run_uhdr_test.sh
+./scripts/build_plugin.sh test
+# or: ./scripts/run_uhdr_test.sh
 ```
 
 ```powershell
-.\scripts\run_uhdr_test.ps1
+.\scripts\build_plugin.ps1 test
 ```
 
 Defaults → encode, **`--inspect`**, checks **`gainmap_size`** & **`primary_xmp`**
