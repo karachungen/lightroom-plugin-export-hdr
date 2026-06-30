@@ -7,6 +7,12 @@ Each public build is tagged `vX.Y.Z-rN`, where `X.Y.Z` comes from `Info.lua` sem
 
 ## Unreleased
 
+## v1.0.0-r16
+
+### Fixed
+
+- Windows smoke test: prefer bundled `ExportHDR.lrplugin/bin/uhdr_repack.exe` (DLLs colocated) and handle native exit codes under pwsh 7.
+
 ## v1.0.0-r15
 
 ### Fixed

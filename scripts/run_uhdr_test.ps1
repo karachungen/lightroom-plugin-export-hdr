@@ -2,6 +2,7 @@
 #Requires -Version 5.1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
@@ -10,10 +11,11 @@ $Hdr = Join-Path $TestDir "hdr-raw.tif"
 $Base = Join-Path $TestDir "sdr.jpg"
 $Out = Join-Path $TestDir "out_uhdr.jpg"
 
+# Prefer bundled plugin binary (uhdr.dll next to exe); build-tree exe alone often lacks DLLs on Windows.
 $BinCandidates = @(
+	(Join-Path $RepoRoot "ExportHDR.lrplugin\bin\uhdr_repack.exe"),
 	(Join-Path $RepoRoot "tools\uhdr_repack\build\Release\uhdr_repack.exe"),
-	(Join-Path $RepoRoot "tools\uhdr_repack\build\uhdr_repack.exe"),
-	(Join-Path $RepoRoot "ExportHDR.lrplugin\bin\uhdr_repack.exe")
+	(Join-Path $RepoRoot "tools\uhdr_repack\build\uhdr_repack.exe")
 )
 $Bin = $null
 foreach ($candidate in $BinCandidates) {
@@ -31,6 +33,9 @@ or manually (Visual Studio generator, not NMake):
   cmake --build tools/uhdr_repack/build --config Release
 "@
 }
+
+$BinDir = Split-Path -Parent $Bin
+$env:PATH = "$BinDir;$env:PATH"
 
 if (-not (Test-Path -LiteralPath $Hdr) -or -not (Test-Path -LiteralPath $Base)) {
 	Write-Error "Missing test inputs. See test/README.md — need:`n  $Hdr`n  $Base"
@@ -64,7 +69,9 @@ function Assert-InspectOk {
 Write-Host "==> Using $Bin"
 Remove-Item -Force -ErrorAction SilentlyContinue $Out, (Join-Path $TestDir "out_uhdr_*.jpg")
 & $Bin --hdr-tiff $Hdr --base $Base --out $Out
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($LASTEXITCODE -ne 0) {
+	throw "encode failed (exit $LASTEXITCODE): $Bin --hdr-tiff $Hdr --base $Base --out $Out"
+}
 Assert-InspectOk $Out
 Write-Host "OK: default encode — gain map matches dimensions and primary_xmp is present."
 
