@@ -8,6 +8,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PLUGIN_DIR="$REPO_ROOT/ExportHDR.lrplugin"
 PLUGIN_BIN="$PLUGIN_DIR/bin"
 
+if [[ ! -f "$PLUGIN_DIR/Info.lua" ]]; then
+	echo "Missing $PLUGIN_DIR/Info.lua — plug-in Lua sources must be present before packaging." >&2
+	exit 1
+fi
+
 usage() {
 	cat <<'EOF'
 Usage: package_plugin.sh [macos-arm64|windows-x64]

@@ -324,6 +324,115 @@ local function jpegHeaderLooksValid(path)
 	return a == 0xFF and b == 0xD8 and c == 0xFF
 end
 
+--- Promote staged encoder output to the Lightroom export path (Windows staging only).
+local function promoteEncodedFile(src, dest, logPath, sdrSizeBytes)
+	if not src or not dest or not LrFileUtils.exists(src) then
+		return false, "source missing"
+	end
+	local srcSize = fileSizeBytes(src)
+	if not srcSize or srcSize <= 0 or not jpegHeaderLooksValid(src) then
+		return false, "invalid staged JPEG"
+	end
+	if LrFileUtils.exists(dest) then
+		pcall(function()
+			LrFileUtils.delete(dest)
+		end)
+	end
+	local copyOk = pcall(function()
+		LrFileUtils.copy(src, dest)
+	end)
+	if not copyOk or not LrFileUtils.exists(dest) then
+		return false, "copy failed"
+	end
+	local destSize = fileSizeBytes(dest)
+	if logPath then
+		Log.append(
+			logPath,
+			"Promote: src=" .. tostring(srcSize) .. " bytes dest=" .. tostring(destSize) .. " bytes\n"
+		)
+	end
+	if not destSize or destSize <= 0 then
+		return false, "destination empty"
+	end
+	if sdrSizeBytes and srcSize > sdrSizeBytes and destSize == sdrSizeBytes then
+		return false, "destination still matches SDR size after promote"
+	end
+	if destSize ~= srcSize then
+		return false, "destination size mismatch after promote"
+	end
+	return true
+end
+
+--- Promote a staged slice JPEG to the export folder (Windows staging only).
+local function promoteSliceFile(src, dest, logPath)
+	if not src or not dest or not LrFileUtils.exists(src) then
+		return false
+	end
+	if LrFileUtils.exists(dest) then
+		pcall(function()
+			LrFileUtils.delete(dest)
+		end)
+	end
+	local copyOk = pcall(function()
+		LrFileUtils.copy(src, dest)
+	end)
+	if not copyOk or not LrFileUtils.exists(dest) then
+		return false
+	end
+	local srcSize = fileSizeBytes(src)
+	local destSize = fileSizeBytes(dest)
+	if logPath and srcSize and destSize then
+		Log.append(
+			logPath,
+			"Promote slice: src=" .. tostring(srcSize) .. " bytes dest=" .. tostring(destSize) .. " bytes\n"
+		)
+	end
+	return srcSize and destSize and destSize == srcSize
+end
+
+--- Run uhdr_repack --inspect and return whether output reports Ultra HDR.
+local function inspectIsUltraHdr(binary, path)
+	if not path or not LrFileUtils.exists(path) then
+		return false
+	end
+	local cmd = CMD.buildInspectCommand(binary, path)
+	if CMD.isWindows() then
+		cmd = cmd .. " 2>nul"
+	else
+		cmd = cmd .. " 2>/dev/null"
+	end
+	local handle = io.popen(cmd)
+	if not handle then
+		return false
+	end
+	local out = handle:read("*a") or ""
+	handle:close()
+	return string.find(out, "is_ultra_hdr: yes", 1, true) ~= nil
+end
+
+--- Fail export when final JPEG is not valid Ultra HDR (size + inspect).
+local function assertFinalUltraHdr(binary, outPath, logPath, sdrSizeBytes)
+	local outSize = fileSizeBytes(outPath)
+	if logPath then
+		Log.append(
+			logPath,
+			"Final output size: " .. tostring(outSize) .. " bytes (SDR base was " .. tostring(sdrSizeBytes) .. ")\n"
+		)
+	end
+	if not outSize or outSize <= 0 or not jpegHeaderLooksValid(outPath) then
+		error("Ultra HDR: encoder output is missing or not a JPEG: " .. tostring(outPath))
+	end
+	if sdrSizeBytes and outSize == sdrSizeBytes then
+		error(
+			"Ultra HDR: final export matches SDR base size — gain map was not written to "
+				.. tostring(outPath)
+		)
+	end
+	if not inspectIsUltraHdr(binary, outPath) then
+		error("Ultra HDR: --inspect reports the final export is not Ultra HDR: " .. tostring(outPath))
+	end
+end
+
 --[[
   Lightroom sometimes returns from waitForRender before the file is fully flushed.
   Wait until byte size is stable across two reads and the TIFF header is valid.
@@ -713,6 +822,7 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 
 		local outPath = basePath
+		local useStagingOut = CMD.isWindows()
 
 		-- ASCII-only staging paths for cmd.exe (avoids Cyrillic / special-char mangling in LrTasks.execute).
 		local encodeHdrPath = LrPathUtils.child(tempDir, "uhdr_hdr_encode.tif")
@@ -736,8 +846,13 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 		Log.append(logPath, "Encode staging SDR: " .. tostring(encodeBasePath) .. "\n")
 
-		local encodeOutPath = LrPathUtils.child(tempDir, "uhdr_out_encode.jpg")
-		Log.append(logPath, "Encode staging OUT: " .. tostring(encodeOutPath) .. "\n")
+		local encodeOutPath
+		if useStagingOut then
+			encodeOutPath = LrPathUtils.child(tempDir, "uhdr_out_encode.jpg")
+			Log.append(logPath, "Encode staging OUT: " .. tostring(encodeOutPath) .. "\n")
+		else
+			encodeOutPath = outPath
+		end
 		Log.append(logPath, "Final OUT: " .. tostring(outPath) .. "\n")
 
 		if UHDR.sliceAspectEnabled(propertyTable) then
@@ -786,38 +901,45 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 
 		if not LrFileUtils.exists(encodeOutPath) then
 			safeDeleteTree(tempDir)
-			error("Ultra HDR: encoder did not write staged output: " .. tostring(encodeOutPath))
+			error("Ultra HDR: encoder did not write output: " .. tostring(encodeOutPath))
 		end
 
-		local outCopyOk = pcall(function()
-			LrFileUtils.copy(encodeOutPath, outPath)
-		end)
-		if not outCopyOk or not LrFileUtils.exists(outPath) then
-			safeDeleteTree(tempDir)
-			error("Ultra HDR: could not copy encoded JPEG to export path: " .. tostring(outPath))
-		end
-		Log.append(logPath, "Copied staged output to: " .. tostring(outPath) .. "\n")
+		local sdrSize = fileSizeBytes(encodeBasePath)
 
-		if UHDR.sliceAspectEnabled(propertyTable) then
-			local aspect = propertyTable[UHDR.KEY.sliceAspect]
-			local stagedSlices = CMD.listSliceOutputs(encodeOutPath, aspect)
-			Log.append(logPath, "Promoting " .. tostring(#stagedSlices) .. " slice file(s) to export folder\n")
-			for _, stagedSlice in ipairs(stagedSlices) do
-				local finalSlice = CMD.promoteStagedSlicePath(stagedSlice, encodeOutPath, outPath)
-				if not finalSlice then
-					safeDeleteTree(tempDir)
-					error("Ultra HDR: could not map staged slice path: " .. tostring(stagedSlice))
+		if useStagingOut then
+			local promoteOk, promoteErr = promoteEncodedFile(encodeOutPath, outPath, logPath, sdrSize)
+			if not promoteOk then
+				safeDeleteTree(tempDir)
+				error(
+					"Ultra HDR: could not promote encoded JPEG to export path: "
+						.. tostring(promoteErr)
+						.. " ("
+						.. tostring(outPath)
+						.. ")"
+				)
+			end
+			Log.append(logPath, "Copied staged output to: " .. tostring(outPath) .. "\n")
+
+			if UHDR.sliceAspectEnabled(propertyTable) then
+				local aspect = propertyTable[UHDR.KEY.sliceAspect]
+				local stagedSlices = CMD.listSliceOutputs(encodeOutPath, aspect)
+				Log.append(logPath, "Promoting " .. tostring(#stagedSlices) .. " slice file(s) to export folder\n")
+				for _, stagedSlice in ipairs(stagedSlices) do
+					local finalSlice = CMD.promoteStagedSlicePath(stagedSlice, encodeOutPath, outPath)
+					if not finalSlice then
+						safeDeleteTree(tempDir)
+						error("Ultra HDR: could not map staged slice path: " .. tostring(stagedSlice))
+					end
+					if not promoteSliceFile(stagedSlice, finalSlice, logPath) then
+						safeDeleteTree(tempDir)
+						error("Ultra HDR: could not copy slice to: " .. tostring(finalSlice))
+					end
+					Log.append(logPath, "Copied slice to: " .. tostring(finalSlice) .. "\n")
 				end
-				local sliceCopyOk = pcall(function()
-					LrFileUtils.copy(stagedSlice, finalSlice)
-				end)
-				if not sliceCopyOk or not LrFileUtils.exists(finalSlice) then
-					safeDeleteTree(tempDir)
-					error("Ultra HDR: could not copy slice to: " .. tostring(finalSlice))
-				end
-				Log.append(logPath, "Copied slice to: " .. tostring(finalSlice) .. "\n")
 			end
 		end
+
+		assertFinalUltraHdr(binary, outPath, logPath, sdrSize)
 
 		if propertyTable[UHDR.KEY.runInspect] then
 			local ins = CMD.buildInspectCommand(binary, outPath)

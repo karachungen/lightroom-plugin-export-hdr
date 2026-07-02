@@ -7,6 +7,19 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.3
+
+### Fixed
+
+- macOS export filter: stop using `package.config` for platform detection; Lightroom's Lua sandbox does not expose `package`, which caused an internal error on `Command.lua` line 20.
+- macOS export filter: final JPEG stayed SDR-only after v2.0.1 because staged Ultra HDR was not promoted to the Lightroom export path; restore direct `--out` on macOS (Windows keeps temp staging with delete-before-copy verification).
+- macOS export filter: fail export when `--inspect` reports the final JPEG is not Ultra HDR (catches silent SDR-only promotion).
+
+### Changed
+
+- Local build default is `install` (build → bundle → test, updates `ExportHDR.lrplugin` in place, no zip); CI/release still uses `all`.
+- `package_plugin.sh` refuses to zip when `Info.lua` is missing (prevents bin-only release archives).
+
 ## v2.0.2
 
 ### Fixed

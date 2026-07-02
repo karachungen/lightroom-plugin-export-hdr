@@ -3,7 +3,7 @@
 # Uses CMake presets in tools/uhdr_repack/CMakePresets.json — same path for local and CI.
 #
 # Usage:
-#   ./scripts/build_plugin.sh [install-deps|build|bundle|test|package|all] [--preset NAME] [--clean]
+#   ./scripts/build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean]
 set -euo pipefail
 
 # Pin CMake 3.31.x on Windows (CMake 4.x breaks vendored libjpeg-turbo).
@@ -21,14 +21,15 @@ COMMAND=""
 
 usage() {
 	cat <<'EOF'
-Usage: build_plugin.sh [install-deps|build|bundle|test|package|all] [--preset NAME] [--clean]
+Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean]
 
   install-deps  Install platform build dependencies (macOS: brew; Windows local: setup_windows_build.ps1)
+  install       build → bundle → test (default; updates ExportHDR.lrplugin in place, no zip)
   build         cmake --preset + cmake --build
   bundle        Copy encoder + runtime libs into ExportHDR.lrplugin/bin
   test          Run scripts/run_uhdr_test.sh
   package       Create platform zip via scripts/package_plugin.sh
-  all           build → bundle → test → package
+  all           build → bundle → test → package (CI / release)
 
 Options:
   --preset NAME   Override auto-detected preset (macos-arm64-release | windows-x64-release)
@@ -38,7 +39,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-	install-deps | build | bundle | test | package | all)
+	install-deps | install | build | bundle | test | package | all)
 		COMMAND="$1"
 		shift
 		;;
@@ -63,7 +64,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$COMMAND" ]]; then
-	COMMAND="all"
+	COMMAND="install"
 fi
 
 detect_preset() {
@@ -366,12 +367,19 @@ cmd_test() {
 	"$SCRIPT_DIR/run_uhdr_test.sh"
 }
 
+cmd_install() {
+	cmd_build
+	cmd_bundle
+	cmd_test
+}
+
 cmd_package() {
 	"$SCRIPT_DIR/package_plugin.sh" "$(detect_platform_id)"
 }
 
 case "$COMMAND" in
 install-deps) cmd_install_deps ;;
+install) cmd_install ;;
 build) cmd_build ;;
 bundle) cmd_bundle ;;
 test) cmd_test ;;

@@ -3,8 +3,8 @@
 #Requires -Version 5.1
 param(
 	[Parameter(Position = 0)]
-	[ValidateSet("install-deps", "build", "bundle", "test", "package", "all")]
-	[string]$Command = "all",
+	[ValidateSet("install-deps", "install", "build", "bundle", "test", "package", "all")]
+	[string]$Command = "install",
 	[switch]$InstallDeps,
 	[switch]$Clean,
 	[string]$Preset = "windows-x64-release"
@@ -179,6 +179,12 @@ if ($InstallDeps) {
 
 switch ($Command) {
 	"install-deps" { Invoke-InstallDeps }
+	"install" {
+		Ensure-BuildDependencies -ScriptDir $ScriptDir -InstallDeps:$InstallDeps
+		Invoke-CmakeBuild
+		Invoke-BundleWindows
+		Invoke-TestStep
+	}
 	"build" {
 		Ensure-BuildDependencies -ScriptDir $ScriptDir -InstallDeps:$InstallDeps
 		Invoke-CmakeBuild

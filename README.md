@@ -20,6 +20,19 @@ Lightroom can edit/export HDR, but HDR support across apps is still uneven. Inst
 2. The plugin runs an internal HDR TIFF export with matching dimensions.
 3. Bundled `uhdr_repack` encodes the gain-map JPEG and replaces the base file path with the final Ultra HDR `.jpg`.
 
+## Local development
+
+From the repo root, build and refresh the in-tree plug-in (no zip):
+
+```bash
+./scripts/build_plugin.sh
+# same as: ./scripts/build_plugin.sh install
+```
+
+This runs **build → bundle → test** and updates `ExportHDR.lrplugin/bin/` in place. In Lightroom: **File → Plug-in Manager → Add** (or Reload) and select the `ExportHDR.lrplugin` folder in this repo.
+
+Do **not** unzip release archives over the dev `ExportHDR.lrplugin` folder — that can remove the Lua sources. Use `./scripts/build_plugin.sh all` only when you need a release zip (same as CI).
+
 ## Install and use
 
 1. Download plugin from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases)

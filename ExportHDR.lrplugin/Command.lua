@@ -14,11 +14,7 @@ local CMD = {}
 
 --- True when running in Lightroom Classic on Windows.
 function CMD.isWindows()
-	if WIN_ENV == true then
-		return true
-	end
-	local sep = package.config:sub(1, 1)
-	return sep == "\\"
+	return WIN_ENV == true
 end
 
 function CMD.binaryFileName()
