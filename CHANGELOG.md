@@ -7,6 +7,12 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+### Fixed
+
+- Windows export filter: encoding always failed with `uhdr_repack failed (exit 1, raw 1)` because `LrTasks.execute` passes the line to `cmd /c` verbatim and cmd strips the first and last quote when the line starts with a quoted exe path. `runShell` now wraps the whole command in sacrificial outer quotes.
+- Windows export filter: `--inspect` verification (`inspectIsUltraHdr`) ran a relative `uhdr_repack.exe` via `io.popen` from Lightroom's working directory, so the encoder was never found; it now resolves the bundled absolute path and uses the same sacrificial-quote wrapping.
+- Windows quoting regression test invoked cmd via `Start-Process`, which re-quotes the argument string and masked the bug; it now passes the command line to `cmd.exe /c` verbatim like `LrTasks.execute`, asserts the unwrapped pattern fails, and checks `--inspect` output. The test now runs in the Windows release CI job (it previously existed only as a manual script).
+
 ## v2.0.3
 
 ### Fixed
