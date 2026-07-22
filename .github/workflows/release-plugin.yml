@@ -13,6 +13,8 @@ on:
       - "scripts/bundle_uhdr_for_plugin.sh"
       - "scripts/bundle_uhdr_for_plugin_windows.ps1"
       - "scripts/run_uhdr_test.sh"
+      - "scripts/run_uhdr_test.ps1"
+      - "scripts/test_windows_cmd_quote.ps1"
       - "scripts/windows_build_common.ps1"
       - "scripts/setup_windows_build.ps1"
   workflow_dispatch:
@@ -61,6 +63,11 @@ jobs:
       - name: Build, test, and package plugin
         shell: bash
         run: bash scripts/build_plugin.sh all
+
+      - name: Windows cmd quoting regression test
+        if: matrix.id == 'windows-x64'
+        shell: powershell
+        run: .\scripts\test_windows_cmd_quote.ps1
 
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4

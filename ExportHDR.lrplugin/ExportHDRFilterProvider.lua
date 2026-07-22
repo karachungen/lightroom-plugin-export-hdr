@@ -397,7 +397,9 @@ local function inspectIsUltraHdr(binary, path)
 	end
 	local cmd = CMD.buildInspectCommand(binary, path)
 	if CMD.isWindows() then
-		cmd = cmd .. " 2>nul"
+		-- io.popen also goes through `cmd /c`; resolve the relative exe name to the
+		-- absolute bundled path and add sacrificial quotes (see CMD.wrapForWindowsShell).
+		cmd = CMD.wrapForWindowsShell(CMD.resolveWindowsCommand(cmd) .. " 2>nul")
 	else
 		cmd = cmd .. " 2>/dev/null"
 	end
@@ -874,7 +876,10 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 
 		Log.append(logPath, "Command: " .. cmdLine .. "\n")
 		if CMD.isWindows() then
-			Log.append(logPath, "Execute: " .. CMD.resolveWindowsCommand(cmdLine) .. "\n")
+			Log.append(
+				logPath,
+				"Execute: " .. CMD.wrapForWindowsShell(CMD.resolveWindowsCommand(cmdLine)) .. "\n"
+			)
 		end
 		local st = CMD.runShell(cmdLine, logPath)
 		if st ~= 0 then

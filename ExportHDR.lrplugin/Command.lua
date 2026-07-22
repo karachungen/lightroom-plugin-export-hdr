@@ -225,6 +225,15 @@ function CMD.resolveWindowsCommand(line)
 	return line
 end
 
+--- When `cmd /c "<line>"` is run, the first and last quotes are removed
+--- So `cmd /c "test1.exe"` gets converted to `cmd /c test1.exe` which still works.
+--- But when chaining commands like `cmd /c "test1.exe" "test2.exe"`
+--- they get converted to `cmd /c test1.exe" "test2.exe` and fails.
+--- Here we add a pair of extra quotes at beginning and end
+function CMD.wrapForWindowsShell(line)
+	return '"' .. line .. '"'
+end
+
 local function appendCaptureToLog(logPath, capturePath)
 	if not logPath or logPath == "" or not capturePath then
 		return
@@ -266,7 +275,7 @@ function CMD.runShell(line, logPath)
 		if logPath and logPath ~= "" then
 			inner = inner .. " > " .. CMD.shellQuote(capturePath) .. " 2>&1"
 		end
-		local st = LrTasks.execute(inner)
+		local st = LrTasks.execute(CMD.wrapForWindowsShell(inner))
 		if logPath and logPath ~= "" then
 			appendCaptureToLog(logPath, capturePath)
 		end
