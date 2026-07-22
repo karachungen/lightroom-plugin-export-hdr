@@ -7,6 +7,8 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.4
+
 ### Fixed
 
 - Windows export filter: encoding always failed with `uhdr_repack failed (exit 1, raw 1)` because `LrTasks.execute` passes the line to `cmd /c` verbatim and cmd strips the first and last quote when the line starts with a quoted exe path. `runShell` now wraps the whole command in sacrificial outer quotes.
