@@ -6,10 +6,12 @@ on:
     paths:
       - "ExportHDR.lrplugin/**"
       - "tools/uhdr_repack/**"
+      - "CHANGELOG.md"
       - "scripts/build_plugin.sh"
       - "scripts/build_plugin.ps1"
       - "scripts/package_plugin.sh"
       - "scripts/parse_plugin_version.sh"
+      - "scripts/build_release_notes.sh"
       - "scripts/bundle_uhdr_for_plugin.sh"
       - "scripts/bundle_uhdr_for_plugin_windows.ps1"
       - "scripts/run_uhdr_test.sh"
@@ -88,10 +90,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Parse version from Info.lua
         id: ver
         run: bash scripts/parse_plugin_version.sh --github-output
+
+      - name: Validate changelog section for release tag
+        run: bash scripts/build_release_notes.sh --check-only
+
+      - name: Build release notes from CHANGELOG.md
+        run: bash scripts/build_release_notes.sh
 
       - name: Download platform artifacts
         uses: actions/download-artifact@v4
@@ -104,26 +115,7 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: Ultra HDR Export v${{ steps.ver.outputs.semver }}
-          body: |
-            ## 🎉 Ultra HDR Export v${{ steps.ver.outputs.semver }}
-
-            ### ✨ Highlights
-            - 🪟 **Windows x64** — full plug-in + `uhdr_repack.exe` (WIC loader, colocated DLLs)
-            - ✂️ **Slice images** — optional `1:1` or `4:5` tiles; keeps the master Ultra HDR file and writes numbered slices beside it
-
-            **Platforms:** separate plug-in archives per OS (no mixed binaries).
-
-            | Platform | Archive |
-            |----------|---------|
-            | macOS 26 (Tahoe), ARM64 | `ExportHDR.lrplugin-macos-arm64.zip` |
-            | Windows x64 | `ExportHDR.lrplugin-windows-x64.zip` |
-
-            **Lightroom:** Classic **14+** (`LrSdkMinimumVersion` in `Info.lua`).
-
-            **Install:** unzip the archive for your OS, then in Lightroom **File → Plug-in Manager → Add** and select the `ExportHDR.lrplugin` folder.
-
-            **Commit:** [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})  
-            **Workflow run:** [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          body_path: RELEASE_NOTES.md
           files: |
             release-assets/ExportHDR.lrplugin-macos-arm64.zip
             release-assets/ExportHDR.lrplugin-windows-x64.zip

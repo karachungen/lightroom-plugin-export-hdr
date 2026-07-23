@@ -93,11 +93,16 @@ fi
   cat <<EOF
 ---
 
-**Platform:** **macOS 26 (Tahoe), ARM64.** Built on GitHub \`macos-26\`.
+**Platforms:** separate plug-in archives per OS (no mixed binaries).
+
+| Platform | Archive |
+|----------|---------|
+| macOS 26 (Tahoe), ARM64 | \`ExportHDR.lrplugin-macos-arm64.zip\` |
+| Windows x64 | \`ExportHDR.lrplugin-windows-x64.zip\` |
 
 **Lightroom:** Classic **14+** (\`LrSdkMinimumVersion\` in \`Info.lua\`).
 
-**Install:** unzip the archive, then in Lightroom **File → Plug-in Manager → Add** and select the \`ExportHDR.lrplugin\` folder.
+**Install:** unzip the archive for your OS, then in Lightroom **File → Plug-in Manager → Add** and select the \`ExportHDR.lrplugin\` folder.
 
 **Commit:** [\`${commit_sha}\`](https://github.com/${repository}/commit/${commit_sha})  
 **Workflow run:** [${run_id}](https://github.com/${repository}/actions/runs/${run_id})
