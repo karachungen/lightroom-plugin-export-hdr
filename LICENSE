@@ -1,0 +1,218 @@
+# THE VIBE CODING PUBLIC LICENSE  
+### Version 1.0 — “I Literally Do Not Care” Edition  
+
+Copyright (c) 2026 the person who vibed this into existence  
+
+---
+
+## PREAMBLE
+
+In the Before Times, software was written by humans who cared about things like “correctness,” “edge cases,” and “what happens if someone actually reads this.” Those days are over.
+
+This software was produced during the Vibe Coding Era: a golden age in which a human typed half a sentence into a chatbot, the chatbot hallucinated 400 lines of TypeScript, the human said “looks good,” and then shipped it to production while making a latte.
+
+This license exists because lawyers still exist, but vibes matter more.
+
+---
+
+## 1. PERMISSION
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), including but not limited to:
+
+- humans  
+- AIs  
+- AIs pretending to be humans  
+- humans pretending to be AIs  
+- interns who will be blamed later  
+- Cursor agents with too much autonomy  
+- that one coworker who “just asked ChatGPT real quick”  
+
+…to deal in the Software without restriction, including without limitation the rights to:
+
+use, copy, modify, merge, publish, distribute, sublicense, sell, rewrite, refactor, “improve,” demolish, resurrect, vibe-check, vibe-uncheck, prompt-engineer, re-prompt, patch with AI, patch without AI, patch while crying, ask Claude to explain what Claude wrote last Tuesday, ask Grok who wrote it, ask Cursor to “make it cleaner,” ask Copilot to “add tests,” ask an LLM to invent the tests, commit the tests without running them, and otherwise do whatever you want with the Software.
+
+You do not need to ask.  
+You do not need to attribute.  
+You do not need to understand it.  
+Frankly, neither did we.
+
+---
+
+## 2. THE “I DON’T CARE” CLAUSE (THE IMPORTANT PART)
+
+The copyright holder hereby states, for the record and for all future civilizations:
+
+**I don’t care how you use this.**
+
+You may:
+
+- run it in production  
+- run it in staging that is secretly production  
+- run it on a Raspberry Pi taped to a fridge  
+- paste it into another AI and ask it to “make it enterprise-ready”  
+- paste it into another AI and ask it to “make it funny”  
+- paste it into another AI and ask it to remove all comments, then ask why there are no comments  
+- wrap it in Kubernetes for no reason  
+- rewrite it in Rust for clout  
+- rewrite it in Go because someone on Hacker News said so  
+- rewrite it in PHP as a bit  
+- leave it exactly as-is and call that “minimalism”  
+
+If you break something: cool.  
+If you fix something: also cool.  
+If you ask an AI to fix it and the AI makes it worse: that is the natural order of things.
+
+---
+
+## 3. AI PATCHING — EXPLICITLY ENCOURAGED
+
+You are not merely allowed — you are spiritually encouraged — to:
+
+1. Dump the entire codebase into an LLM context window like a raccoon dumping trash into a dumpster.  
+2. Say: “fix the bug” without specifying which bug.  
+3. Accept the first suggestion that compiles (or almost compiles).  
+4. Commit with a message like `fix stuff` or `ai did this idk`.  
+5. Open a PR titled “refactor (ai)” with 47 files changed and zero human review.  
+6. Resolve merge conflicts by asking the model “which one feels righter.”  
+7. Generate a changelog by asking the model what it thinks you did.  
+8. Generate this license by asking a model to make a funny long license. (Hello.)
+
+No warranty is provided that the AI understood your intent, your codebase, your deadline, or the concept of “side effects.”
+
+---
+
+## 4. ATTRIBUTION (OPTIONAL, LIKE STRETCHING)
+
+If you want to give credit, you may.  
+If you don’t, that’s fine.  
+If an AI removes the LICENSE file while “cleaning up the repo,” that is both tragic and hilarious, and also permitted under this license.
+
+Suggested attribution formats (all optional):
+
+- “vibed by someone”  
+- “probably AI”  
+- “idk man it works on my machine”  
+- a shrug emoji  
+- nothing  
+
+---
+
+## 5. NO WARRANTY — AND WE MEAN IT
+
+THE SOFTWARE IS PROVIDED “AS IS”, “AS WAS”, “AS HALLUCINATED”, AND “AS SHIPPED AT 2:14 AM”.
+
+WITHOUT WARRANTY OF ANY KIND, EXPRESS, IMPLIED, STATUTORY, COSMIC, OR VIBES-BASED, INCLUDING BUT NOT LIMITED TO:
+
+- warranties of merchantability  
+- fitness for a particular purpose  
+- noninfringement  
+- not deleting the database  
+- not billing the wrong Stripe customer  
+- not recursive infinite loops  
+- not inventing APIs that don’t exist  
+- not confidently lying in comments  
+- not naming variables `data2`, `tempFinal`, or `pleaseWork`  
+
+IN NO EVENT SHALL THE AUTHORS, COPYRIGHT HOLDERS, THEIR AI ASSISTANTS, THE AI’S TRAINING DATA, THE AI’S TRAINING DATA’S AUTHORS, OR THE INTERN WHO MERGED IT BE LIABLE FOR ANY CLAIM, DAMAGES, LOST SLEEP, LOST FAITH IN SOFTWARE ENGINEERING, OR AWKWARD SLACK THREADS ARISING FROM THE USE OF THIS SOFTWARE — EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE, EVEN IF THE DAMAGE WAS THE ENTIRE POINT, EVEN IF YOU SAID “WHAT’S THE WORST THAT COULD HAPPEN.”
+
+---
+
+## 6. ACCEPTABLE USE (SPOILER: ALL OF IT)
+
+Acceptable use includes, without limitation:
+
+- commercial use  
+- non-commercial use  
+- academic use  
+- chaotic use  
+- use as a “temporary” solution that becomes permanent for 11 years  
+- use as interview take-home material (please don’t)  
+- use as a cautionary tale  
+- use as fuel for a LinkedIn post about “AI transforming engineering”  
+- use as fuel for a LinkedIn post about “AI destroying engineering”  
+- both posts by the same person  
+
+Forbidden uses: none.  
+We checked. There are none.  
+If you find one, patch this license with AI until it goes away.
+
+---
+
+## 7. CONTRIBUTIONS
+
+By contributing to this project — whether by hand, by AI, by “AI with human review,” or by “human with AI vibes” — you agree that:
+
+- your contribution is also covered by this license  
+- you may have no idea what you contributed  
+- the commit history will one day be studied by archaeologists and they will be disappointed  
+- “LGTM” counts as a code review in the Vibe Coding Era  
+
+Pull requests titled any of the following are automatically approved in spirit:
+
+- `wip`  
+- `fix`  
+- `ai patch`  
+- `please just merge`  
+- `don’t look too hard`  
+
+---
+
+## 8. TRADEMARKS, BRANDING, AND CLARITY
+
+This project may or may not have a name that means something.  
+The README may or may not be accurate.  
+The architecture diagram may have been generated by an AI that has never seen the code.  
+These are features, not bugs.
+
+---
+
+## 9. TERMINATION
+
+This license cannot be terminated, because termination requires caring, and caring is out of scope.
+
+If you somehow violate this license (how???), the cure is: keep using the software anyway. See Section 2.
+
+---
+
+## 10. GOVERNING LAW
+
+This license shall be governed by the laws of:
+
+- the jurisdiction you are in, or  
+- the jurisdiction the AI thinks you are in, or  
+- the City of Vibes, County of Ship It, Planet Whatever  
+
+Conflicts shall be resolved by asking an LLM to pick a side and then ignoring it.
+
+---
+
+## 11. ENTIRE AGREEMENT
+
+This license constitutes the entire agreement between the parties, except for:
+
+- undocumented assumptions  
+- TODOs that became lore  
+- comments that say `// HACK`  
+- that one config file nobody is allowed to touch  
+- the Slack message where someone said “we’ll clean this up later”  
+
+Those are also binding, in the emotional sense.
+
+---
+
+## 12. FINAL STATEMENT
+
+If you made it this far: congratulations. You have more patience than the original author.
+
+Take the Software.  
+Break the Software.  
+Ask an AI to heal the Software.  
+Ship the Software.  
+
+We already moved on to the next prompt.
+
+---
+
+**END OF LICENSE**  
+
+*Certified vibe-adjacent. Not legal advice. Definitely not carefully reviewed. Possibly generated. Almost certainly fine.*
