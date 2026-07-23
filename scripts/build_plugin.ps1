@@ -65,24 +65,6 @@ function Invoke-BundleWindows {
 	Clear-PluginBin
 	Copy-Item -LiteralPath $buildExe -Destination (Join-Path $PluginBin "uhdr_repack.exe") -Force
 
-	$dllRoots = @(
-		$BuildDir,
-		(Join-Path $BuildDir "Release"),
-		(Join-Path $BuildDir "_deps\libultrahdr-build"),
-		(Join-Path $BuildDir "_deps\libultrahdr-build\Release")
-	)
-	$copied = @{}
-	foreach ($root in $dllRoots) {
-		if (-not (Test-Path -LiteralPath $root)) { continue }
-		Get-ChildItem -LiteralPath $root -Filter "*.dll" -File -ErrorAction SilentlyContinue | ForEach-Object {
-			if (-not $copied.ContainsKey($_.Name)) {
-				Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $PluginBin $_.Name) -Force
-				$copied[$_.Name] = $true
-				Write-Host "    bundled $($_.Name)"
-			}
-		}
-	}
-
 	$pluginExe = Join-Path $PluginBin "uhdr_repack.exe"
 	Write-Host "==> Smoke: uhdr_repack.exe (usage if no args)"
 	$prevEap = $ErrorActionPreference

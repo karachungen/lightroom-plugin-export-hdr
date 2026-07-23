@@ -136,7 +136,7 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake jpeg-turbo dylibbundler
+		brew install cmake
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
 		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -159,6 +159,10 @@ cmd_build() {
 		echo "==> Cleaning $BUILD_DIR"
 		rm -rf "$BUILD_DIR"
 	fi
+
+	# Vendored libjpeg-turbo's cmake_minimum_required() predates CMake 4's removal of
+	# compatibility with CMake < 3.5; this tells CMake to treat it as 3.5 instead of erroring.
+	export CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 	echo "==> Configuring preset: $PRESET"
 	if [[ ${#cmake_extra[@]} -gt 0 ]]; then
@@ -220,92 +224,10 @@ bundle_macos() {
 	cp "$build_exe" "$PLUGIN_BIN/uhdr_repack"
 	chmod +x "$PLUGIN_BIN/uhdr_repack"
 
-	local libuhdr_build="$BUILD_DIR/_deps/libultrahdr-build"
-	if [[ -d "$libuhdr_build" ]]; then
-		shopt -s nullglob
-		local f
-		for f in "$libuhdr_build"/libuhdr*.dylib; do
-			cp -f "$f" "$PLUGIN_BIN/"
-		done
-		shopt -u nullglob
-		local uhdr_bin="$PLUGIN_BIN/uhdr_repack"
-		local dep
-		while IFS= read -r dep; do
-			[[ -n "$dep" ]] || continue
-			case "$dep" in
-			@rpath/libuhdr*.dylib)
-				local base="${dep##*/}"
-				install_name_tool -change "$dep" "@loader_path/$base" "$uhdr_bin" 2>/dev/null || true
-				;;
-			esac
-		done < <(otool -L "$uhdr_bin" | tail -n +2 | awk '{print $1}')
-	fi
-
-	bundle_with_dylibbundler() {
-		if ! command -v dylibbundler &>/dev/null; then
-			return 1
-		fi
-		echo "==> Bundling dependencies with dylibbundler"
-		(
-			cd "$PLUGIN_BIN"
-			dylibbundler -od -b -x "./uhdr_repack" -d . -p "@loader_path/"
-		)
-	}
-
-	bundle_fallback() {
-		local dir="$PLUGIN_BIN"
-		local max=6 round
-		echo "==> Bundling dependencies (otool fallback; install dylibbundler for best results)"
-		for ((round = 1; round <= max; round++)); do
-			local changed=0
-			local bins=("$dir/uhdr_repack")
-			while IFS= read -r -d '' f; do
-				bins+=("$f")
-			done < <(find "$dir" -maxdepth 1 -name "*.dylib" -print0 2>/dev/null || true)
-			local bin dep name dest
-			for bin in "${bins[@]}"; do
-				[[ -f "$bin" ]] || continue
-				chmod u+w "$bin" || true
-				while IFS= read -r dep; do
-					[[ -n "$dep" ]] || continue
-					case "$dep" in
-					@*) continue ;;
-					/usr/lib/* | /System/*) continue ;;
-					*/libSystem*) continue ;;
-					esac
-					[[ ! -f "$dep" ]] && continue
-					[[ "$dep" == *.framework/* ]] && continue
-					name="$(basename "$dep")"
-					[[ "$name" == *.dylib ]] || continue
-					dest="$dir/$name"
-					if [[ ! -f "$dest" ]]; then
-						echo "    copy $dep"
-						cp -f "$dep" "$dest"
-						chmod u+w "$dest"
-						changed=1
-					fi
-					install_name_tool -change "$dep" "@loader_path/$name" "$bin" 2>/dev/null || true
-				done < <(otool -L "$bin" | tail -n +2 | awk '{ print $1 }')
-			done
-			[[ $changed -eq 0 ]] && break
-		done
-	}
-
-	if bundle_with_dylibbundler; then
-		:
-	else
-		bundle_fallback
-	fi
-
-	echo "==> Ad-hoc codesign (required after rewriting load commands)"
-	local f
-	for f in "$PLUGIN_BIN"/*.dylib; do
-		[[ -f "$f" ]] || continue
-		codesign --force --sign - "$f"
-	done
-	if [[ -f "$PLUGIN_BIN/uhdr_repack" ]]; then
-		codesign --force --sign - "$PLUGIN_BIN/uhdr_repack"
-	fi
+	# uhdr_repack links libuhdr and libjpeg-turbo statically (see tools/uhdr_repack/CMakeLists.txt),
+	# so the only remaining dependencies are Apple system frameworks/libraries — no bundling needed.
+	echo "==> Ad-hoc codesign (required after copying into the plug-in bundle)"
+	codesign --force --sign - "$PLUGIN_BIN/uhdr_repack"
 
 	echo "==> Bundled encoder: $PLUGIN_BIN/uhdr_repack"
 }
@@ -320,26 +242,6 @@ bundle_windows() {
 	echo "==> Cleaning old Windows bundle in $PLUGIN_BIN"
 	clean_plugin_bin
 	cp "$build_exe" "$PLUGIN_BIN/uhdr_repack.exe"
-
-	local roots=(
-		"$BUILD_DIR"
-		"$BUILD_DIR/Release"
-		"$BUILD_DIR/_deps/libultrahdr-build"
-		"$BUILD_DIR/_deps/libultrahdr-build/Release"
-	)
-	local root dll name
-	for root in "${roots[@]}"; do
-		[[ -d "$root" ]] || continue
-		shopt -s nullglob
-		for dll in "$root"/*.dll; do
-			name="$(basename "$dll")"
-			if [[ ! -f "$PLUGIN_BIN/$name" ]]; then
-				cp -f "$dll" "$PLUGIN_BIN/$name"
-				echo "    bundled $name"
-			fi
-		done
-		shopt -u nullglob
-	done
 
 	local plugin_exe="$PLUGIN_BIN/uhdr_repack.exe"
 	echo "==> Smoke: uhdr_repack.exe (usage if no args)"

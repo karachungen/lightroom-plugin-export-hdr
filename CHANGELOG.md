@@ -7,6 +7,16 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.6
+
+### Changed
+
+- Ship a single self-contained `uhdr_repack` binary on macOS and Windows: libultrahdr and libjpeg-turbo are linked statically, so downloads no longer include separate `.dylib` / `.dll` files that Gatekeeper can block one-by-one (closes #3).
+
+### Removed
+
+- macOS local-build requirement for Homebrew `jpeg-turbo` and `dylibbundler` (jpeg is vendored via `UHDR_BUILD_DEPS`).
+
 ## v2.0.5
 
 ### Fixed
