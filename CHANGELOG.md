@@ -7,6 +7,13 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.5
+
+### Fixed
+
+- macOS export filter: quote the bundled `uhdr_repack` path in `CMD.shellBinary` so installs under `~/Library/Application Support/Adobe/Lightroom/Modules` (and other paths with spaces) no longer fail with `sh: …/Application: No such file or directory` (issue #2).
+- Add `scripts/test_macos_shell_quote.sh` regression test (unquoted path fails; `shellQuote` encode/`--inspect` succeeds) and run it in the macOS release CI job.
+
 ## v2.0.4
 
 ### Fixed

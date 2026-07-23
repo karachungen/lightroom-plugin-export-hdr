@@ -65,7 +65,8 @@ function CMD.shellBinary(binary)
 	if CMD.isWindows() then
 		return CMD.binaryFileName()
 	end
-	return binary or CMD.bundledBinaryPath()
+	-- Quote so installs under paths with spaces (e.g. Application Support) work.
+	return CMD.shellQuote(binary or CMD.bundledBinaryPath())
 end
 
 --- Build main encode command string (returns full line for LrTasks.execute).

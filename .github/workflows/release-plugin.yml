@@ -14,6 +14,7 @@ on:
       - "scripts/bundle_uhdr_for_plugin_windows.ps1"
       - "scripts/run_uhdr_test.sh"
       - "scripts/run_uhdr_test.ps1"
+      - "scripts/test_macos_shell_quote.sh"
       - "scripts/test_windows_cmd_quote.ps1"
       - "scripts/windows_build_common.ps1"
       - "scripts/setup_windows_build.ps1"
@@ -63,6 +64,11 @@ jobs:
       - name: Build, test, and package plugin
         shell: bash
         run: bash scripts/build_plugin.sh all
+
+      - name: macOS shell quoting regression test
+        if: matrix.id == 'macos-arm64'
+        shell: bash
+        run: bash scripts/test_macos_shell_quote.sh
 
       - name: Windows cmd quoting regression test
         if: matrix.id == 'windows-x64'
