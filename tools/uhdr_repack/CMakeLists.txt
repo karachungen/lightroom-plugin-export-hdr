@@ -67,14 +67,15 @@ else()
     GIT_TAG ${_LIBUHDR_TAG}
     GIT_SHALLOW TRUE
   )
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libultrahdr as a static library" FORCE)
   set(UHDR_WRITE_XMP ON CACHE BOOL "Write gainmap metadata in XMP packet" FORCE)
   set(UHDR_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
-  if(WIN32)
-    set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr on Windows" FORCE)
-  endif()
+  # Vendor + statically build libjpeg-turbo instead of linking whatever the host has installed
+  # (e.g. Homebrew's dylib, which pins an absolute /opt/homebrew or /usr/local path).
+  set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr" FORCE)
   FetchContent_MakeAvailable(libultrahdr)
 endif()
 
