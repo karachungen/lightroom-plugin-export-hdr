@@ -23,6 +23,12 @@ bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
                                 unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
                                 std::string* error);
 
+/** Compatibility path only: honor an embedded ICC profile and normalize SDR pixels to sRGB. */
+bool decode_scale_crop_to_rgba8_color_managed(
+    const std::string& path, unsigned master_width, unsigned master_height, unsigned out_w,
+    unsigned out_h, unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
+    std::string* error);
+
 }  // namespace wic
 }  // namespace uhdr_repack
 

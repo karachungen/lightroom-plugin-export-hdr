@@ -5,6 +5,7 @@
 #include <ultrahdr_api.h>
 
 #include <cstdint>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -16,7 +17,7 @@ namespace uhdr_repack {
 namespace {
 
 bool ParseSofSamplingFactors(const uint8_t* data, size_t len, std::string* detail_out,
-                             bool* looks_like_420) {
+                             bool* looks_like_420, int* components = nullptr) {
   *looks_like_420 = false;
   size_t i = 0;
   while (i + 1 < len) {
@@ -31,6 +32,7 @@ bool ParseSofSamplingFactors(const uint8_t* data, size_t len, std::string* detai
       if (i + seglen > len) return false;
       const       uint8_t ncomp = data[i + 9];
       if (ncomp < 1 || ncomp > 4) return false;
+      if (components) *components = ncomp;
       if (i + 10 + (size_t)ncomp * 3 > len) return false;
       uint8_t maxh = 0, maxv = 0;
       std::ostringstream oss;
@@ -210,12 +212,19 @@ bool inspect_ultra_hdr_file(const std::string& path, InspectReport* report, std:
   if (gm && gm->data && gm->data_sz > 0) {
     std::string d3;
     ParseSofSamplingFactors(static_cast<const uint8_t*>(gm->data), gm->data_sz, &d3,
-                           &report->gainmap_jpeg_420);
+                           &report->gainmap_jpeg_420, &report->gainmap_components);
     report->detail += " | gainmap:" + d3;
   }
 
   uhdr_gainmap_metadata_t* meta = uhdr_dec_get_gainmap_metadata(dec);
   if (meta) {
+    report->gainmap_min_log2 = std::log2(meta->min_content_boost[0]);
+    report->gainmap_max_log2 = std::log2(meta->max_content_boost[0]);
+    report->gainmap_gamma = meta->gamma[0];
+    report->gainmap_offset_sdr = meta->offset_sdr[0];
+    report->gainmap_offset_hdr = meta->offset_hdr[0];
+    report->hdr_capacity_min = meta->hdr_capacity_min;
+    report->hdr_capacity_max = meta->hdr_capacity_max;
     std::ostringstream oss;
     oss << " min_boost=(" << meta->min_content_boost[0] << "," << meta->min_content_boost[1] << ","
         << meta->min_content_boost[2] << ")"

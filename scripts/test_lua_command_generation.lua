@@ -45,6 +45,7 @@ local CMD = loadPluginModule("Command")
 local props = UHDR.defaults()
 
 assert(props[UHDR.KEY.autoContentBoost] == true, "Auto min/max boost must default ON")
+assert(props[UHDR.KEY.gainmapAlgorithm] == "libultrahdr", "Gain map algorithm must default to libultrahdr")
 
 local function command()
 	return CMD.buildEncodeCommand({
@@ -57,6 +58,8 @@ local function command()
 end
 
 local auto = command()
+local historicalAuto = auto
+assert(not string.find(auto, "--gainmap-algorithm", 1, true), "Default command must remain the historical invocation")
 assert(not string.find(auto, "--min-content-boost", 1, true), "Auto command contains min flag")
 assert(not string.find(auto, "--max-content-boost", 1, true), "Auto command contains max flag")
 
@@ -67,4 +70,16 @@ local manual = command()
 assert(string.find(manual, "--min-content-boost 0.5", 1, true), "Manual command lacks min flag")
 assert(string.find(manual, "--max-content-boost 8", 1, true), "Manual command lacks max flag")
 
-print("PASS: Lua Auto omits min/max flags; Manual emits both flags")
+props[UHDR.KEY.gainmapAlgorithm] = "compatibility-scalar"
+props[UHDR.KEY.autoContentBoost] = false
+local compatibility = command()
+assert(string.find(compatibility, "--gainmap-algorithm compatibility-scalar", 1, true), "Compatibility command lacks algorithm flag")
+assert(not string.find(compatibility, "--min-content-boost", 1, true), "Compatibility command must use calculated scalar range")
+assert(not string.find(compatibility, "--max-content-boost", 1, true), "Compatibility command must use calculated scalar range")
+
+props[UHDR.KEY.gainmapAlgorithm] = nil
+props[UHDR.KEY.autoContentBoost] = true
+local oldPreset = command()
+assert(oldPreset == historicalAuto, "Old preset without algorithm key must use historical command")
+
+print("PASS: default/old presets retain historical path; compatibility is opt-in")

@@ -97,6 +97,45 @@ if ($AutoInspect -match 'min_boost=\(1,1,1\)') {
 }
 Write-Host "OK: default encode — gain map matches dimensions and primary_xmp is present."
 
+$ExplicitExistingOut = Join-Path $TestDir "out_existing_explicit_uhdr.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $ExplicitExistingOut
+& $Bin --hdr-tiff $Hdr --base $Base --out $ExplicitExistingOut --gainmap-algorithm libultrahdr
+if ($LASTEXITCODE -ne 0) { throw "Explicit existing/libultrahdr encode failed" }
+$defaultHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Out).Hash
+$explicitHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ExplicitExistingOut).Hash
+if ($defaultHash -ne $explicitHash) {
+	throw "FAIL: explicit libultrahdr mode differs from the historical default path"
+}
+Write-Host "OK: existing/libultrahdr mode is byte-identical to the historical default invocation."
+
+$CompatOut = Join-Path $TestDir "out_compatibility_scalar_uhdr.jpg"
+$CompatMap = Join-Path $TestDir "out_compatibility_scalar_gainmap.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $CompatOut, $CompatMap
+$CompatLog = (& $Bin --hdr-tiff $Hdr --base $Base --out $CompatOut `
+	--gainmap-algorithm compatibility-scalar --gainmap-scale 4 --gainmap-quality 73 `
+	--target-display-peak 1000 --gainmap-debug-out $CompatMap | Out-String)
+if ($LASTEXITCODE -ne 0) { throw "Compatibility scalar encode failed: $CompatLog" }
+$CompatInspect = (& $Bin --inspect $CompatOut | Out-String)
+if ($CompatInspect -notmatch '(?m)^is_ultra_hdr: yes\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_size: 250x250\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_components: 1\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_gamma: 1\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_offsets: 0\.000976562,0\.000976562\s*$' -or
+	$CompatInspect -notmatch '(?m)^markers: .*primary_xmp=(yes|1).*iso_app2_hint=(yes|1)') {
+	throw "FAIL: compatibility inspect mismatch: $CompatInspect"
+}
+if (($CompatLog + $CompatInspect) -match '(?i)(^|[^a-z])(nan|inf)([^a-z]|$)') {
+	throw "FAIL: compatibility scalar produced NaN/Inf"
+}
+$calcMin = [regex]::Match($CompatLog, '(?m)^Compatibility GainMapMin: (.+)\s*$').Groups[1].Value.Trim()
+$calcMax = [regex]::Match($CompatLog, '(?m)^Compatibility GainMapMax: (.+)\s*$').Groups[1].Value.Trim()
+$metaMin = [regex]::Match($CompatInspect, '(?m)^gainmap_min_log2: (.+)\s*$').Groups[1].Value.Trim()
+$metaMax = [regex]::Match($CompatInspect, '(?m)^gainmap_max_log2: (.+)\s*$').Groups[1].Value.Trim()
+if (-not $calcMin.StartsWith('-') -or $calcMin -ne $metaMin -or $calcMax -ne $metaMax) {
+	throw "FAIL: compatibility calculated/metadata ranges differ or negative min was lost"
+}
+Write-Host "OK: compatibility scalar is grayscale, scaled, finite, negative-safe, and metadata-consistent."
+
 $ManualOut = Join-Path $TestDir "out_manual_boost_uhdr.jpg"
 Remove-Item -Force -ErrorAction SilentlyContinue $ManualOut
 & $Bin --hdr-tiff $Hdr --base $Base --out $ManualOut --min-content-boost 0.5 --max-content-boost 8

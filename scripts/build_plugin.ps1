@@ -60,12 +60,6 @@ function Invoke-BundleWindows {
 	if (-not $buildExe) {
 		throw "Build failed: missing uhdr_repack.exe under $BuildDir"
 	}
-	$currentExe = Join-Path $PluginBin "uhdr_repack.exe"
-	$backupExe = Join-Path $PluginBin "uhdr_repack.exe.bak"
-	if ((Test-Path -LiteralPath $currentExe) -and -not (Test-Path -LiteralPath $backupExe)) {
-		Copy-Item -LiteralPath $currentExe -Destination $backupExe
-		Write-Host "==> Backed up previous encoder: $backupExe"
-	}
 
 	Write-Host "==> Cleaning old Windows bundle in $PluginBin"
 	Clear-PluginBin
@@ -146,7 +140,6 @@ function Invoke-PackageStep {
 		$binStaging = Join-Path $staging "ExportHDR.lrplugin\bin"
 		Remove-Item (Join-Path $binStaging ".gitignore") -Force -ErrorAction SilentlyContinue
 		Remove-Item (Join-Path $binStaging "README.txt") -Force -ErrorAction SilentlyContinue
-		Remove-Item (Join-Path $binStaging "uhdr_repack.exe.bak") -Force -ErrorAction SilentlyContinue
 		if (Test-Path -LiteralPath $outZip) { Remove-Item -LiteralPath $outZip -Force }
 		Compress-Archive -Path (Join-Path $staging "ExportHDR.lrplugin") -DestinationPath $outZip -Force
 		Write-Host "Created $outZip"

@@ -93,6 +93,7 @@ set(_UHDR_COMMON_SOURCES
   src/main.cpp
   src/slice_plan.cpp
   src/uhdr_encode.cpp
+  src/compatibility_gainmap.cpp
   src/gainmap_metadata.cpp
   src/verify.cpp
   src/half_float.cpp
@@ -123,8 +124,14 @@ target_include_directories(uhdr_repack PRIVATE
 if(UHDR_USE_SYSTEM)
   target_include_directories(uhdr_repack PRIVATE "${_uhdr_vendor_include}")
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
+  find_package(JPEG REQUIRED)
+  target_link_libraries(uhdr_repack PRIVATE JPEG::JPEG)
 else()
   target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
+  target_include_directories(uhdr_repack PRIVATE
+    "${libultrahdr_SOURCE_DIR}/third_party/turbojpeg/src"
+    "${libultrahdr_BINARY_DIR}/turbojpeg/src/turbojpeg-build"
+  )
   # Current libultrahdr names its static MSVC target uhdr-static; v1.4.0 used uhdr.
   if(TARGET uhdr-static)
     target_link_libraries(uhdr_repack PRIVATE uhdr-static)
@@ -147,3 +154,31 @@ elseif(WIN32)
 endif()
 
 install(TARGETS uhdr_repack RUNTIME DESTINATION bin)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(compatibility_gainmap_test
+    test/compatibility_gainmap_test.cpp
+    src/compatibility_gainmap.cpp
+    src/half_float.cpp
+  )
+  target_include_directories(compatibility_gainmap_test PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
+  if(UHDR_USE_SYSTEM)
+    target_include_directories(compatibility_gainmap_test PRIVATE "${_uhdr_vendor_include}")
+    target_link_libraries(compatibility_gainmap_test PRIVATE "${_uhdr_vendor_lib}" JPEG::JPEG)
+  else()
+    target_include_directories(compatibility_gainmap_test PRIVATE
+      "${libultrahdr_SOURCE_DIR}"
+      "${libultrahdr_SOURCE_DIR}/third_party/turbojpeg/src"
+      "${libultrahdr_BINARY_DIR}/turbojpeg/src/turbojpeg-build"
+    )
+    if(TARGET uhdr-static)
+      target_link_libraries(compatibility_gainmap_test PRIVATE uhdr-static)
+    else()
+      target_link_libraries(compatibility_gainmap_test PRIVATE uhdr)
+    endif()
+  endif()
+  add_test(NAME compatibility_gainmap_test COMMAND compatibility_gainmap_test)
+endif()

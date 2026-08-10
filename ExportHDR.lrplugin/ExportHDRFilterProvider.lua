@@ -45,6 +45,13 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 			return not auto
 		end,
 	}
+	local libultrahdrModeEnabled = bind {
+		key = K.gainmapAlgorithm,
+		object = propertyTable,
+		transform = function(value)
+			return value ~= "compatibility-scalar"
+		end,
+	}
 
 	local LW = 20
 
@@ -105,6 +112,21 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 						immediate = true,
 						width = 80,
 						tooltip = "1 = gain map same pixel size as the base image; larger values use a smaller gain map (smaller file).",
+					},
+				},
+				f:row {
+					f:static_text {
+						title = "Gain map algorithm",
+						width_in_chars = LW,
+					},
+					f:popup_menu {
+						value = bind { key = K.gainmapAlgorithm, object = propertyTable },
+						width_in_chars = 24,
+						items = {
+							{ title = "Existing / libultrahdr", value = "libultrahdr" },
+							{ title = "Compatibility scalar", value = "compatibility-scalar" },
+						},
+						tooltip = "Existing preserves the historical libultrahdr gain-map generation. Compatibility scalar derives one luminance gain per pixel.",
 					},
 				},
 				f:row {
@@ -173,6 +195,8 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 					f:checkbox {
 						title = "Monochrome gain map",
 						value = bind { key = K.monochromeGainmap, object = propertyTable },
+						enabled = libultrahdrModeEnabled,
+						tooltip = "Compatibility scalar is always a one-component grayscale gain map.",
 					},
 				},
 				f:row {
@@ -524,7 +548,8 @@ local function debugPostfixPaths(basePath, hdrPath)
 	local hdrExt = LrPathUtils.extension(hdrPath) or "tif"
 	local sdrDest = LrPathUtils.child(folder, baseNoExt .. "_uhdr_sdr." .. baseExt)
 	local hdrDest = LrPathUtils.child(folder, baseNoExt .. "_uhdr_hdr." .. hdrExt)
-	return sdrDest, hdrDest
+	local gainmapDest = LrPathUtils.child(folder, baseNoExt .. "_uhdr_gainmap.jpg")
+	return sdrDest, hdrDest, gainmapDest
 end
 
 -- LrPathUtils.extension returns the suffix without a leading dot (e.g. "tif" on macOS).
@@ -876,6 +901,12 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			encodeOutPath = outPath
 		end
 		Log.append(logPath, "Final OUT: " .. tostring(outPath) .. "\n")
+		local gainmapDebugOut
+		if UHDR.gainmapAlgorithm(propertyTable) == "compatibility-scalar"
+			and (propertyTable[UHDR.KEY.keepIntermediates] or propertyTable[UHDR.KEY.debugSaveArtifacts])
+		then
+			gainmapDebugOut = LrPathUtils.child(tempDir, "uhdr_scalar_gainmap.jpg")
+		end
 
 		if UHDR.sliceAspectEnabled(propertyTable) then
 			Log.append(
@@ -892,8 +923,15 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			basePath = encodeBasePath,
 			outPath = encodeOutPath,
 			props = propertyTable,
+			gainmapDebugOut = gainmapDebugOut,
 		})
-		if propertyTable[UHDR.KEY.autoContentBoost] == false then
+		Log.append(
+			logPath,
+			"Gain map algorithm: " .. UHDR.gainmapAlgorithm(propertyTable) .. "\n"
+		)
+		if UHDR.gainmapAlgorithm(propertyTable) == "compatibility-scalar" then
+			Log.append(logPath, "Content boost: calculated from compatibility scalar map\n")
+		elseif propertyTable[UHDR.KEY.autoContentBoost] == false then
 			Log.append(
 				logPath,
 				"Content boost: manual min="
@@ -939,6 +977,16 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		if not LrFileUtils.exists(encodeOutPath) then
 			safeDeleteTree(tempDir)
 			error("Ultra HDR: encoder did not write output: " .. tostring(encodeOutPath))
+		end
+
+		if gainmapDebugOut and propertyTable[UHDR.KEY.debugSaveArtifacts]
+			and LrFileUtils.exists(gainmapDebugOut)
+		then
+			local _, _, gainmapDup = debugPostfixPaths(basePath, hdrPath)
+			pcall(function()
+				LrFileUtils.copy(gainmapDebugOut, gainmapDup)
+			end)
+			Log.append(logPath, "Debug: scalar gain map copy: " .. tostring(gainmapDup) .. "\n")
 		end
 
 		local sdrSize = fileSizeBytes(encodeBasePath)

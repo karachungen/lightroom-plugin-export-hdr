@@ -33,6 +33,8 @@ void PrintUsage() {
       << "                                 (both omitted: libultrahdr auto)\n"
       << "  --target-display-peak <nits>   (default 1000)\n"
       << "  --monochrome-gainmap           single-channel gain map\n"
+      << "  --gainmap-algorithm <libultrahdr|compatibility-scalar>\n"
+      << "  --gainmap-debug-out <path.jpg>  optional compatibility gain-map copy\n"
       << "  --slice-aspect <none|1x1|4x5>  optional full-height slices (numbered files next to --out)\n";
 }
 
@@ -57,9 +59,17 @@ bool ParseFloat(const char* s, float* out) {
 }
 
 bool EncodePair(const uhdr_repack::RawImageHolder& hdr, const uhdr_repack::RawImageHolder& sdr,
-                const uhdr_repack::EncodeOptions& opt, const std::string& out_path,
-                std::string* err) {
-  if (!uhdr_repack::encode_ultra_hdr_jpeg(hdr, sdr, opt, out_path, err)) {
+                const uhdr_repack::EncodeOptions& opt, const std::string& base_path,
+                bool preserve_compressed_base, const std::string& out_path, std::string* err) {
+  bool encoded = false;
+  if (opt.gainmap_algorithm == uhdr_repack::GainmapAlgorithm::kCompatibilityScalar) {
+    encoded = uhdr_repack::encode_compatibility_scalar_jpeg(
+        hdr, sdr, opt, base_path, preserve_compressed_base, out_path, err);
+  } else {
+    std::cout << "Gain map algorithm: libultrahdr\n";
+    encoded = uhdr_repack::encode_ultra_hdr_jpeg(hdr, sdr, opt, out_path, err);
+  }
+  if (!encoded) {
     std::cerr << "encode: " << *err << "\n";
     return false;
   }
@@ -120,6 +130,13 @@ static int run(int argc, char** argv) {
     std::cout << "is_ultra_hdr: " << (rep.is_ultra_hdr ? "yes" : "no") << "\n";
     std::cout << "dimensions: " << rep.width << "x" << rep.height << "\n";
     std::cout << "gainmap_size: " << rep.gainmap_width << "x" << rep.gainmap_height << "\n";
+    std::cout << "gainmap_components: " << rep.gainmap_components << "\n";
+    std::cout << "gainmap_min_log2: " << rep.gainmap_min_log2 << "\n";
+    std::cout << "gainmap_max_log2: " << rep.gainmap_max_log2 << "\n";
+    std::cout << "gainmap_gamma: " << rep.gainmap_gamma << "\n";
+    std::cout << "gainmap_offsets: " << rep.gainmap_offset_sdr << "," << rep.gainmap_offset_hdr
+              << "\n";
+    std::cout << "hdr_capacity: " << rep.hdr_capacity_min << "," << rep.hdr_capacity_max << "\n";
     std::cout << "primary_jpeg_420: " << (rep.primary_jpeg_420 ? "likely" : "no") << "\n";
     std::cout << "gainmap_jpeg_420: " << (rep.gainmap_jpeg_420 ? "likely" : "no") << "\n";
     std::cout << "markers: MPF=" << rep.has_mpf << " primary_xmp=" << rep.has_primary_xmp
@@ -191,6 +208,18 @@ static int run(int argc, char** argv) {
       opt.target_display_peak_nits = v;
     } else if (a == "--monochrome-gainmap") {
       opt.monochrome_gainmap = true;
+    } else if (a == "--gainmap-algorithm" && i + 1 < argc) {
+      const std::string value = argv[++i];
+      if (value == "libultrahdr") {
+        opt.gainmap_algorithm = uhdr_repack::GainmapAlgorithm::kLibultrahdr;
+      } else if (value == "compatibility-scalar") {
+        opt.gainmap_algorithm = uhdr_repack::GainmapAlgorithm::kCompatibilityScalar;
+      } else {
+        std::cerr << "bad --gainmap-algorithm\n";
+        return 1;
+      }
+    } else if (a == "--gainmap-debug-out" && i + 1 < argc) {
+      opt.gainmap_debug_output_path = argv[++i];
     } else {
       std::cerr << "unknown argument: " << a << "\n";
       PrintUsage();
@@ -226,12 +255,16 @@ static int run(int argc, char** argv) {
   const unsigned master_w = hdr.ref().w;
   const unsigned master_h = hdr.ref().h;
 
-  if (!uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr, &err)) {
+  const bool sdr_loaded =
+      opt.gainmap_algorithm == uhdr_repack::GainmapAlgorithm::kCompatibilityScalar
+          ? uhdr_repack::load_sdr_base_raw_compatibility(base_path, master_w, master_h, &sdr, &err)
+          : uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr, &err);
+  if (!sdr_loaded) {
     std::cerr << "SDR base: " << err << "\n";
     return 4;
   }
 
-  if (!EncodePair(hdr, sdr, opt, out_path, &err)) {
+  if (!EncodePair(hdr, sdr, opt, base_path, true, out_path, &err)) {
     return 5;
   }
 
@@ -257,7 +290,13 @@ static int run(int argc, char** argv) {
       std::cerr << "HDR slice " << idx << ": " << err << "\n";
       return 7;
     }
-    if (!uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr_slice, &err, &crop)) {
+    const bool slice_sdr_loaded =
+        opt.gainmap_algorithm == uhdr_repack::GainmapAlgorithm::kCompatibilityScalar
+            ? uhdr_repack::load_sdr_base_raw_compatibility(base_path, master_w, master_h,
+                                                           &sdr_slice, &err, &crop)
+            : uhdr_repack::load_sdr_base_raw(base_path, master_w, master_h, &sdr_slice, &err,
+                                             &crop);
+    if (!slice_sdr_loaded) {
       std::cerr << "SDR slice " << idx << ": " << err << "\n";
       return 8;
     }
@@ -266,7 +305,9 @@ static int run(int argc, char** argv) {
     std::cerr << "Slice " << idx << ": crop " << crop.x << "," << crop.y << " " << crop.w << "x"
               << crop.h << " -> " << slice_out << "\n";
 
-    if (!EncodePair(hdr_slice, sdr_slice, opt, slice_out, &err)) {
+    uhdr_repack::EncodeOptions slice_opt = opt;
+    slice_opt.gainmap_debug_output_path.clear();
+    if (!EncodePair(hdr_slice, sdr_slice, slice_opt, base_path, false, slice_out, &err)) {
       return 9;
     }
     ++idx;

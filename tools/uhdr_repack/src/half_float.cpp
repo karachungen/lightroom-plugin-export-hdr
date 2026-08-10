@@ -55,6 +55,33 @@ uint16_t float_to_half(float value) {
 #endif
 }
 
+float half_to_float(uint16_t value) {
+  const uint32_t sign = static_cast<uint32_t>(value & 0x8000u) << 16;
+  uint32_t exponent = (value >> 10) & 0x1fu;
+  uint32_t mantissa = value & 0x03ffu;
+  uint32_t bits = 0;
+  if (exponent == 0) {
+    if (mantissa == 0) {
+      bits = sign;
+    } else {
+      exponent = 127 - 14;
+      while ((mantissa & 0x0400u) == 0) {
+        mantissa <<= 1;
+        --exponent;
+      }
+      mantissa &= 0x03ffu;
+      bits = sign | (exponent << 23) | (mantissa << 13);
+    }
+  } else if (exponent == 31) {
+    bits = sign | 0x7f800000u | (mantissa << 13);
+  } else {
+    bits = sign | ((exponent + 127 - 15) << 23) | (mantissa << 13);
+  }
+  float result = 0.0f;
+  std::memcpy(&result, &bits, sizeof(result));
+  return result;
+}
+
 void float_rgba_to_half_rgba(const float* src, fp16_t* dst, size_t num_floats) {
   for (size_t i = 0; i < num_floats; ++i) {
     float f = src[i];

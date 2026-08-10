@@ -87,7 +87,17 @@ function CMD.buildEncodeCommand(o)
 		"--gainmap-scale",
 		tostring(math.floor(tonumber(o.props[K.gainmapScale]) or 1)),
 	}
-	if o.props[K.autoContentBoost] == false then
+	if UHDR.gainmapAlgorithm(o.props) == "compatibility-scalar" then
+		table.insert(parts, "--gainmap-algorithm")
+		table.insert(parts, "compatibility-scalar")
+		if o.gainmapDebugOut and o.gainmapDebugOut ~= "" then
+			table.insert(parts, "--gainmap-debug-out")
+			table.insert(parts, CMD.shellQuote(o.gainmapDebugOut))
+		end
+	end
+	if UHDR.gainmapAlgorithm(o.props) == "libultrahdr"
+		and o.props[K.autoContentBoost] == false
+	then
 		table.insert(parts, "--min-content-boost")
 		table.insert(parts, tostring(tonumber(o.props[K.minContentBoost]) or 1.0))
 		table.insert(parts, "--max-content-boost")

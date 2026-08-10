@@ -4,7 +4,6 @@ tools/uhdr_repack/build/
 # Bundled helper inside plugin (rebuild via platform bundle scripts)
 ExportHDR.lrplugin/bin/uhdr_repack
 ExportHDR.lrplugin/bin/uhdr_repack.exe
-ExportHDR.lrplugin/bin/uhdr_repack.exe.bak
 ExportHDR.lrplugin/bin/*.dylib
 ExportHDR.lrplugin/bin/*.dll
 

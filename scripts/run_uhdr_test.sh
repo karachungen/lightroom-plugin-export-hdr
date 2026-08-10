@@ -95,6 +95,49 @@ if echo "$AUTO_INSPECT" | grep -q 'min_boost=(1,1,1)'; then
 fi
 echo "OK: default encode — gain map matches dimensions and primary_xmp is present."
 
+EXPLICIT_EXISTING_OUT="$TEST_DIR/out_existing_explicit_uhdr.jpg"
+rm -f "$EXPLICIT_EXISTING_OUT"
+"$BIN" --hdr-tiff "$HDR" --base "$BASE" --out "$EXPLICIT_EXISTING_OUT" \
+	--gainmap-algorithm libultrahdr
+if ! cmp -s "$OUT" "$EXPLICIT_EXISTING_OUT"; then
+	echo "FAIL: explicit libultrahdr mode differs from the historical default path" >&2
+	exit 14
+fi
+echo "OK: existing/libultrahdr mode is byte-identical to the historical default invocation."
+
+COMPAT_OUT="$TEST_DIR/out_compatibility_scalar_uhdr.jpg"
+COMPAT_MAP="$TEST_DIR/out_compatibility_scalar_gainmap.jpg"
+rm -f "$COMPAT_OUT" "$COMPAT_MAP"
+COMPAT_LOG="$("$BIN" --hdr-tiff "$HDR" --base "$BASE" --out "$COMPAT_OUT" \
+	--gainmap-algorithm compatibility-scalar --gainmap-scale 4 --gainmap-quality 73 \
+	--target-display-peak 1000 --gainmap-debug-out "$COMPAT_MAP")"
+echo "$COMPAT_LOG"
+COMPAT_INSPECT="$("$BIN" --inspect "$COMPAT_OUT")"
+echo "$COMPAT_INSPECT"
+echo "$COMPAT_INSPECT" | grep -q '^is_ultra_hdr: yes$'
+echo "$COMPAT_INSPECT" | grep -q '^gainmap_size: 250x250$'
+echo "$COMPAT_INSPECT" | grep -q '^gainmap_components: 1$'
+echo "$COMPAT_INSPECT" | grep -q '^gainmap_gamma: 1$'
+echo "$COMPAT_INSPECT" | grep -q '^gainmap_offsets: 0.000976562,0.000976562$'
+echo "$COMPAT_INSPECT" | grep -Eq '^markers: .*primary_xmp=(yes|1).*iso_app2_hint=(yes|1)'
+if echo "$COMPAT_LOG$COMPAT_INSPECT" | grep -Eqi '(^|[^[:alpha:]])(nan|inf)([^[:alpha:]]|$)'; then
+	echo "FAIL: compatibility scalar produced NaN/Inf" >&2
+	exit 15
+fi
+CALC_MIN="$(echo "$COMPAT_LOG" | sed -n 's/^Compatibility GainMapMin: //p')"
+CALC_MAX="$(echo "$COMPAT_LOG" | sed -n 's/^Compatibility GainMapMax: //p')"
+META_MIN="$(echo "$COMPAT_INSPECT" | sed -n 's/^gainmap_min_log2: //p')"
+META_MAX="$(echo "$COMPAT_INSPECT" | sed -n 's/^gainmap_max_log2: //p')"
+if [[ -z "$CALC_MIN" || "$CALC_MIN" != "$META_MIN" || "$CALC_MAX" != "$META_MAX" ]]; then
+	echo "FAIL: compatibility metadata does not match calculated min/max" >&2
+	exit 16
+fi
+if [[ "${CALC_MIN:0:1}" != "-" ]]; then
+	echo "FAIL: fixture should exercise a negative compatibility GainMapMin" >&2
+	exit 17
+fi
+echo "OK: compatibility scalar is grayscale, scaled, finite, negative-safe, and metadata-consistent."
+
 MANUAL_OUT="$TEST_DIR/out_manual_boost_uhdr.jpg"
 rm -f "$MANUAL_OUT"
 "$BIN" --hdr-tiff "$HDR" --base "$BASE" --out "$MANUAL_OUT" \

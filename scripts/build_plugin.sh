@@ -238,10 +238,6 @@ bundle_windows() {
 		echo "Build failed: missing uhdr_repack.exe under $BUILD_DIR" >&2
 		exit 1
 	}
-	if [[ -f "$PLUGIN_BIN/uhdr_repack.exe" ]] && [[ ! -f "$PLUGIN_BIN/uhdr_repack.exe.bak" ]]; then
-		cp "$PLUGIN_BIN/uhdr_repack.exe" "$PLUGIN_BIN/uhdr_repack.exe.bak"
-		echo "==> Backed up previous encoder: $PLUGIN_BIN/uhdr_repack.exe.bak"
-	fi
 
 	echo "==> Cleaning old Windows bundle in $PLUGIN_BIN"
 	clean_plugin_bin
