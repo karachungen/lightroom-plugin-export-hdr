@@ -1,6 +1,6 @@
 # uhdr_repack
 
-CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** **`v1.4.0`**, **`UHDR_WRITE_XMP=ON`**.
+CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** at merge commit **`11ac0c325bbf56ecf8be8704ff0f79fc9e1aac77`** (PR #394 marker-order fix), **`UHDR_WRITE_XMP=ON`**.
 
 **Platforms:**
 - **macOS 26 (Tahoe), ARM64** — HDR/SDR ingest via Core Image (`.mm` loaders).
@@ -94,7 +94,7 @@ Each platform copies only that OS binary into **`ExportHDR.lrplugin/bin/`** (sel
 ./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), optional paired `--min-content-boost` / `--max-content-boost` (omitting both lets libultrahdr derive the range), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
 
 ### Optional slicing (`--slice-aspect`)
 

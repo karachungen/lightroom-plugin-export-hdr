@@ -38,6 +38,13 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 	UHDR.applyDefaults(propertyTable)
 	local bind = LrView.bind
 	local K = UHDR.KEY
+	local manualBoostEnabled = bind {
+		key = K.autoContentBoost,
+		object = propertyTable,
+		transform = function(auto)
+			return not auto
+		end,
+	}
 
 	local LW = 20
 
@@ -102,17 +109,30 @@ function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
 				},
 				f:row {
 					f:static_text {
+						title = "Content boost",
+						width_in_chars = LW,
+					},
+					f:checkbox {
+						title = "Auto min/max boost",
+						value = bind { key = K.autoContentBoost, object = propertyTable },
+						tooltip = "Let libultrahdr derive gain-map min/max from the HDR and SDR renditions.",
+					},
+				},
+				f:row {
+					f:static_text {
 						title = "Min / max boost",
 						width_in_chars = LW,
 					},
 					f:edit_field {
 						value = bind { key = K.minContentBoost, object = propertyTable },
+						enabled = manualBoostEnabled,
 						immediate = true,
 						width = 64,
 					},
 					f:static_text { title = "-" },
 					f:edit_field {
 						value = bind { key = K.maxContentBoost, object = propertyTable },
+						enabled = manualBoostEnabled,
 						immediate = true,
 						width = 64,
 					},
@@ -873,6 +893,18 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			outPath = encodeOutPath,
 			props = propertyTable,
 		})
+		if propertyTable[UHDR.KEY.autoContentBoost] == false then
+			Log.append(
+				logPath,
+				"Content boost: manual min="
+					.. tostring(propertyTable[UHDR.KEY.minContentBoost])
+					.. " max="
+					.. tostring(propertyTable[UHDR.KEY.maxContentBoost])
+					.. "\n"
+			)
+		else
+			Log.append(logPath, "Content boost: auto (libultrahdr)\n")
+		end
 
 		Log.append(logPath, "Command: " .. cmdLine .. "\n")
 		if CMD.isWindows() then

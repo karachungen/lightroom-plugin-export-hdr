@@ -5,6 +5,7 @@
 #include "verify.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -27,8 +28,9 @@ void PrintUsage() {
       << "  --base-quality <0-100>       (default 92)\n"
       << "  --gainmap-quality <0-100>    (default 85)\n"
       << "  --gainmap-scale <N>          gain-map downsample factor vs base (1 = full size; default 1)\n"
-      << "  --min-content-boost <linear>   (default 1.0)\n"
-      << "  --max-content-boost <linear>   (default 1000)\n"
+      << "  --min-content-boost <linear>   manual mode; specify together with max\n"
+      << "  --max-content-boost <linear>   manual mode; specify together with min\n"
+      << "                                 (both omitted: libultrahdr auto)\n"
       << "  --target-display-peak <nits>   (default 1000)\n"
       << "  --monochrome-gainmap           single-channel gain map\n"
       << "  --slice-aspect <none|1x1|4x5>  optional full-height slices (numbered files next to --out)\n";
@@ -47,7 +49,7 @@ bool ParseInt(const char* s, int* out) {
 bool ParseFloat(const char* s, float* out) {
   char* end = nullptr;
   float v = std::strtof(s, &end);
-  if (end == s || *end != '\0') {
+  if (end == s || *end != '\0' || !std::isfinite(v)) {
     return false;
   }
   *out = v;
@@ -198,6 +200,17 @@ static int run(int argc, char** argv) {
 
   if (hdr_tiff.empty() || base_path.empty() || out_path.empty()) {
     PrintUsage();
+    return 1;
+  }
+
+  if (opt.min_content_boost.has_value() != opt.max_content_boost.has_value()) {
+    std::cerr << "Both --min-content-boost and --max-content-boost must be specified together\n";
+    return 1;
+  }
+  if (opt.min_content_boost &&
+      (*opt.min_content_boost <= 0.0f || *opt.max_content_boost <= 0.0f ||
+       *opt.min_content_boost > *opt.max_content_boost)) {
+    std::cerr << "Content boost min/max must be positive and min <= max\n";
     return 1;
   }
 

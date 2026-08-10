@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.15)
 
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+
 if(APPLE)
   project(uhdr_repack LANGUAGES CXX OBJCXX)
 else()
   project(uhdr_repack LANGUAGES CXX)
+endif()
+
+if(MSVC)
+  # Match the statically linked upstream libuhdr and keep the plug-in binary self-contained.
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -60,12 +69,13 @@ if(UHDR_USE_SYSTEM)
   set(_uhdr_vendor_lib "${UHDR_LIBRARY}")
 else()
   include(FetchContent)
-  set(_LIBUHDR_TAG "v1.4.0")
+  # google/libultrahdr PR #394: JFIF first after SOI and MPF immediately before SOS.
+  # Pin the reviewed upstream merge commit so the build remains reproducible.
+  set(_LIBUHDR_TAG "11ac0c325bbf56ecf8be8704ff0f79fc9e1aac77")
   FetchContent_Declare(
     libultrahdr
     GIT_REPOSITORY https://github.com/google/libultrahdr.git
     GIT_TAG ${_LIBUHDR_TAG}
-    GIT_SHALLOW TRUE
   )
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libultrahdr as a static library" FORCE)
   set(UHDR_WRITE_XMP ON CACHE BOOL "Write gainmap metadata in XMP packet" FORCE)
@@ -115,7 +125,12 @@ if(UHDR_USE_SYSTEM)
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
 else()
   target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
-  target_link_libraries(uhdr_repack PRIVATE uhdr)
+  # Current libultrahdr names its static MSVC target uhdr-static; v1.4.0 used uhdr.
+  if(TARGET uhdr-static)
+    target_link_libraries(uhdr_repack PRIVATE uhdr-static)
+  else()
+    target_link_libraries(uhdr_repack PRIVATE uhdr)
+  endif()
 endif()
 
 if(APPLE)

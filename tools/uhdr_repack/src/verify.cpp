@@ -218,7 +218,9 @@ bool inspect_ultra_hdr_file(const std::string& path, InspectReport* report, std:
   if (meta) {
     std::ostringstream oss;
     oss << " min_boost=(" << meta->min_content_boost[0] << "," << meta->min_content_boost[1] << ","
-        << meta->min_content_boost[2] << ")";
+        << meta->min_content_boost[2] << ")"
+        << " max_boost=(" << meta->max_content_boost[0] << "," << meta->max_content_boost[1] << ","
+        << meta->max_content_boost[2] << ")";
     report->detail += oss.str();
   }
 

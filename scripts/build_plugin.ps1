@@ -60,6 +60,12 @@ function Invoke-BundleWindows {
 	if (-not $buildExe) {
 		throw "Build failed: missing uhdr_repack.exe under $BuildDir"
 	}
+	$currentExe = Join-Path $PluginBin "uhdr_repack.exe"
+	$backupExe = Join-Path $PluginBin "uhdr_repack.exe.bak"
+	if ((Test-Path -LiteralPath $currentExe) -and -not (Test-Path -LiteralPath $backupExe)) {
+		Copy-Item -LiteralPath $currentExe -Destination $backupExe
+		Write-Host "==> Backed up previous encoder: $backupExe"
+	}
 
 	Write-Host "==> Cleaning old Windows bundle in $PluginBin"
 	Clear-PluginBin
@@ -105,7 +111,8 @@ function Invoke-CmakeBuild {
 function Invoke-TestStep {
 	$bash = Get-BashExe
 	if ($bash) {
-		& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
+		$testScript = (Join-Path $ScriptDir "run_uhdr_test.sh").Replace("\", "/")
+		& $bash --login $testScript
 		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 		return
 	}
@@ -116,7 +123,8 @@ function Invoke-TestStep {
 function Invoke-PackageStep {
 	$bash = Get-BashExe
 	if ($bash) {
-		& $bash (Join-Path $ScriptDir "package_plugin.sh") "windows-x64"
+		$packageScript = (Join-Path $ScriptDir "package_plugin.sh").Replace("\", "/")
+		& $bash --login $packageScript "windows-x64"
 		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 		return
 	}
@@ -138,6 +146,7 @@ function Invoke-PackageStep {
 		$binStaging = Join-Path $staging "ExportHDR.lrplugin\bin"
 		Remove-Item (Join-Path $binStaging ".gitignore") -Force -ErrorAction SilentlyContinue
 		Remove-Item (Join-Path $binStaging "README.txt") -Force -ErrorAction SilentlyContinue
+		Remove-Item (Join-Path $binStaging "uhdr_repack.exe.bak") -Force -ErrorAction SilentlyContinue
 		if (Test-Path -LiteralPath $outZip) { Remove-Item -LiteralPath $outZip -Force }
 		Compress-Archive -Path (Join-Path $staging "ExportHDR.lrplugin") -DestinationPath $outZip -Force
 		Write-Host "Created $outZip"

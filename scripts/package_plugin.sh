@@ -85,7 +85,8 @@ macos-arm64)
 		cd "$REPO_ROOT"
 		zip -r "$artifact" ExportHDR.lrplugin \
 			-x "ExportHDR.lrplugin/bin/.gitignore" \
-			-x "ExportHDR.lrplugin/bin/README.txt"
+			-x "ExportHDR.lrplugin/bin/README.txt" \
+			-x "ExportHDR.lrplugin/bin/uhdr_repack.exe.bak"
 	)
 	;;
 windows-x64)
@@ -94,7 +95,8 @@ windows-x64)
 			cd "$REPO_ROOT"
 			zip -r "$artifact" ExportHDR.lrplugin \
 				-x "ExportHDR.lrplugin/bin/.gitignore" \
-				-x "ExportHDR.lrplugin/bin/README.txt"
+				-x "ExportHDR.lrplugin/bin/README.txt" \
+				-x "ExportHDR.lrplugin/bin/uhdr_repack.exe.bak"
 		)
 	else
 		# Git Bash on Windows may lack zip; use PowerShell Compress-Archive with temp staging.
@@ -102,7 +104,8 @@ windows-x64)
 		trap 'rm -rf "$staging"' EXIT
 		cp -R "$PLUGIN_DIR" "$staging/"
 		rm -f "$staging/ExportHDR.lrplugin/bin/.gitignore" \
-			"$staging/ExportHDR.lrplugin/bin/README.txt" 2>/dev/null || true
+			"$staging/ExportHDR.lrplugin/bin/README.txt" \
+			"$staging/ExportHDR.lrplugin/bin/uhdr_repack.exe.bak" 2>/dev/null || true
 		staging_plugin="$staging/ExportHDR.lrplugin"
 		if command -v cygpath &>/dev/null; then
 			staging_plugin="$(cygpath -w "$staging_plugin")"
