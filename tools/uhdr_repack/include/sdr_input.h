@@ -15,4 +15,9 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
                        RawImageHolder* out, std::string* error,
                        const CropRect* crop = nullptr);
 
+/** Compatibility scalar decode, with embedded SDR ICC converted to the declared sRGB space. */
+bool load_sdr_base_raw_compatibility(const std::string& path, unsigned master_width,
+                                     unsigned master_height, RawImageHolder* out,
+                                     std::string* error, const CropRect* crop = nullptr);
+
 }  // namespace uhdr_repack

@@ -9,7 +9,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $bash = Get-BashExe
 if ($bash) {
-	& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
+	$testScript = (Join-Path $ScriptDir "run_uhdr_test.sh").Replace("\", "/")
+	& $bash --login $testScript
 	exit $LASTEXITCODE
 }
 
@@ -18,6 +19,16 @@ $TestDir = Join-Path $RepoRoot "test"
 $Hdr = Join-Path $TestDir "hdr-raw.tif"
 $Base = Join-Path $TestDir "sdr.jpg"
 $Out = Join-Path $TestDir "out_uhdr.jpg"
+
+$Python = Get-Command python -ErrorAction SilentlyContinue
+$PythonArgs = @()
+if (-not $Python) {
+	$Python = Get-Command py -ErrorAction SilentlyContinue
+	$PythonArgs = @("-3")
+}
+if (-not $Python) {
+	throw "Python 3 is required for the independent JPEG marker-order check."
+}
 
 $BinCandidates = @(
 	(Join-Path $RepoRoot "ExportHDR.lrplugin\bin\uhdr_repack.exe"),
@@ -78,7 +89,74 @@ if ($LASTEXITCODE -ne 0) {
 	throw "encode failed (exit $LASTEXITCODE): $Bin --hdr-tiff $Hdr --base $Base --out $Out"
 }
 Assert-InspectOk $Out
+& $Python.Source @PythonArgs (Join-Path $ScriptDir "check_jpeg_marker_order.py") --check $Out
+if ($LASTEXITCODE -ne 0) { throw "JPEG marker-order check failed for $Out" }
+$AutoInspect = (& $Bin --inspect $Out | Out-String)
+if ($AutoInspect -match 'min_boost=\(1,1,1\)') {
+	throw "FAIL: auto mode retained the old manual min boost of 1"
+}
 Write-Host "OK: default encode — gain map matches dimensions and primary_xmp is present."
+
+$ExplicitExistingOut = Join-Path $TestDir "out_existing_explicit_uhdr.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $ExplicitExistingOut
+& $Bin --hdr-tiff $Hdr --base $Base --out $ExplicitExistingOut --gainmap-algorithm libultrahdr
+if ($LASTEXITCODE -ne 0) { throw "Explicit existing/libultrahdr encode failed" }
+$defaultHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Out).Hash
+$explicitHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $ExplicitExistingOut).Hash
+if ($defaultHash -ne $explicitHash) {
+	throw "FAIL: explicit libultrahdr mode differs from the historical default path"
+}
+Write-Host "OK: existing/libultrahdr mode is byte-identical to the historical default invocation."
+
+$CompatOut = Join-Path $TestDir "out_compatibility_scalar_uhdr.jpg"
+$CompatMap = Join-Path $TestDir "out_compatibility_scalar_gainmap.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $CompatOut, $CompatMap
+$CompatLog = (& $Bin --hdr-tiff $Hdr --base $Base --out $CompatOut `
+	--gainmap-algorithm compatibility-scalar --gainmap-scale 4 --gainmap-quality 73 `
+	--target-display-peak 1000 --gainmap-debug-out $CompatMap | Out-String)
+if ($LASTEXITCODE -ne 0) { throw "Compatibility scalar encode failed: $CompatLog" }
+$CompatInspect = (& $Bin --inspect $CompatOut | Out-String)
+if ($CompatInspect -notmatch '(?m)^is_ultra_hdr: yes\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_size: 250x250\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_components: 1\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_gamma: 1\s*$' -or
+	$CompatInspect -notmatch '(?m)^gainmap_offsets: 0\.000976562,0\.000976562\s*$' -or
+	$CompatInspect -notmatch '(?m)^markers: .*primary_xmp=(yes|1).*iso_app2_hint=(yes|1)') {
+	throw "FAIL: compatibility inspect mismatch: $CompatInspect"
+}
+if (($CompatLog + $CompatInspect) -match '(?i)(^|[^a-z])(nan|inf)([^a-z]|$)') {
+	throw "FAIL: compatibility scalar produced NaN/Inf"
+}
+$calcMin = [regex]::Match($CompatLog, '(?m)^Compatibility GainMapMin: (.+)\s*$').Groups[1].Value.Trim()
+$calcMax = [regex]::Match($CompatLog, '(?m)^Compatibility GainMapMax: (.+)\s*$').Groups[1].Value.Trim()
+$metaMin = [regex]::Match($CompatInspect, '(?m)^gainmap_min_log2: (.+)\s*$').Groups[1].Value.Trim()
+$metaMax = [regex]::Match($CompatInspect, '(?m)^gainmap_max_log2: (.+)\s*$').Groups[1].Value.Trim()
+if (-not $calcMin.StartsWith('-') -or $calcMin -ne $metaMin -or $calcMax -ne $metaMax) {
+	throw "FAIL: compatibility calculated/metadata ranges differ or negative min was lost"
+}
+Write-Host "OK: compatibility scalar is grayscale, scaled, finite, negative-safe, and metadata-consistent."
+
+$ManualOut = Join-Path $TestDir "out_manual_boost_uhdr.jpg"
+Remove-Item -Force -ErrorAction SilentlyContinue $ManualOut
+& $Bin --hdr-tiff $Hdr --base $Base --out $ManualOut --min-content-boost 0.5 --max-content-boost 8
+if ($LASTEXITCODE -ne 0) { throw "Manual content boost encode failed" }
+Assert-InspectOk $ManualOut
+$ManualInspect = (& $Bin --inspect $ManualOut | Out-String)
+if ($ManualInspect -notmatch 'min_boost=\(0\.5,0\.5,0\.5\)' -or
+	$ManualInspect -notmatch 'max_boost=\(8,8,8\)') {
+	throw "FAIL: manual metadata does not contain requested min=0.5 max=8: $ManualInspect"
+}
+Write-Host "OK: manual content boost pair encodes successfully."
+
+foreach ($singleFlag in @("--min-content-boost", "--max-content-boost")) {
+	$capture = (& $Bin --hdr-tiff $Hdr --base $Base --out (Join-Path $TestDir "out_invalid_boost.jpg") $singleFlag 0.5 2>&1 | Out-String)
+	if ($LASTEXITCODE -eq 0) { throw "FAIL: $singleFlag without its pair unexpectedly succeeded" }
+	if ($capture -notmatch "Both --min-content-boost and --max-content-boost must be specified together") {
+		throw "FAIL: $singleFlag did not report the expected pair error: $capture"
+	}
+}
+Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $TestDir "out_invalid_boost.jpg")
+Write-Host "OK: unpaired content boost flags are rejected."
 
 $CyrDir = Join-Path $TestDir "тест"
 New-Item -ItemType Directory -Force -Path $CyrDir | Out-Null

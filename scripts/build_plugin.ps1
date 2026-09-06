@@ -105,7 +105,8 @@ function Invoke-CmakeBuild {
 function Invoke-TestStep {
 	$bash = Get-BashExe
 	if ($bash) {
-		& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
+		$testScript = (Join-Path $ScriptDir "run_uhdr_test.sh").Replace("\", "/")
+		& $bash --login $testScript
 		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 		return
 	}
@@ -116,7 +117,8 @@ function Invoke-TestStep {
 function Invoke-PackageStep {
 	$bash = Get-BashExe
 	if ($bash) {
-		& $bash (Join-Path $ScriptDir "package_plugin.sh") "windows-x64"
+		$packageScript = (Join-Path $ScriptDir "package_plugin.sh").Replace("\", "/")
+		& $bash --login $packageScript "windows-x64"
 		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 		return
 	}

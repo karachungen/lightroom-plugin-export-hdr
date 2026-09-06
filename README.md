@@ -9,6 +9,7 @@ Lightroom can edit/export HDR, but HDR support across apps is still uneven. Inst
 ## What the plugin does
 
 - Adds export filter `Ultra HDR Export -> Encode Ultra HDR JPEG (uhdr_repack)`.
+- Gain Map Algorithm defaults to the historical `Existing / libultrahdr` path; optional `Compatibility scalar` preserves the Lightroom SDR JPEG and repacks a directly calculated grayscale luminance map.
 - Keeps your normal export as SDR base (usually JPEG) with your chosen sizing.
 - Runs a second internal export as temporary `32-bit` `Rec2020_hdr` TIFF.
 - Merges HDR TIFF + SDR base into one Ultra HDR `.jpg` at the same output path.

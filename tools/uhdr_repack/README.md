@@ -1,6 +1,6 @@
 # uhdr_repack
 
-CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** **`v1.4.0`**, **`UHDR_WRITE_XMP=ON`**.
+CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** at merge commit **`11ac0c325bbf56ecf8be8704ff0f79fc9e1aac77`** (PR #394 marker-order fix), **`UHDR_WRITE_XMP=ON`**.
 
 **Platforms:**
 - **macOS 26 (Tahoe), ARM64** — HDR/SDR ingest via Core Image (`.mm` loaders).
@@ -94,7 +94,9 @@ Each platform copies only that OS binary into **`ExportHDR.lrplugin/bin/`** (sel
 ./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
+**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--gainmap-algorithm <libultrahdr|compatibility-scalar>` (default `libultrahdr`), optional paired `--min-content-boost` / `--max-content-boost` (existing mode only; omitting both lets libultrahdr derive the range), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
+
+`compatibility-scalar` keeps the ICC-managed SDR decode at full RGB resolution, converts it to linear sRGB/BT.709 luminance, and compares it with Linear Rec.2020 HDR luminance. Equal `1/1024` SDR/HDR black offsets keep the scalar ratio stable when the 8-bit Lightroom JPEG quantizes a shadow to zero; pixels and metadata use the same reversible equation, with no fixed gain clamp. The mode writes a one-component grayscale JPEG map and uses libultrahdr API-4 to repack that map with the original compressed SDR JPEG and one shared metadata descriptor.
 
 ### Optional slicing (`--slice-aspect`)
 
@@ -115,7 +117,7 @@ Gain maps are **re-derived per slice** from identically cropped HDR TIFF + SDR b
 1. HDR TIFF with HDR output on; align HDR and SDR edits (e.g. same virtual copy).
 2. Same **pixel size** for both inputs (base is scaled to HDR if needed).
 3. Primary **4:2:0**; gain map may differ — **`--inspect`** → **`primary_jpeg_420`** / **`gainmap_jpeg_420`**
-4. **Odd dimensions** — If Lightroom exports an odd width or height (e.g. from Image Sizing or crop), the encoder crops one pixel from the right and/or bottom so both HDR and SDR match even dimensions required for 4:2:0. A line is written to stderr, e.g. `HDR dimensions cropped from 1291x1614 to 1290x1614 for 4:2:0 compatibility`.
+4. **Odd dimensions** — If Lightroom exports an odd width or height (e.g. from Image Sizing or crop), the encoder crops one pixel from the right and/or bottom so both HDR and SDR match even dimensions required for 4:2:0. Compatibility mode crops the SDR identically instead of scaling it by one pixel, preserving pixel alignment. A line is written to stderr, e.g. `HDR dimensions cropped from 1291x1614 to 1290x1614 for 4:2:0 compatibility`.
 
 ## Test
 

@@ -86,13 +86,25 @@ function CMD.buildEncodeCommand(o)
 		tostring(math.floor(tonumber(o.props[K.gainmapQuality]) or 85)),
 		"--gainmap-scale",
 		tostring(math.floor(tonumber(o.props[K.gainmapScale]) or 1)),
-		"--min-content-boost",
-		tostring(tonumber(o.props[K.minContentBoost]) or 1.0),
-		"--max-content-boost",
-		tostring(tonumber(o.props[K.maxContentBoost]) or 1000.0),
-		"--target-display-peak",
-		tostring(tonumber(o.props[K.targetDisplayPeak]) or 1000.0),
 	}
+	if UHDR.gainmapAlgorithm(o.props) == "compatibility-scalar" then
+		table.insert(parts, "--gainmap-algorithm")
+		table.insert(parts, "compatibility-scalar")
+		if o.gainmapDebugOut and o.gainmapDebugOut ~= "" then
+			table.insert(parts, "--gainmap-debug-out")
+			table.insert(parts, CMD.shellQuote(o.gainmapDebugOut))
+		end
+	end
+	if UHDR.gainmapAlgorithm(o.props) == "libultrahdr"
+		and o.props[K.autoContentBoost] == false
+	then
+		table.insert(parts, "--min-content-boost")
+		table.insert(parts, tostring(tonumber(o.props[K.minContentBoost]) or 1.0))
+		table.insert(parts, "--max-content-boost")
+		table.insert(parts, tostring(tonumber(o.props[K.maxContentBoost]) or 1000.0))
+	end
+	table.insert(parts, "--target-display-peak")
+	table.insert(parts, tostring(tonumber(o.props[K.targetDisplayPeak]) or 1000.0))
 	if o.props[K.monochromeGainmap] then
 		table.insert(parts, "--monochrome-gainmap")
 	end

@@ -14,6 +14,8 @@ Outputs (`out_uhdr.jpg`) are gitignored; the script writes them when run.
 
 The smoke scripts include a Cyrillic folder path test (`test/тест/`). Lightroom exports with Cyrillic filenames use ASCII staging inside the plug-in temp folder before calling `uhdr_repack`; the final JPEG is copied to the export path via `LrFileUtils` after encode.
 
+The same smoke pass also checks that explicit `libultrahdr` output is byte-identical to the default invocation and that `compatibility-scalar` produces a scaled one-component JPEG with finite negative-capable min/max and matching decoded metadata. CTest additionally runs a synthetic black/NaN safety case in `compatibility_gainmap_test`.
+
 **Windows cmd quoting:** `.\scripts\test_windows_cmd_quote.ps1` verifies full-path shell invocation under a synthetic path containing space and `(N)`, and asserts the legacy `cd` + relative-exe pattern fails.
 
 **macOS shell quoting:** `./scripts/test_macos_shell_quote.sh` stages the encoder under a path containing `Application Support`, asserts an unquoted binary path fails (issue #2), and asserts `CMD.shellQuote` + `Command.lua` `shellBinary` quoting succeed for encode/`--inspect`.

@@ -48,6 +48,36 @@ bool convert_frame_to_format(IWICImagingFactory* factory, IWICBitmapFrameDecode*
   return true;
 }
 
+bool color_manage_frame_to_srgb(IWICImagingFactory* factory, IWICBitmapFrameDecode* frame,
+                                Microsoft::WRL::ComPtr<IWICBitmapSource>& out_source) {
+  Microsoft::WRL::ComPtr<IWICColorContext> source_context;
+  Microsoft::WRL::ComPtr<IWICColorContext> destination_context;
+  if (FAILED(factory->CreateColorContext(&source_context)) ||
+      FAILED(factory->CreateColorContext(&destination_context))) {
+    return false;
+  }
+
+  UINT context_count = 0;
+  HRESULT hr = frame->GetColorContexts(0, nullptr, &context_count);
+  if (SUCCEEDED(hr) && context_count > 0) {
+    IWICColorContext* contexts[] = {source_context.Get()};
+    UINT actual = 0;
+    hr = frame->GetColorContexts(1, contexts, &actual);
+    if (FAILED(hr) || actual == 0) return false;
+  } else if (FAILED(source_context->InitializeFromExifColorSpace(1))) {
+    return false;
+  }
+  if (FAILED(destination_context->InitializeFromExifColorSpace(1))) return false;
+
+  Microsoft::WRL::ComPtr<IWICColorTransform> transform;
+  if (FAILED(factory->CreateColorTransformer(&transform))) return false;
+  hr = transform->Initialize(frame, source_context.Get(), destination_context.Get(),
+                             GUID_WICPixelFormat32bppRGBA);
+  if (FAILED(hr)) return false;
+  out_source = transform;
+  return true;
+}
+
 bool copy_pixels(IWICBitmapSource* source, unsigned width, unsigned height,
                  WICPixelFormatGUID fmt, void* dst, size_t dst_bytes, std::string* error) {
   UINT w = 0;
@@ -242,10 +272,10 @@ bool decode_to_rgba_float(const std::string& path, std::vector<float>& rgba, uns
   return load_rgba_float(path, rgba, width, height, error);
 }
 
-bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
-                                unsigned master_height, unsigned out_w, unsigned out_h,
-                                unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
-                                std::string* error) {
+bool decode_scale_crop_to_rgba8_impl(const std::string& path, unsigned master_width,
+                                     unsigned master_height, unsigned out_w, unsigned out_h,
+                                     unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
+                                     std::string* error, bool color_managed) {
   auto factory = create_factory();
   if (!factory) {
     if (error) {
@@ -281,9 +311,35 @@ bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
   }
 
   Microsoft::WRL::ComPtr<IWICBitmapSource> rgba_source;
-  if (!convert_frame_to_format(factory.Get(), frame.Get(), GUID_WICPixelFormat32bppRGBA,
+  if ((!color_managed || !color_manage_frame_to_srgb(factory.Get(), frame.Get(), rgba_source)) &&
+      !convert_frame_to_format(factory.Get(), frame.Get(), GUID_WICPixelFormat32bppRGBA,
                                rgba_source, error)) {
     return false;
+  }
+
+  // Lightroom gives the SDR JPEG and HDR TIFF the same odd dimensions. HDR loading normalizes
+  // 4:2:0 input by cropping the last row/column; scaling the SDR by that single pixel would make
+  // corresponding edges drift apart and turn them into false scalar-gain highlights. Keep the
+  // legacy loader unchanged and use the matching crop only for the compatibility/color-managed
+  // path.
+  const bool compatibility_even_crop =
+      color_managed && (src_w == master_width || src_w == master_width + 1) &&
+      (src_h == master_height || src_h == master_height + 1);
+  if (compatibility_even_crop) {
+    WICRect source_rect{};
+    source_rect.X = static_cast<INT>(crop_x);
+    source_rect.Y = static_cast<INT>(crop_y);
+    source_rect.Width = static_cast<INT>(out_w);
+    source_rect.Height = static_cast<INT>(out_h);
+    const size_t nbytes = static_cast<size_t>(out_w) * static_cast<size_t>(out_h) * 4;
+    rgba.assign(nbytes, 0);
+    const UINT stride = out_w * 4;
+    hr = rgba_source->CopyPixels(&source_rect, stride, static_cast<UINT>(nbytes), rgba.data());
+    if (FAILED(hr)) {
+      hr_or_error(hr, error, "WIC compatibility crop CopyPixels failed");
+      return false;
+    }
+    return true;
   }
 
   Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
@@ -315,6 +371,22 @@ bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
     return false;
   }
   return true;
+}
+
+bool decode_scale_crop_to_rgba8(const std::string& path, unsigned master_width,
+                                unsigned master_height, unsigned out_w, unsigned out_h,
+                                unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
+                                std::string* error) {
+  return decode_scale_crop_to_rgba8_impl(path, master_width, master_height, out_w, out_h, crop_x,
+                                         crop_y, rgba, error, false);
+}
+
+bool decode_scale_crop_to_rgba8_color_managed(
+    const std::string& path, unsigned master_width, unsigned master_height, unsigned out_w,
+    unsigned out_h, unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& rgba,
+    std::string* error) {
+  return decode_scale_crop_to_rgba8_impl(path, master_width, master_height, out_w, out_h, crop_x,
+                                         crop_y, rgba, error, true);
 }
 
 }  // namespace wic

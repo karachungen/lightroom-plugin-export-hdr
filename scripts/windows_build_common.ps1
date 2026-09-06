@@ -102,8 +102,8 @@ function Get-CmakeExe {
 
 function Get-BashExe {
 	Refresh-BuildToolPath
-	$cmd = Get-Command bash -ErrorAction SilentlyContinue
-	if ($cmd) { return $cmd.Source }
+	# Prefer Git Bash: the build/test scripts pass Windows workspace paths, which
+	# WSL's system32\bash.exe cannot resolve without explicit path translation.
 	$candidates = @(
 		"C:\Program Files\Git\bin\bash.exe",
 		"C:\Program Files\Git\usr\bin\bash.exe"
@@ -111,6 +111,8 @@ function Get-BashExe {
 	foreach ($candidate in $candidates) {
 		if (Test-Path -LiteralPath $candidate) { return $candidate }
 	}
+	$cmd = Get-Command bash -ErrorAction SilentlyContinue
+	if ($cmd -and $cmd.Source -match '\\Git\\.*\\bash\.exe$') { return $cmd.Source }
 	return $null
 }
 

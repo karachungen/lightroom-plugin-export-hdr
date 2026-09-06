@@ -10,6 +10,8 @@ UHDR.KEY = {
 	baseQuality = "UHDR_baseQuality",
 	gainmapQuality = "UHDR_gainmapQuality",
 	gainmapScale = "UHDR_gainmapScale",
+	gainmapAlgorithm = "UHDR_gainmapAlgorithm",
+	autoContentBoost = "UHDR_autoContentBoost",
 	minContentBoost = "UHDR_minContentBoost",
 	maxContentBoost = "UHDR_maxContentBoost",
 	targetDisplayPeak = "UHDR_targetDisplayPeak",
@@ -25,6 +27,8 @@ function UHDR.defaults()
 		[UHDR.KEY.baseQuality] = 92,
 		[UHDR.KEY.gainmapQuality] = 85,
 		[UHDR.KEY.gainmapScale] = 1,
+		[UHDR.KEY.gainmapAlgorithm] = "libultrahdr",
+		[UHDR.KEY.autoContentBoost] = true,
 		[UHDR.KEY.minContentBoost] = 1.0,
 		[UHDR.KEY.maxContentBoost] = 1000.0,
 		[UHDR.KEY.targetDisplayPeak] = 1000.0,
@@ -34,6 +38,14 @@ function UHDR.defaults()
 		[UHDR.KEY.debugSaveArtifacts] = false,
 		[UHDR.KEY.sliceAspect] = "none",
 	}
+end
+
+function UHDR.gainmapAlgorithm(propertyTable)
+	if propertyTable and propertyTable[UHDR.KEY.gainmapAlgorithm] == "compatibility-scalar" then
+		return "compatibility-scalar"
+	end
+	-- Missing keys in old export presets intentionally retain the historical path.
+	return "libultrahdr"
 end
 
 function UHDR.sliceAspectEnabled(propertyTable)
@@ -172,10 +184,16 @@ function UHDR.validate(propertyTable)
 	if not gs or gs < 1 or gs > 16 then
 		return bad("Gain map scale must be between 1 and 16.")
 	end
-	local mn = tonumber(propertyTable[UHDR.KEY.minContentBoost])
-	local mx = tonumber(propertyTable[UHDR.KEY.maxContentBoost])
-	if not mn or not mx or mn <= 0 or mx <= 0 or mn > mx then
-		return bad("Content boost min/max must be positive and min <= max.")
+	if propertyTable[UHDR.KEY.autoContentBoost] == false then
+		local mn = tonumber(propertyTable[UHDR.KEY.minContentBoost])
+		local mx = tonumber(propertyTable[UHDR.KEY.maxContentBoost])
+		if not mn or not mx or mn <= 0 or mx <= 0 or mn > mx then
+			return bad("Content boost min/max must be positive and min <= max.")
+		end
+	end
+	local algorithm = propertyTable[UHDR.KEY.gainmapAlgorithm]
+	if algorithm ~= nil and algorithm ~= "libultrahdr" and algorithm ~= "compatibility-scalar" then
+		return bad("Gain map algorithm must be Existing / libultrahdr or Compatibility scalar.")
 	end
 	local peak = tonumber(propertyTable[UHDR.KEY.targetDisplayPeak])
 	if not peak or peak <= 0 or peak > 10000 then

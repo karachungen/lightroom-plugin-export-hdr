@@ -90,8 +90,9 @@ bool rgba8888_to_yuv420_bt709(const uint8_t* rgba, unsigned w, unsigned h, uint8
 
 }  // namespace
 
-bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned master_height,
-                       RawImageHolder* out, std::string* error, const CropRect* crop) {
+bool load_sdr_base_raw_impl(const std::string& path, unsigned master_width,
+                            unsigned master_height, RawImageHolder* out, std::string* error,
+                            const CropRect* crop, bool compatibility) {
   if (!out || master_width == 0 || master_height == 0) {
     if (error) {
       *error = "invalid arguments";
@@ -134,8 +135,10 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
     const double sh = std::max(1.0, srcExtent.size.height);
     const CGFloat mw = (CGFloat)master_width;
     const CGFloat mh = (CGFloat)master_height;
-    const CGFloat sx = mw / (CGFloat)sw;
-    const CGFloat sy = mh / (CGFloat)sh;
+    const bool compatibilityEvenCrop =
+        compatibility && (sw == mw || sw == mw + 1.0) && (sh == mh || sh == mh + 1.0);
+    const CGFloat sx = compatibilityEvenCrop ? 1.0 : mw / (CGFloat)sw;
+    const CGFloat sy = compatibilityEvenCrop ? 1.0 : mh / (CGFloat)sh;
 
     CIImage* norm = [im imageByApplyingTransform:CGAffineTransformMakeTranslation(
                                                       -CGRectGetMinX(srcExtent), -CGRectGetMinY(srcExtent))];
@@ -187,6 +190,20 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
       colorSpace:srgb];
     CGColorSpaceRelease(srgb);
 
+    if (compatibility) {
+      uhdr_raw_image_t& r = out->ref();
+      std::memset(&r, 0, sizeof(r));
+      r.fmt = UHDR_IMG_FMT_32bppRGBA8888;
+      r.cg = UHDR_CG_BT_709;
+      r.ct = UHDR_CT_SRGB;
+      r.range = UHDR_CR_FULL_RANGE;
+      r.w = out_w;
+      r.h = out_h;
+      r.planes[UHDR_PLANE_PACKED] = buf;
+      r.stride[UHDR_PLANE_PACKED] = out_w;
+      return true;
+    }
+
     uint8_t* py = nullptr;
     uint8_t* pu = nullptr;
     uint8_t* pv = nullptr;
@@ -214,6 +231,19 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
   }
 
   return true;
+}
+
+bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned master_height,
+                       RawImageHolder* out, std::string* error, const CropRect* crop) {
+  return load_sdr_base_raw_impl(path, master_width, master_height, out, error, crop, false);
+}
+
+bool load_sdr_base_raw_compatibility(const std::string& path, unsigned master_width,
+                                     unsigned master_height, RawImageHolder* out,
+                                     std::string* error, const CropRect* crop) {
+  // Core Image render applies the embedded profile into explicit sRGB. Keep its full-resolution
+  // RGB samples for scalar luminance instead of introducing a 4:2:0 round trip.
+  return load_sdr_base_raw_impl(path, master_width, master_height, out, error, crop, true);
 }
 
 }  // namespace uhdr_repack
