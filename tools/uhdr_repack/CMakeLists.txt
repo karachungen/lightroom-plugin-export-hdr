@@ -73,6 +73,7 @@ else()
   set(UHDR_BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
+  set(UHDR_MAX_DIMENSION 65500 CACHE STRING "Maximum input width and height supported by libultrahdr" FORCE)
   # Vendor + statically build libjpeg-turbo instead of linking whatever the host has installed
   # (e.g. Homebrew's dylib, which pins an absolute /opt/homebrew or /usr/local path).
   set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr" FORCE)
