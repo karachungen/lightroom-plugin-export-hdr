@@ -7,9 +7,11 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v2.0.7
+
 ### Fixed
 
-- Raise the bundled libultrahdr maximum image dimension from 8192 to 65500 pixels, allowing exports of high-resolution images.
+- Raise the bundled libultrahdr maximum image dimension from 8192 to 65500 pixels, allowing exports of high-resolution images such as Nikon Z8 8256×5504 (closes #9).
 
 ## v2.0.6
 
