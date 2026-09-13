@@ -76,7 +76,6 @@ class GuiBridge : public QObject {
   void saveCurrentGain(int index);
   void scheduleFinalPreview();
   void ensureHdrThenPreview(int index);
-  void preloadAllHdrTiffs();
   void preferHdrTiff(int index);
   bool hasEncodedHdr() const;
   bool needsEncodedPreview() const;

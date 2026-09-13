@@ -1,6 +1,7 @@
 #include "session.h"
 
 #include "encode_engine.h"
+#include "path_io.h"
 #include "slice_plan.h"
 
 #include <nlohmann/json.hpp>
@@ -418,6 +419,61 @@ bool apply_session_dest_dir(PreviewSession* session, std::string* error) {
   return true;
 }
 
+int encode_session_item(const PreviewSession& session, const SessionItem& item, ItemEncodeResult* ir,
+                        std::string* error) {
+  if (!ir) {
+    if (error) *error = "null encode result";
+    return 1;
+  }
+  ir->id = item.id;
+  ir->skipped = item.skipped;
+  ir->out = item.out;
+  ir->encoded = false;
+  ir->exit_code = 0;
+  ir->error.clear();
+  ir->slices.clear();
+
+  if (item.skipped) {
+    return 0;
+  }
+
+  EncodeRequest req;
+  req.hdr_tiff = item.hdr_tiff;
+  req.base_path = item.sdr;
+  req.out_path = item.out;
+  req.options = effective_encode_options(session, item);
+  req.gainmap_in = item.gainmap_in;
+  req.watermark_config = item.watermark_config;
+  req.metadata_patch = item.metadata_patch;
+  req.slice_aspect = effective_slice_aspect(session, item);
+  req.crop_offset = effective_crop_offset(item);
+  req.slice_count = effective_slice_count(item);
+  req.preview_slice_index = 0;
+  req.output_width = item.output_width;
+  req.output_height = item.output_height;
+
+  std::string enc_err;
+  ir->exit_code = encode_from_paths(req, &enc_err);
+  ir->encoded = (ir->exit_code == 0);
+  ir->error = enc_err;
+  if (ir->encoded && req.slice_aspect != SliceAspect::kNone) {
+    ir->slices = list_slice_output_paths(item.out, req.slice_aspect);
+  }
+  if (ir->exit_code != 0 && error && error->empty()) {
+    *error = enc_err;
+  }
+  return ir->exit_code;
+}
+
+void discard_hdr_tiff_file(SessionItem* item) {
+  if (!item || item->hdr_tiff.empty()) {
+    return;
+  }
+  std::error_code ec;
+  fs::remove(path_from_utf8(item->hdr_tiff), ec);
+  item->hdr_tiff.clear();
+}
+
 int apply_session_batch(PreviewSession* session, PreviewResult* result, std::string* error) {
   if (!session || !result) {
     if (error) *error = "null session/result";
@@ -434,41 +490,10 @@ int apply_session_batch(PreviewSession* session, PreviewResult* result, std::str
 
   for (const auto& item : session->items) {
     ItemEncodeResult ir;
-    ir.id = item.id;
-    ir.skipped = item.skipped;
-    ir.out = item.out;
-
-    if (item.skipped) {
-      ir.encoded = false;
-      result->items.push_back(ir);
-      continue;
-    }
-
-    EncodeRequest req;
-    req.hdr_tiff = item.hdr_tiff;
-    req.base_path = item.sdr;
-    req.out_path = item.out;
-    req.options = effective_encode_options(*session, item);
-    req.gainmap_in = item.gainmap_in;
-    req.watermark_config = item.watermark_config;
-    req.metadata_patch = item.metadata_patch;
-    req.slice_aspect = effective_slice_aspect(*session, item);
-    req.crop_offset = effective_crop_offset(item);
-    req.slice_count = effective_slice_count(item);
-    req.preview_slice_index = 0;
-    req.output_width = item.output_width;
-    req.output_height = item.output_height;
-
-    std::string enc_err;
-    ir.exit_code = encode_from_paths(req, &enc_err);
-    ir.encoded = (ir.exit_code == 0);
-    ir.error = enc_err;
-    if (ir.encoded && req.slice_aspect != SliceAspect::kNone) {
-      ir.slices = list_slice_output_paths(item.out, req.slice_aspect);
-    }
+    const int code = encode_session_item(*session, item, &ir, error);
     result->items.push_back(ir);
 
-    if (ir.exit_code != 0) {
+    if (code != 0) {
       result->approved = false;
     }
   }

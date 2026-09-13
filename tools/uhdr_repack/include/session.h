@@ -75,6 +75,12 @@ bool parse_edit_cli_args(int argc, char** argv, PreviewSession* session, std::st
 
 std::string resolve_repo_relative(const std::string& path, const std::string& base_dir);
 
+int encode_session_item(const PreviewSession& session, const SessionItem& item, ItemEncodeResult* ir,
+                        std::string* error);
+
+/** Delete the on-disk HDR TIFF and clear item.hdr_tiff (no-op if empty/missing). */
+void discard_hdr_tiff_file(SessionItem* item);
+
 int apply_session_batch(PreviewSession* session, PreviewResult* result, std::string* error);
 
 /** Fill dest_dir if empty, then retarget each item.out to dest_dir / original filename. */

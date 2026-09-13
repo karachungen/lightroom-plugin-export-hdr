@@ -74,6 +74,10 @@ end
 function ExportHDRServiceProvider.updateExportSettings(exportSettings)
 	UHDR.applyDefaults(exportSettings)
 	UHDR.forceOverwriteExistingFiles(exportSettings)
+	-- Native (unchecked) Image Sizing on a panorama writes multi-GB 32-bit TIFFs.
+	if not exportSettings.LR_size_doConstrain then
+		UHDR.applyOutputSizeCap(exportSettings)
+	end
 end
 
 function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
@@ -85,8 +89,8 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	local howTo = {
 		"How to use:",
 		"In Export To, choose ULTRA HDR.",
-		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes.",
-		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered when you open Gain/HDR for a photo, or when you click Encode.",
+		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes. If it is off (or larger than Instagram 2×), the short edge is capped at 2880px so 32-bit HDR TIFFs of panoramas do not fill the disk.",
+		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered for the current photo (Gain/HDR preview) or one photo at a time on Encode.",
 		"Existing files at the export path are always overwritten (no Ask / Skip prompt).",
 		"Use HDR editing in Develop when needed (Lightroom 14+).",
 	}
@@ -98,7 +102,7 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	return {
 		{
 			title = EXPORT_UI_TITLE,
-			synopsis = "Exports SDR JPEGs, then opens Ultra HDR. HDR TIFF and encode run per photo on Gain/HDR preview or on Encode.",
+			synopsis = "Exports SDR JPEGs, then opens Ultra HDR. HDR TIFF renders per photo on Gain/HDR preview or Encode.",
 			f:row {
 				fill_horizontal = 1,
 				f:column {
@@ -315,6 +319,46 @@ local function promoteEncodedFile(src, dest, logPath, sdrSizeBytes)
 	return true
 end
 
+--- Move Lightroom's HDR TIFF to the ASCII staging name (copy+delete if move fails).
+local function stageHdrTiff(hdrPath, encodeHdrPath, logPath)
+	if not hdrPath or not encodeHdrPath then
+		return nil, "missing HDR TIFF path"
+	end
+	if pathEqual(hdrPath, encodeHdrPath) then
+		return encodeHdrPath
+	end
+	if LrFileUtils.exists(encodeHdrPath) then
+		pcall(function()
+			LrFileUtils.delete(encodeHdrPath)
+		end)
+	end
+	local moved = false
+	if LrFileUtils.move then
+		moved = pcall(function()
+			LrFileUtils.move(hdrPath, encodeHdrPath)
+		end)
+		moved = moved and LrFileUtils.exists(encodeHdrPath) and not LrFileUtils.exists(hdrPath)
+	end
+	if not moved then
+		local copied = pcall(function()
+			LrFileUtils.copy(hdrPath, encodeHdrPath)
+		end)
+		if not copied or not LrFileUtils.exists(encodeHdrPath) then
+			return nil, "could not copy HDR TIFF for encoding"
+		end
+		pcall(function()
+			LrFileUtils.delete(hdrPath)
+		end)
+	end
+	if logPath then
+		Log.append(
+			logPath,
+			"HDR TIFF staged: " .. tostring(hdrPath) .. " -> " .. tostring(encodeHdrPath) .. "\n"
+		)
+	end
+	return encodeHdrPath
+end
+
 --- Promote a staged slice JPEG to the export folder (Windows staging only).
 local function promoteSliceFile(src, dest, logPath)
 	if not src or not dest or not LrFileUtils.exists(src) then
@@ -505,12 +549,15 @@ local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 		Log.append(
 			logPath,
 			string.format(
-				"HDR pass settings: format=%s destType=%s dest=%s colorSpace=%s provider=%s\n",
+				"HDR pass settings: format=%s destType=%s dest=%s colorSpace=%s provider=%s size=%s %sx%s\n",
 				tostring(hdrSettings.LR_format),
 				tostring(hdrSettings.LR_export_destinationType),
 				tostring(hdrSettings.LR_export_destinationPathPrefix),
 				tostring(hdrSettings.LR_export_colorSpace),
-				tostring(hdrSettings.LR_exportServiceProvider)
+				tostring(hdrSettings.LR_exportServiceProvider),
+				tostring(hdrSettings.LR_size_resizeType),
+				tostring(hdrSettings.LR_size_maxWidth),
+				tostring(hdrSettings.LR_size_maxHeight)
 			)
 		)
 	end
@@ -648,15 +695,13 @@ local function fulfillOnDemandHdrTiff(item, propertyTable, previewWorkRoot)
 	end
 
 	local encodeHdrPath = item.hdrStagingPath or LrPathUtils.child(item.tempDir, "uhdr_hdr_encode.tif")
-	local hdrCopyOk = pcall(function()
-		LrFileUtils.copy(hdrPath, encodeHdrPath)
-	end)
-	if not hdrCopyOk or not LrFileUtils.exists(encodeHdrPath) then
-		fail("could not copy HDR TIFF for encoding")
+	local staged, stageErr = stageHdrTiff(hdrPath, encodeHdrPath, logPath)
+	if not staged then
+		fail(stageErr or "could not stage HDR TIFF for encoding")
 		return
 	end
-	item.hdr_tiff = encodeHdrPath
-	Log.append(logPath or "", "Encode staging HDR: " .. tostring(encodeHdrPath) .. "\n")
+	item.hdr_tiff = staged
+	Log.append(logPath or "", "Encode staging HDR: " .. tostring(staged) .. "\n")
 	PreviewSession.appendActivity(previewWorkRoot, item.id, "wait_tiff", "ready " .. tostring(encodeHdrPath))
 	PreviewSession.writeDone(previewWorkRoot, item.id, true, encodeHdrPath, nil)
 end
@@ -827,7 +872,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 			sdrSize = fileSizeBytes(encodeBasePath),
 			photo = photo,
 		}
-		Log.append(logPath, "Queued for Ultra HDR (HDR TIFF preload on editor open)\n")
+		Log.append(logPath, "Queued for Ultra HDR (HDR TIFF on demand)\n")
 	end
 
 	if #previewBatch > 0 then

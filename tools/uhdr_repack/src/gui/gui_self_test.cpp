@@ -387,6 +387,7 @@ bool test_hdr_tiff_client_overlapping(const PreviewSession& source, int* checks)
   session.items[0].hdr_tiff.clear();
   session.items[1].hdr_tiff.clear();
   session.work_dir = (fs::path(source.work_dir) / "tiff_client_overlap").string();
+  fs::remove_all(fs::u8path(session.work_dir));
   fs::create_directories(session.work_dir);
   fs::create_directories(fs::u8path(hdr_requests_dir(session.work_dir)));
   std::string error;

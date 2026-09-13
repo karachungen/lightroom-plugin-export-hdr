@@ -262,29 +262,36 @@ void MainWindow::applyOverlayGeometry() {
 }
 
 void MainWindow::onApplyAll() {
-  bridge_->setBusy(true, tr("Preparing HDR…"));
-
-  std::vector<int> needed;
-  for (int i = 0; i < document_->itemCount(); ++i) {
-    if (document_->item(i).skipped) continue;
-    needed.push_back(i);
+  encode_aborted_ = false;
+  std::string dest_error;
+  if (!apply_session_dest_dir(&document_->mutableSession(), &dest_error)) {
+    failEncode(tr("Encode failed"), QString::fromStdString(dest_error));
+    return;
   }
-  bridge_->ensureHdrTiffs(needed, [this](bool ok, const QString& error) {
-    if (!ok) {
-      bridge_->setBusy(false, tr("HDR render failed"));
-      QMessageBox::critical(this, tr("HDR render failed"),
-                            error.isEmpty() ? tr("Lightroom could not render HDR TIFF.") : error);
-      return;
+  bridge_->sendDestDir();
+  prepareItemGainMaps();
+
+  encode_result_ = {};
+  encode_result_.dest_dir = document_->session().dest_dir;
+  encode_queue_.clear();
+  encode_cursor_ = 0;
+  for (int i = 0; i < document_->itemCount(); ++i) {
+    if (document_->item(i).skipped) {
+      ItemEncodeResult skipped;
+      skipped.id = document_->item(i).id;
+      skipped.skipped = true;
+      skipped.out = document_->item(i).out;
+      encode_result_.items.push_back(skipped);
+      continue;
     }
-    encodeApprovedQueue();
-  });
+    encode_queue_.push_back(i);
+  }
+  encodeNextQueuedItem();
 }
 
-void MainWindow::encodeApprovedQueue() {
-  bridge_->setBusy(true, tr("Encoding export queue…"));
-
-  PreviewSession session_copy = document_->session();
-  for (size_t i = 0; i < session_copy.items.size(); ++i) {
+void MainWindow::prepareItemGainMaps() {
+  auto& session = document_->mutableSession();
+  for (size_t i = 0; i < session.items.size(); ++i) {
     auto* editor = bridge_->editorForIndex(static_cast<int>(i));
     const bool override_map = document_->state(static_cast<int>(i)).gainmap_override ||
                               (editor && !editor->auto_gain_map.empty() &&
@@ -293,34 +300,86 @@ void MainWindow::encodeApprovedQueue() {
       document_->updateGainMap(static_cast<int>(i), editor->gain_map, editor->width,
                                editor->height, true);
       document_->saveGainMap(static_cast<int>(i), nullptr);
-      session_copy.items[i].gainmap_in = document_->item(static_cast<int>(i)).gainmap_in;
+      session.items[i].gainmap_in = document_->item(static_cast<int>(i)).gainmap_in;
     } else {
-      session_copy.items[i].gainmap_in.clear();
+      session.items[i].gainmap_in.clear();
     }
   }
+}
 
-  auto future = QtConcurrent::run([session_copy = std::move(session_copy)]() mutable {
-    PreviewResult result;
-    std::string error;
-    const int code = apply_session_batch(&session_copy, &result, &error);
-    return std::pair<int, QString>{code, QString::fromStdString(error)};
-  });
+void MainWindow::encodeNextQueuedItem() {
+  if (encode_aborted_) {
+    return;
+  }
+  if (encode_cursor_ >= encode_queue_.size()) {
+    finishEncodeSuccess();
+    return;
+  }
 
-  auto* watcher = new QFutureWatcher<std::pair<int, QString>>(this);
-  connect(watcher, &QFutureWatcher<std::pair<int, QString>>::finished, this, [this, watcher] {
-    const auto [code, error] = watcher->result();
-    watcher->deleteLater();
-    if (code != 0) {
-      bridge_->setBusy(false, tr("Encode failed"));
-      QMessageBox::critical(this, tr("Encode failed"),
-                            error.isEmpty() ? tr("The export queue could not be encoded.") : error);
+  const int index = encode_queue_[encode_cursor_];
+  const int ordinal = static_cast<int>(encode_cursor_) + 1;
+  const int total = static_cast<int>(encode_queue_.size());
+  bridge_->setBusy(true, tr("HDR TIFF %1/%2…").arg(ordinal).arg(total));
+  bridge_->ensureHdrTiffs({index}, [this, index, ordinal, total](bool ok, const QString& error) {
+    if (encode_aborted_) {
       return;
     }
-    approved_ = true;
-    bridge_->markApproved();
-    close();
+    if (!ok) {
+      failEncode(tr("HDR render failed"),
+                 error.isEmpty() ? tr("Lightroom could not render HDR TIFF.") : error);
+      return;
+    }
+
+    bridge_->setBusy(true, tr("Encoding %1/%2…").arg(ordinal).arg(total));
+    SessionItem item = document_->item(index);
+    PreviewSession session_copy = document_->session();
+    auto future = QtConcurrent::run([session_copy = std::move(session_copy),
+                                     item = std::move(item)]() mutable {
+      ItemEncodeResult ir;
+      std::string error;
+      const int code = encode_session_item(session_copy, item, &ir, &error);
+      return std::pair<int, ItemEncodeResult>{code, std::move(ir)};
+    });
+
+    auto* watcher = new QFutureWatcher<std::pair<int, ItemEncodeResult>>(this);
+    connect(watcher, &QFutureWatcher<std::pair<int, ItemEncodeResult>>::finished, this,
+            [this, watcher, index] {
+              const auto [code, ir] = watcher->result();
+              watcher->deleteLater();
+              if (encode_aborted_) {
+                return;
+              }
+              if (code != 0) {
+                failEncode(tr("Encode failed"),
+                           ir.error.empty() ? tr("The export queue could not be encoded.")
+                                            : QString::fromStdString(ir.error));
+                return;
+              }
+              discard_hdr_tiff_file(&document_->mutableSession().items[static_cast<size_t>(index)]);
+              document_->setHdrTiff(index, {});
+              encode_result_.items.push_back(ir);
+              ++encode_cursor_;
+              encodeNextQueuedItem();
+            });
+    watcher->setFuture(future);
   });
-  watcher->setFuture(future);
+}
+
+void MainWindow::failEncode(const QString& title, const QString& error) {
+  encode_aborted_ = true;
+  bridge_->setBusy(false, title);
+  QMessageBox::critical(this, title, error);
+}
+
+void MainWindow::finishEncodeSuccess() {
+  encode_result_.approved = true;
+  std::string error;
+  if (!document_->session().result_path.empty()) {
+    write_result_file(document_->session().result_path, encode_result_, &error);
+  }
+  approved_ = true;
+  bridge_->markApproved();
+  close();
 }
 
 void MainWindow::onChooseDest() {
@@ -337,6 +396,7 @@ void MainWindow::onChooseDest() {
 }
 
 void MainWindow::onCancel() {
+  encode_aborted_ = true;
   approved_ = false;
   PreviewResult result;
   result.approved = false;

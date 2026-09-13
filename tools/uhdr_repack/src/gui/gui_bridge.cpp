@@ -552,15 +552,6 @@ void GuiBridge::ensureHdrTiffs(const std::vector<int>& indices, HdrTiffClient::F
   hdr_client_->ensure(indices, std::move(finished));
 }
 
-void GuiBridge::preloadAllHdrTiffs() {
-  if (!hdr_client_ || !document_) return;
-  std::vector<int> all;
-  all.reserve(static_cast<size_t>(document_->itemCount()));
-  for (int i = 0; i < document_->itemCount(); ++i) all.push_back(i);
-  hdr_client_->requestMissing(all);
-  if (document_->itemCount() > 0) preferHdrTiff(0);
-}
-
 void GuiBridge::preferHdrTiff(int index) {
   if (!hdr_client_ || !document_ || index < 0 || index >= document_->itemCount()) return;
   hdr_client_->setPriority(document_->item(index).id);
@@ -900,7 +891,6 @@ void GuiBridge::handleMessage(const QString& json_text) {
     }
     chrome_->postToPage(QString::fromStdString(settings.dump()));
     sendDestDir();
-    preloadAllHdrTiffs();
     if (document_->itemCount() > 0) {
       current_index_ = 0;
       document_->requestItem(0);

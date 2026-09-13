@@ -8,6 +8,7 @@
 #include <QShowEvent>
 #include <QVector>
 #include <memory>
+#include <vector>
 
 namespace uhdr_repack {
 
@@ -30,7 +31,7 @@ class MainWindow : public QMainWindow {
 
  private slots:
   void onApplyAll();
-  void encodeApprovedQueue();
+  void encodeNextQueuedItem();
   void onCancel();
   void onChooseDest();
   void onPreviewOverlayChanged(const QRect& preview_rect, const QRect& hdr_rect, bool visible);
@@ -39,12 +40,19 @@ class MainWindow : public QMainWindow {
 
  private:
   void applyOverlayGeometry();
+  void prepareItemGainMaps();
+  void failEncode(const QString& title, const QString& error);
+  void finishEncodeSuccess();
 
   std::unique_ptr<PreviewDocument> document_;
   HdrRhiViewport* viewport_ = nullptr;
   WebChrome* chrome_ = nullptr;
   GuiBridge* bridge_ = nullptr;
   bool approved_ = false;
+  bool encode_aborted_ = false;
+  std::vector<int> encode_queue_;
+  size_t encode_cursor_ = 0;
+  PreviewResult encode_result_;
 #if defined(Q_OS_WIN)
   bool windows_notice_shown_ = false;
 #endif
