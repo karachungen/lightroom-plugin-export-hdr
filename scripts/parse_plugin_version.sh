@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Parse ExportHDR.lrplugin/Info.lua version fields.
+# Parse ExportHDR.lrplugin/Info.lua version fields and the matching CHANGELOG codename.
 # Usage:
 #   ./scripts/parse_plugin_version.sh              # KEY=value lines to stdout
 #   ./scripts/parse_plugin_version.sh --github-output  # append to GITHUB_OUTPUT
@@ -8,12 +8,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 INFO_LUA="$REPO_ROOT/ExportHDR.lrplugin/Info.lua"
+CHANGELOG="$REPO_ROOT/CHANGELOG.md"
 
 usage() {
 	cat <<'EOF'
 Usage: parse_plugin_version.sh [--github-output]
 
-  --github-output  Write major, minor, revision, semver, tag to GITHUB_OUTPUT
+  --github-output  Write major, minor, revision, semver, tag, codename to GITHUB_OUTPUT
 EOF
 }
 
@@ -31,6 +32,11 @@ if [[ ! -f "$INFO_LUA" ]]; then
 	exit 1
 fi
 
+if [[ ! -f "$CHANGELOG" ]]; then
+	echo "Missing CHANGELOG.md: $CHANGELOG" >&2
+	exit 1
+fi
+
 line=$(grep 'VERSION = {' "$INFO_LUA")
 major=$(echo "$line" | sed -E 's/.*major *= *([0-9]+).*/\1/')
 minor=$(echo "$line" | sed -E 's/.*minor *= *([0-9]+).*/\1/')
@@ -44,6 +50,19 @@ fi
 
 semver="${major}.${minor}.${revision}"
 tag="v${semver}"
+
+header_line=$(grep -E "^## ${tag}($| — )" "$CHANGELOG" | head -1 || true)
+codename=""
+if [[ "$header_line" == *" — "* ]]; then
+	codename="${header_line#* — }"
+	codename="${codename%"${codename##*[![:space:]]}"}"
+	codename="${codename#"${codename%%[![:space:]]*}"}"
+fi
+
+if [[ -z "$codename" ]]; then
+	echo "CHANGELOG.md section for ${tag} must include a vibe-coding name: ## ${tag} — Name" >&2
+	exit 1
+fi
 
 emit() {
 	local key="$1"
@@ -61,3 +80,4 @@ emit revision "$revision"
 emit build "$build"
 emit semver "$semver"
 emit tag "$tag"
+emit codename "$codename"

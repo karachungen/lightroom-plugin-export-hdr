@@ -1,0 +1,6 @@
+Patch applied at configure time by apply_libultrahdr_progressive.cmake
+on google/libultrahdr v1.4.0 lib/src/jpegencoderhelper.cpp
+
+Insert immediately before jpeg_start_compress:
+
+    jpeg_simple_progression(&cinfo);

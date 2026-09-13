@@ -19,6 +19,15 @@ class RawImageHolder {
     other.img_ = {};
   }
 
+  RawImageHolder& operator=(RawImageHolder&& other) noexcept {
+    if (this != &other) {
+      reset();
+      img_ = other.img_;
+      other.img_ = {};
+    }
+    return *this;
+  }
+
   uhdr_raw_image_t* get() { return &img_; }
   const uhdr_raw_image_t* get() const { return &img_; }
   uhdr_raw_image_t& ref() { return img_; }

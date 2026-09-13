@@ -2,6 +2,7 @@
 
 #include "sdr_input.h"
 
+#include "color_primaries.h"
 #include "wic_utils.h"
 #include "yuv_convert.h"
 
@@ -48,18 +49,19 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
                                        crop_y, rgba, error)) {
     return false;
   }
+  srgb_rgba8888_to_display_p3(rgba.data(), static_cast<size_t>(out_w) * out_h);
 
   uint8_t* py = nullptr;
   uint8_t* pu = nullptr;
   uint8_t* pv = nullptr;
-  if (!rgba8888_to_yuv420_bt709(rgba.data(), out_w, out_h, &py, &pu, &pv, error)) {
+  if (!rgba8888_to_yuv420_bt601(rgba.data(), out_w, out_h, &py, &pu, &pv, error)) {
     return false;
   }
 
   uhdr_raw_image_t& r = out->ref();
   std::memset(&r, 0, sizeof(r));
   r.fmt = UHDR_IMG_FMT_12bppYCbCr420;
-  r.cg = UHDR_CG_BT_709;
+  r.cg = UHDR_CG_DISPLAY_P3;
   r.ct = UHDR_CT_SRGB;
   r.range = UHDR_CR_FULL_RANGE;
   r.w = out_w;

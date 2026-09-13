@@ -8,7 +8,6 @@ local LrPathUtils = import "LrPathUtils"
 local LrTasks = import "LrTasks"
 
 local loadPluginModule = assert(loadfile(LrPathUtils.child(_PLUGIN.path, "PluginInit.lua")))()
-local UHDR = loadPluginModule("UHDRSettings")
 
 local CMD = {}
 
@@ -69,9 +68,8 @@ function CMD.shellBinary(binary)
 	return CMD.shellQuote(binary or CMD.bundledBinaryPath())
 end
 
---- Build main encode command string (returns full line for LrTasks.execute).
+--- Build main encode command string (legacy helper; encode settings live in Ultra HDR).
 function CMD.buildEncodeCommand(o)
-	local K = UHDR.KEY
 	local parts = {
 		CMD.shellBinary(o.binary),
 		"--hdr-tiff",
@@ -80,28 +78,22 @@ function CMD.buildEncodeCommand(o)
 		CMD.shellQuote(o.basePath),
 		"--out",
 		CMD.shellQuote(o.outPath),
-		"--base-quality",
-		tostring(math.floor(tonumber(o.props[K.baseQuality]) or 92)),
-		"--gainmap-quality",
-		tostring(math.floor(tonumber(o.props[K.gainmapQuality]) or 85)),
-		"--gainmap-scale",
-		tostring(math.floor(tonumber(o.props[K.gainmapScale]) or 1)),
-		"--min-content-boost",
-		tostring(tonumber(o.props[K.minContentBoost]) or 1.0),
-		"--max-content-boost",
-		tostring(tonumber(o.props[K.maxContentBoost]) or 1000.0),
-		"--target-display-peak",
-		tostring(tonumber(o.props[K.targetDisplayPeak]) or 1000.0),
 	}
-	if o.props[K.monochromeGainmap] then
-		table.insert(parts, "--monochrome-gainmap")
-	end
-	local sliceAspect = o.props[K.sliceAspect]
-	if sliceAspect and sliceAspect ~= "none" and sliceAspect ~= "" then
-		table.insert(parts, "--slice-aspect")
-		table.insert(parts, sliceAspect)
+	if o.baseQuality then
+		table.insert(parts, "--base-quality")
+		table.insert(parts, tostring(math.floor(tonumber(o.baseQuality) or 85)))
 	end
 	return table.concat(parts, " ")
+end
+
+--- Build uhdr_repack --edit --session command.
+function CMD.buildPreviewEditCommand(binary, sessionPath)
+	return table.concat({
+		CMD.shellBinary(binary),
+		"--edit",
+		"--session",
+		CMD.shellQuote(sessionPath),
+	}, " ")
 end
 
 local function normalizeFolderPath(folder)

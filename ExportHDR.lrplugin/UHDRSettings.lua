@@ -1,47 +1,20 @@
 --[[----------------------------------------------------------------------------
-  Defaults, export-setting merge for HDR TIFF pass, validation.
-  Named UHDRSettings.lua because import "Settings" conflicts with Lightroom namespaces.
+  HDR TIFF pass merge for dummy export (SDR JPEG + internal HDR TIFF).
+  All encoder settings live in Ultra HDR (uhdr_repack --edit).
 ----------------------------------------------------------------------------]]
 
 local UHDR = {}
 
--- Plugin-specific keys (persist in export presets)
 UHDR.KEY = {
-	baseQuality = "UHDR_baseQuality",
-	gainmapQuality = "UHDR_gainmapQuality",
-	gainmapScale = "UHDR_gainmapScale",
-	minContentBoost = "UHDR_minContentBoost",
-	maxContentBoost = "UHDR_maxContentBoost",
-	targetDisplayPeak = "UHDR_targetDisplayPeak",
-	monochromeGainmap = "UHDR_monochromeGainmap",
 	keepIntermediates = "UHDR_keepIntermediates",
-	runInspect = "UHDR_runInspect",
-	debugSaveArtifacts = "UHDR_debugSaveArtifacts",
-	sliceAspect = "UHDR_sliceAspect",
 }
 
 function UHDR.defaults()
 	return {
-		[UHDR.KEY.baseQuality] = 92,
-		[UHDR.KEY.gainmapQuality] = 85,
-		[UHDR.KEY.gainmapScale] = 1,
-		[UHDR.KEY.minContentBoost] = 1.0,
-		[UHDR.KEY.maxContentBoost] = 1000.0,
-		[UHDR.KEY.targetDisplayPeak] = 1000.0,
-		[UHDR.KEY.monochromeGainmap] = false,
 		[UHDR.KEY.keepIntermediates] = false,
-		[UHDR.KEY.runInspect] = false,
-		[UHDR.KEY.debugSaveArtifacts] = false,
-		[UHDR.KEY.sliceAspect] = "none",
 	}
 end
 
-function UHDR.sliceAspectEnabled(propertyTable)
-	local v = propertyTable and propertyTable[UHDR.KEY.sliceAspect]
-	return v == "1x1" or v == "4x5"
-end
-
---- Shallow copy of a table (export settings are typically flat).
 local function copyTable(t)
 	local o = {}
 	if not t then
@@ -53,10 +26,6 @@ local function copyTable(t)
 	return o
 end
 
---[[
-  Flatten SDK property table: built-in export keys may live under ["< contents >"].
-  Shallow copy only — same as community export plug-in patterns.
-]]
 function UHDR.flattenExportSettings(propertyTable)
 	local out = {}
 	if not propertyTable then
@@ -76,11 +45,6 @@ function UHDR.flattenExportSettings(propertyTable)
 	return out
 end
 
---[[
-  Keys safe to copy from the user's export preset into the auxiliary HDR TIFF job.
-  Full flatten+copy inherited JPEG/format/service keys and Lightroom often kept emitting
-  JPEG for the second session despite LR_format = TIFF — whitelist avoids that bleed-through.
-]]
 local function shouldCopyKeyForHdrAuxExport(key)
 	if type(key) ~= "string" then
 		return false
@@ -118,10 +82,6 @@ local function shouldCopyKeyForHdrAuxExport(key)
 	return false
 end
 
---[[
-  Build export settings for the auxiliary HDR TIFF render.
-  Image sizing / sharpening / metadata come from the whitelist above; format + HDR + destination are fixed.
-]]
 function UHDR.mergeHdrTiffSettings(baseExportSettings, tempDir)
 	local flat = UHDR.flattenExportSettings(baseExportSettings)
 	local s = {}
@@ -131,12 +91,11 @@ function UHDR.mergeHdrTiffSettings(baseExportSettings, tempDir)
 		end
 	end
 
-	-- tempFolder matches Adobe HDR TIFF SDK samples; specificFolder still picked up stray JPEG pipeline from presets.
 	s.LR_export_destinationType = "tempFolder"
 	s.LR_export_destinationPathPrefix = tempDir
 	s.LR_export_useSubfolder = false
 	s.LR_export_subfolderName = ""
-	s.LR_collisionHandling = "overwrite"
+	UHDR.forceOverwriteExistingFiles(s)
 
 	s.LR_exportServiceProvider = "com.adobe.ag.export.file"
 	s.LR_reimportExportedPhoto = false
@@ -155,39 +114,16 @@ function UHDR.mergeHdrTiffSettings(baseExportSettings, tempDir)
 	return s
 end
 
-function UHDR.validate(propertyTable)
-	local function bad(msg)
-		return msg
-	end
-
-	local q = tonumber(propertyTable[UHDR.KEY.baseQuality])
-	if not q or q < 0 or q > 100 then
-		return bad("Base quality must be between 0 and 100.")
-	end
-	q = tonumber(propertyTable[UHDR.KEY.gainmapQuality])
-	if not q or q < 0 or q > 100 then
-		return bad("Gain map quality must be between 0 and 100.")
-	end
-	local gs = tonumber(propertyTable[UHDR.KEY.gainmapScale])
-	if not gs or gs < 1 or gs > 16 then
-		return bad("Gain map scale must be between 1 and 16.")
-	end
-	local mn = tonumber(propertyTable[UHDR.KEY.minContentBoost])
-	local mx = tonumber(propertyTable[UHDR.KEY.maxContentBoost])
-	if not mn or not mx or mn <= 0 or mx <= 0 or mn > mx then
-		return bad("Content boost min/max must be positive and min <= max.")
-	end
-	local peak = tonumber(propertyTable[UHDR.KEY.targetDisplayPeak])
-	if not peak or peak <= 0 or peak > 10000 then
-		return bad("Target display peak must be a sensible nit value (1-10000).")
-	end
-
-	local sa = propertyTable[UHDR.KEY.sliceAspect]
-	if sa ~= nil and sa ~= "none" and sa ~= "1x1" and sa ~= "4x5" then
-		return bad("Slice aspect must be Off, 1:1, or 4:5.")
-	end
-
+function UHDR.validate(_propertyTable)
 	return nil
+end
+
+--- Skip Lightroom's Existing Files prompt and replace files at the export path.
+function UHDR.forceOverwriteExistingFiles(settings)
+	if not settings then
+		return
+	end
+	settings.LR_collisionHandling = "overwrite"
 end
 
 function UHDR.applyDefaults(propertyTable)

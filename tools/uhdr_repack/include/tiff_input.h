@@ -17,6 +17,6 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
  */
 bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string* error,
                        unsigned master_w = 0, unsigned master_h = 0,
-                       const CropRect* crop = nullptr);
+                       const CropRect* crop = nullptr, unsigned dst_w = 0, unsigned dst_h = 0);
 
 }  // namespace uhdr_repack
