@@ -1,10 +1,11 @@
 --[[----------------------------------------------------------------------------
-  Export filter: renders user's normal export (SDR/base), renders matching HDR TIFF,
-  runs uhdr_repack to replace the exported file with an Ultra HDR JPEG.
+  Export destination: renders SDR JPEGs, opens Ultra HDR, and renders HDR TIFF
+  on demand (Gain/HDR tab or Encode) before writing Ultra HDR JPEGs.
 ----------------------------------------------------------------------------]]
 
 local LrView = import "LrView"
 local LrDialogs = import "LrDialogs"
+local LrHttp = import "LrHttp"
 local LrTasks = import "LrTasks"
 local LrProgressScope = import "LrProgressScope"
 local LrPathUtils = import "LrPathUtils"
@@ -15,11 +16,34 @@ local loadPluginModule = assert(loadfile(LrPathUtils.child(_PLUGIN.path, "Plugin
 local UHDR = loadPluginModule("UHDRSettings")
 local CMD = loadPluginModule("Command")
 local Log = loadPluginModule("Log")
+local PreviewSession = loadPluginModule("PreviewSession")
 
-local ExportHDRFilterProvider = {}
+local ExportHDRServiceProvider = {}
 
---- Post-process picker, export dialog section, and progress (distinct from LrPluginName umbrella in Info.lua).
-local FILTER_UI_TITLE = "Encode Ultra HDR JPEG (uhdr_repack)"
+--- Export To destination, dialog section, and progress (distinct from LrPluginName in Info.lua).
+local EXPORT_UI_TITLE = "Ultra HDR"
+local ISSUES_URL = "https://github.com/karachungen/lightroom-plugin-export-hdr/issues"
+local windowsNoticeShown = false
+
+local function showWindowsUntestedNotice()
+	if not CMD.isWindows() or windowsNoticeShown then
+		return
+	end
+	windowsNoticeShown = true
+	local result = LrDialogs.confirm(
+		"Version 3 is only tested on macOS.",
+		"Windows may have issues. If something breaks, please open a GitHub issue:\n" .. ISSUES_URL,
+		"Continue",
+		"Open issues"
+	)
+	if result == "cancel" then
+		LrHttp.openUrlInBrowser(ISSUES_URL)
+	end
+end
+
+ExportHDRServiceProvider.hideSections = { "video" }
+ExportHDRServiceProvider.allowFileFormats = { "JPEG" }
+ExportHDRServiceProvider.canExportVideo = false
 
 --- Build exportPresetFields from defaults (preset persistence).
 local exportPresetFields = {}
@@ -28,161 +52,77 @@ do
 		exportPresetFields[#exportPresetFields + 1] = { key = k, default = v }
 	end
 end
-ExportHDRFilterProvider.exportPresetFields = exportPresetFields
+ExportHDRServiceProvider.exportPresetFields = exportPresetFields
 
-function ExportHDRFilterProvider.startDialog(propertyTable)
+function ExportHDRServiceProvider.startDialog(propertyTable)
 	UHDR.applyDefaults(propertyTable)
+	UHDR.forceOverwriteExistingFiles(propertyTable)
+	-- Keep Existing Files on overwrite so Lightroom does not ask on re-export.
+	if propertyTable and not propertyTable._uhdrOverwriteObserver then
+		propertyTable._uhdrOverwriteObserver = true
+		pcall(function()
+			propertyTable:addObserver("LR_collisionHandling", function(props, _key, value)
+				if value ~= "overwrite" then
+					props.LR_collisionHandling = "overwrite"
+				end
+			end)
+		end)
+	end
+	showWindowsUntestedNotice()
 end
 
-function ExportHDRFilterProvider.sectionForFilterInDialog(f, propertyTable)
+function ExportHDRServiceProvider.updateExportSettings(exportSettings)
+	UHDR.applyDefaults(exportSettings)
+	UHDR.forceOverwriteExistingFiles(exportSettings)
+end
+
+function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	UHDR.applyDefaults(propertyTable)
+	UHDR.forceOverwriteExistingFiles(propertyTable)
 	local bind = LrView.bind
 	local K = UHDR.KEY
 
-	local LW = 20
+	local howTo = {
+		"How to use:",
+		"In Export To, choose ULTRA HDR.",
+		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes.",
+		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered when you open Gain/HDR for a photo, or when you click Encode.",
+		"Existing files at the export path are always overwritten (no Ask / Skip prompt).",
+		"Use HDR editing in Develop when needed (Lightroom 14+).",
+	}
+	if CMD.isWindows() then
+		howTo[#howTo + 1] = "Version 3 is only tested on macOS. Windows may have issues — open a GitHub issue: "
+			.. ISSUES_URL
+	end
 
 	return {
-		title = FILTER_UI_TITLE,
-		synopsis = "Encodes Ultra HDR JPEG via uhdr_repack. Use JPEG in File Settings for the SDR base; the plug-in adds a separate HDR TIFF pass internally. Image Sizing applies to both passes.",
-		f:row {
-			fill_horizontal = 1,
-			f:column {
+		{
+			title = EXPORT_UI_TITLE,
+			synopsis = "Exports SDR JPEGs, then opens Ultra HDR. HDR TIFF and encode run per photo on Gain/HDR preview or on Encode.",
+			f:row {
 				fill_horizontal = 1,
-				spacing = f:label_spacing(),
-				f:row {
+				f:column {
 					fill_horizontal = 1,
-					f:static_text {
+					spacing = f:label_spacing(),
+					f:row {
 						fill_horizontal = 1,
-						width_in_chars = 55,
-						title = table.concat({
-							"How to use:",
-							"In Post-Process Actions, click Add → Ultra HDR Export → Encode Ultra HDR JPEG (uhdr_repack). If Lightroom shows Install, click it, then expand the action so this panel appears.",
-							"Under File Settings, pick JPEG (recommended) so Lightroom renders a normal SDR base; the final file is replaced with an Ultra HDR .jpg.",
-							"Do not use TIFF + HDR Output + 32-bit for the main export. The plug-in runs its own internal HDR TIFF pass.",
-							"Use HDR editing in Develop when needed (Lightroom 14+).",
-						}, "\n"),
-						height_in_lines = 7,
-					},
-				},
-				f:spacer { height = f:control_spacing() },
-				f:row {
-					f:static_text {
-						title = "Base quality",
-						width_in_chars = LW,
-					},
-					f:edit_field {
-						value = bind { key = K.baseQuality, object = propertyTable },
-						immediate = true,
-						width = 80,
-					},
-					f:static_text { title = "(0-100)" },
-				},
-				f:row {
-					f:static_text {
-						title = "Gain map Q",
-						width_in_chars = LW,
-					},
-					f:edit_field {
-						value = bind { key = K.gainmapQuality, object = propertyTable },
-						immediate = true,
-						width = 80,
-					},
-				},
-				f:row {
-					f:static_text {
-						title = "Gain map scale",
-						width_in_chars = LW,
-					},
-					f:edit_field {
-						value = bind { key = K.gainmapScale, object = propertyTable },
-						immediate = true,
-						width = 80,
-						tooltip = "1 = gain map same pixel size as the base image; larger values use a smaller gain map (smaller file).",
-					},
-				},
-				f:row {
-					f:static_text {
-						title = "Min / max boost",
-						width_in_chars = LW,
-					},
-					f:edit_field {
-						value = bind { key = K.minContentBoost, object = propertyTable },
-						immediate = true,
-						width = 64,
-					},
-					f:static_text { title = "-" },
-					f:edit_field {
-						value = bind { key = K.maxContentBoost, object = propertyTable },
-						immediate = true,
-						width = 64,
-					},
-				},
-				f:row {
-					f:static_text {
-						title = "Display peak",
-						width_in_chars = LW,
-					},
-					f:edit_field {
-						value = bind { key = K.targetDisplayPeak, object = propertyTable },
-						immediate = true,
-						width = 80,
-					},
-					f:static_text { title = "nits" },
-				},
-				f:row {
-					f:static_text {
-						title = "Slicing",
-						width_in_chars = LW,
-					},
-					f:popup_menu {
-						value = bind { key = K.sliceAspect, object = propertyTable },
-						width_in_chars = 12,
-						items = {
-							{ title = "Off", value = "none" },
-							{ title = "1:1", value = "1x1" },
-							{ title = "4:5", value = "4x5" },
+						f:static_text {
+							fill_horizontal = 1,
+							width_in_chars = 55,
+							title = table.concat(howTo, "\n"),
+							height_in_lines = #howTo + 1,
 						},
-						tooltip = "Optional full-height slices at 1:1 or 4:5. Keeps the original Ultra HDR file and writes numbered slices next to it.",
 					},
-				},
-				f:row {
-					f:static_text {
-						title = "Options",
-						width_in_chars = LW,
-					},
-					f:checkbox {
-						title = "Monochrome gain map",
-						value = bind { key = K.monochromeGainmap, object = propertyTable },
-					},
-				},
-				f:row {
-					f:static_text {
-						title = " ",
-						width_in_chars = LW,
-					},
-					f:checkbox {
-						title = "Keep HDR TIFF temp files",
-						value = bind { key = K.keepIntermediates, object = propertyTable },
-					},
-				},
-				f:row {
-					f:static_text {
-						title = " ",
-						width_in_chars = LW,
-					},
-					f:checkbox {
-						title = "Save debug copies (_uhdr_sdr / _uhdr_hdr next to output, verbose log)",
-						value = bind { key = K.debugSaveArtifacts, object = propertyTable },
-					},
-				},
-				f:row {
-					f:static_text {
-						title = " ",
-						width_in_chars = LW,
-					},
-					f:checkbox {
-						title = "Run --inspect on output (log)",
-						value = bind { key = K.runInspect, object = propertyTable },
+					f:spacer { height = f:control_spacing() },
+					f:row {
+						f:static_text {
+							title = "Options",
+							width_in_chars = 12,
+						},
+						f:checkbox {
+							title = "Keep HDR TIFF temp files after export",
+							value = bind { key = K.keepIntermediates, object = propertyTable },
+						},
 					},
 				},
 			},
@@ -325,6 +265,18 @@ local function jpegHeaderLooksValid(path)
 end
 
 --- Promote staged encoder output to the Lightroom export path (Windows staging only).
+local function pathEqual(a, b)
+	if not a or not b then
+		return false
+	end
+	a = string.gsub(tostring(a), "\\", "/")
+	b = string.gsub(tostring(b), "\\", "/")
+	if CMD.isWindows() then
+		return string.lower(a) == string.lower(b)
+	end
+	return a == b
+end
+
 local function promoteEncodedFile(src, dest, logPath, sdrSizeBytes)
 	if not src or not dest or not LrFileUtils.exists(src) then
 		return false, "source missing"
@@ -648,11 +600,74 @@ local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
 	return hdrPath
 end
 
-function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filterContext)
+local function fulfillOnDemandHdrTiff(item, propertyTable, previewWorkRoot)
+	if not item or not item.id then
+		return
+	end
+	local logPath = item.logPath
+	local okDone, existing = PreviewSession.doneHasValidTiff(previewWorkRoot, item.id)
+	if okDone and existing then
+		item.hdr_tiff = existing
+		PreviewSession.writeDone(previewWorkRoot, item.id, true, existing, nil)
+		return
+	end
+	if item.hdr_tiff and item.hdr_tiff ~= "" and LrFileUtils.exists(item.hdr_tiff) then
+		PreviewSession.writeDone(previewWorkRoot, item.id, true, item.hdr_tiff, nil)
+		PreviewSession.appendActivity(previewWorkRoot, item.id, "wait_tiff", "on disk " .. tostring(item.hdr_tiff))
+		return
+	end
+
+	local function fail(msg)
+		Log.append(logPath or "", "HDR TIFF request failed for " .. tostring(item.id) .. ": " .. tostring(msg) .. "\n")
+		PreviewSession.appendActivity(previewWorkRoot, item.id, "wait_tiff", "fail " .. tostring(msg))
+		PreviewSession.writeDone(previewWorkRoot, item.id, false, "", msg)
+	end
+
+	if not item.photo then
+		fail("missing Lightroom photo object")
+		return
+	end
+	if not item.tempDir then
+		fail("missing temp directory")
+		return
+	end
+
+	PreviewSession.appendActivity(previewWorkRoot, item.id, "wait_tiff", "Lightroom render start")
+	local hdrPath, hdrFailDetail = renderHdrTiff(item.photo, propertyTable, item.tempDir, logPath)
+	if not hdrPath or not LrFileUtils.exists(hdrPath) then
+		local detail = hdrFailDetail or "HDR TIFF render failed"
+		fail(
+			"Ultra HDR: HDR TIFF render failed. Requires Lightroom Classic 14+ with HDR editing/export support. "
+				.. tostring(detail)
+		)
+		return
+	end
+	if not isTiffPath(hdrPath) then
+		fail("internal HDR pass output is not a TIFF file: " .. tostring(hdrPath))
+		return
+	end
+
+	local encodeHdrPath = item.hdrStagingPath or LrPathUtils.child(item.tempDir, "uhdr_hdr_encode.tif")
+	local hdrCopyOk = pcall(function()
+		LrFileUtils.copy(hdrPath, encodeHdrPath)
+	end)
+	if not hdrCopyOk or not LrFileUtils.exists(encodeHdrPath) then
+		fail("could not copy HDR TIFF for encoding")
+		return
+	end
+	item.hdr_tiff = encodeHdrPath
+	Log.append(logPath or "", "Encode staging HDR: " .. tostring(encodeHdrPath) .. "\n")
+	PreviewSession.appendActivity(previewWorkRoot, item.id, "wait_tiff", "ready " .. tostring(encodeHdrPath))
+	PreviewSession.writeDone(previewWorkRoot, item.id, true, encodeHdrPath, nil)
+end
+
+function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportContext)
 	LrDialogs.attachErrorDialogToFunctionContext(functionContext)
 
-	local propertyTable = filterContext.propertyTable
+	local propertyTable = exportContext.propertyTable
 	UHDR.applyDefaults(propertyTable)
+	UHDR.forceOverwriteExistingFiles(propertyTable)
+	showWindowsUntestedNotice()
 
 	local err = UHDR.validate(propertyTable)
 	if err then
@@ -712,23 +727,26 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 
 	local progress = LrProgressScope({
 		functionContext = functionContext,
-		title = FILTER_UI_TITLE,
+		title = EXPORT_UI_TITLE,
 	})
 
-	-- Optional: tie into Lightroom export progress when supported.
-	if type(filterContext.configureProgress) == "function" then
-		pcall(function()
-			filterContext:configureProgress({
-				title = FILTER_UI_TITLE,
-				renderPortion = 1,
-			})
-		end)
-	end
+	pcall(function()
+		exportContext:configureProgress({
+			title = EXPORT_UI_TITLE,
+		})
+	end)
 
 	math.randomseed(os.time() + math.floor((os.clock() or 0) * 1000000 % 999983))
 
 	local done = 0
-	for sourceRendition, _renditionToSatisfy in filterContext:renditions() do
+	local previewBatch = {}
+	local previewWorkRoot = LrPathUtils.child(
+		LrPathUtils.getStandardFilePath("temp"),
+		string.format("uhdr_preview_%s", tostring(sessionStamp))
+	)
+	LrFileUtils.createDirectory(previewWorkRoot)
+
+	for _, rendition in exportContext:renditions({ stopIfCanceled = true }) do
 		done = done + 1
 		local canceled = false
 		pcall(function()
@@ -740,7 +758,7 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			break
 		end
 
-		local renderOk, basePathOrMsg = sourceRendition:waitForRender()
+		local renderOk, basePathOrMsg = rendition:waitForRender()
 		if not renderOk then
 			local msg = "Failed to render base export: " .. tostring(basePathOrMsg)
 			Log.append(fallbackLog(), msg .. "\n")
@@ -755,26 +773,12 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 			end
 		end)
 
-		local photo = sourceRendition.photo
+		local photo = rendition.photo
 		if not photo then
 			error("Ultra HDR: missing photo for rendition.")
 		end
 
 		Log.append(logPath, "\n--- Photo ---\nBase export: " .. tostring(basePath) .. "\n")
-		if propertyTable[UHDR.KEY.debugSaveArtifacts] then
-			Log.append(
-				logPath,
-				"LR_export_destinationPathPrefix: "
-					.. tostring(propertyTable.LR_export_destinationPathPrefix)
-					.. "\n"
-			)
-			pcall(function()
-				local dim = photo:getFormattedMetadata("dimensions")
-				if dim then
-					Log.append(logPath, "dimensions (formatted): " .. tostring(dim) .. "\n")
-				end
-			end)
-		end
 
 		local tempRoot = LrPathUtils.getStandardFilePath("temp")
 		local tempDir = LrPathUtils.child(
@@ -783,59 +787,11 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		)
 		LrFileUtils.createDirectory(tempDir)
 
-		local hdrPath, hdrFailDetail = renderHdrTiff(photo, propertyTable, tempDir, logPath)
-		if not hdrPath or not LrFileUtils.exists(hdrPath) then
-			safeDeleteTree(tempDir)
-			local detail = ""
-			if hdrFailDetail and hdrFailDetail ~= "" then
-				detail = "\nLightroom said: " .. hdrFailDetail .. "\n"
-			end
-			error(
-				"Ultra HDR: HDR TIFF render failed. Requires Lightroom Classic 14+ with HDR editing/export support.\n"
-					.. "If your catalog photo is not an HDR edit, enable HDR in Develop or adjust export compatibility.\n"
-					.. detail
-					.. "See plug-in README troubleshooting."
-			)
-		end
-
-		if not isTiffPath(hdrPath) then
-			Log.append(
-				logPath,
-				"ERROR: internal HDR pass must write a .tif file; got: " .. tostring(hdrPath) .. "\n"
-			)
-			if not propertyTable[UHDR.KEY.keepIntermediates] then
-				safeDeleteTree(tempDir)
-			end
-			error(
-				"Ultra HDR: internal HDR pass output is not a TIFF file: " .. tostring(hdrPath)
-			)
-		end
-
-		if propertyTable[UHDR.KEY.debugSaveArtifacts] then
-			local sdrDup, hdrDup = debugPostfixPaths(basePath, hdrPath)
-			pcall(function()
-				LrFileUtils.copy(basePath, sdrDup)
-			end)
-			pcall(function()
-				LrFileUtils.copy(hdrPath, hdrDup)
-			end)
-			Log.append(logPath, "Debug: SDR copy: " .. tostring(sdrDup) .. "\n")
-			Log.append(logPath, "Debug: HDR copy: " .. tostring(hdrDup) .. "\n")
-		end
-
 		local outPath = basePath
 		local useStagingOut = CMD.isWindows()
 
 		-- ASCII-only staging paths for cmd.exe (avoids Cyrillic / special-char mangling in LrTasks.execute).
 		local encodeHdrPath = LrPathUtils.child(tempDir, "uhdr_hdr_encode.tif")
-		local hdrCopyOk = pcall(function()
-			LrFileUtils.copy(hdrPath, encodeHdrPath)
-		end)
-		if not hdrCopyOk or not LrFileUtils.exists(encodeHdrPath) then
-			safeDeleteTree(tempDir)
-			error("Ultra HDR: could not copy HDR TIFF for encoding.")
-		end
-		Log.append(logPath, "Encode staging HDR: " .. tostring(encodeHdrPath) .. "\n")
 
 		local baseExt = LrPathUtils.extension(basePath) or "jpg"
 		local encodeBasePath = LrPathUtils.child(tempDir, "uhdr_sdr_base_copy." .. baseExt)
@@ -857,115 +813,182 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 		end
 		Log.append(logPath, "Final OUT: " .. tostring(outPath) .. "\n")
 
-		if UHDR.sliceAspectEnabled(propertyTable) then
-			Log.append(
-				logPath,
-				"Slicing enabled ("
-					.. tostring(propertyTable[UHDR.KEY.sliceAspect])
-					.. ")\n"
-			)
+		previewBatch[#previewBatch + 1] = {
+			id = "photo_" .. tostring(done),
+			label = LrPathUtils.leafName(basePath) or ("Photo " .. tostring(done)),
+			sdr = encodeBasePath,
+			hdr_tiff = "",
+			hdrStagingPath = encodeHdrPath,
+			out = encodeOutPath,
+			finalOut = outPath,
+			tempDir = tempDir,
+			logPath = logPath,
+			useStagingOut = useStagingOut,
+			sdrSize = fileSizeBytes(encodeBasePath),
+			photo = photo,
+		}
+		Log.append(logPath, "Queued for Ultra HDR (HDR TIFF preload on editor open)\n")
+	end
+
+	if #previewBatch > 0 then
+		local resultPath = LrPathUtils.child(previewWorkRoot, "result.json")
+		local previewLog = fallbackLog()
+		local sessionPath = PreviewSession.write(previewWorkRoot, resultPath, previewBatch, previewLog)
+		PreviewSession.writeBridge(previewWorkRoot)
+		PreviewSession.appendActivity(previewWorkRoot, "", "session", "editor start " .. tostring(sessionPath))
+		Log.append(previewLog, "Preview session: " .. tostring(sessionPath) .. "\n")
+		Log.append(previewLog, "Preview activity: " .. PreviewSession.previewLogPath(previewWorkRoot) .. "\n")
+		local previewCmd = CMD.buildPreviewEditCommand(binary, sessionPath)
+		Log.append(previewLog, "Preview command: " .. previewCmd .. "\n")
+
+		local itemsById = {}
+		for _, item in ipairs(previewBatch) do
+			itemsById[item.id] = item
 		end
 
-		local cmdLine = CMD.buildEncodeCommand({
-			binary = binary,
-			hdrTiff = encodeHdrPath,
-			basePath = encodeBasePath,
-			outPath = encodeOutPath,
-			props = propertyTable,
-		})
-
-		Log.append(logPath, "Command: " .. cmdLine .. "\n")
-		if CMD.isWindows() then
-			Log.append(
-				logPath,
-				"Execute: " .. CMD.wrapForWindowsShell(CMD.resolveWindowsCommand(cmdLine)) .. "\n"
-			)
-		end
-		local st = CMD.runShell(cmdLine, logPath)
-		if st ~= 0 then
-			local sx = shellExitStatus(st)
-			local hint = uhdrFailureHint(sx, st, logPath)
-			Log.append(
-				logPath,
-				"uhdr_repack exit status: raw=" .. tostring(st) .. " exit≈" .. tostring(sx) .. "\n"
-			)
-			if hint ~= "" then
-				Log.append(logPath, hint)
-			end
-			safeDeleteTree(tempDir)
-			error(
-				"uhdr_repack failed (exit "
-					.. tostring(sx)
-					.. ", raw "
-					.. tostring(st)
-					.. "). See log: "
-					.. tostring(logPath)
-					.. hint
-			)
-		end
-
-		if not LrFileUtils.exists(encodeOutPath) then
-			safeDeleteTree(tempDir)
-			error("Ultra HDR: encoder did not write output: " .. tostring(encodeOutPath))
-		end
-
-		local sdrSize = fileSizeBytes(encodeBasePath)
-
-		if useStagingOut then
-			local promoteOk, promoteErr = promoteEncodedFile(encodeOutPath, outPath, logPath, sdrSize)
-			if not promoteOk then
-				safeDeleteTree(tempDir)
-				error(
-					"Ultra HDR: could not promote encoded JPEG to export path: "
-						.. tostring(promoteErr)
-						.. " ("
-						.. tostring(outPath)
-						.. ")"
-				)
-			end
-			Log.append(logPath, "Copied staged output to: " .. tostring(outPath) .. "\n")
-
-			if UHDR.sliceAspectEnabled(propertyTable) then
-				local aspect = propertyTable[UHDR.KEY.sliceAspect]
-				local stagedSlices = CMD.listSliceOutputs(encodeOutPath, aspect)
-				Log.append(logPath, "Promoting " .. tostring(#stagedSlices) .. " slice file(s) to export folder\n")
-				for _, stagedSlice in ipairs(stagedSlices) do
-					local finalSlice = CMD.promoteStagedSlicePath(stagedSlice, encodeOutPath, outPath)
-					if not finalSlice then
-						safeDeleteTree(tempDir)
-						error("Ultra HDR: could not map staged slice path: " .. tostring(stagedSlice))
+		local guiDone = false
+		local pst = 0
+		if LrTasks.startAsyncTask then
+			LrTasks.startAsyncTask(function()
+				pst = CMD.runShell(previewCmd, previewLog)
+				guiDone = true
+			end)
+			while not guiDone do
+				local canceled = false
+				pcall(function()
+					if progress.isCanceled and progress:isCanceled() then
+						canceled = true
 					end
-					if not promoteSliceFile(stagedSlice, finalSlice, logPath) then
-						safeDeleteTree(tempDir)
-						error("Ultra HDR: could not copy slice to: " .. tostring(finalSlice))
+				end)
+				if canceled then
+					break
+				end
+				local reqId = PreviewSession.nextPendingRequestId(previewWorkRoot)
+				if reqId then
+					local item = itemsById[reqId]
+					if item then
+						pcall(function()
+							if progress.setCaption then
+								progress:setCaption("HDR: " .. (item.label or item.id))
+							end
+						end)
+						fulfillOnDemandHdrTiff(item, propertyTable, previewWorkRoot)
+					else
+						PreviewSession.writeDone(previewWorkRoot, reqId, false, "", "unknown photo id")
 					end
-					Log.append(logPath, "Copied slice to: " .. tostring(finalSlice) .. "\n")
 				end
+				taskSleep(0.15)
 			end
-		end
-
-		assertFinalUltraHdr(binary, outPath, logPath, sdrSize)
-
-		if propertyTable[UHDR.KEY.runInspect] then
-			local ins = CMD.buildInspectCommand(binary, outPath)
-			Log.append(logPath, "Inspect: " .. ins .. "\n")
-			CMD.runShell(ins, logPath)
-			if UHDR.sliceAspectEnabled(propertyTable) then
-				local aspect = propertyTable[UHDR.KEY.sliceAspect]
-				local slicePaths = CMD.listSliceOutputs(outPath, aspect)
-				Log.append(logPath, "Slice inspect: found " .. tostring(#slicePaths) .. " file(s)\n")
-				for _, slicePath in ipairs(slicePaths) do
-					local sliceIns = CMD.buildInspectCommand(binary, slicePath)
-					Log.append(logPath, "Inspect slice: " .. sliceIns .. "\n")
-					CMD.runShell(sliceIns, logPath)
-				end
-			end
-		end
-
-		if not propertyTable[UHDR.KEY.keepIntermediates] then
-			safeDeleteTree(tempDir)
 		else
-			Log.append(logPath, "Kept intermediate HDR TIFF folder: " .. tostring(tempDir) .. "\n")
+			pst = CMD.runShell(previewCmd, previewLog)
+		end
+
+		local function discardPreviewTemps()
+			for _, item in ipairs(previewBatch) do
+				if not propertyTable[UHDR.KEY.keepIntermediates] then
+					safeDeleteTree(item.tempDir)
+				end
+			end
+		end
+
+		local function previewCanceledFromLightroom()
+			local canceled = false
+			pcall(function()
+				if progress.isCanceled and progress:isCanceled() then
+					canceled = true
+				end
+			end)
+			return canceled
+		end
+
+		local sx = shellExitStatus(pst)
+		local approved = PreviewSession.readApproved(resultPath)
+		-- Studio cancel returns 2 (LrTasks.execute: 512 on macOS). Do not surface that as an export error.
+		if previewCanceledFromLightroom() or sx == 2 or (sx == 0 and not approved) then
+			discardPreviewTemps()
+			Log.append(previewLog, "Ultra HDR preview cancelled.\n")
+			pcall(function()
+				progress:done()
+			end)
+			return
+		end
+		if sx ~= 0 then
+			discardPreviewTemps()
+			error(
+				"Ultra HDR preview failed (exit "
+					.. tostring(sx)
+					.. "). See log: "
+					.. tostring(previewLog)
+					.. uhdrFailureHint(sx, pst, previewLog)
+			)
+		end
+		if not approved then
+			discardPreviewTemps()
+			Log.append(previewLog, "Ultra HDR preview cancelled.\n")
+			pcall(function()
+				progress:done()
+			end)
+			return
+		end
+		local itemStatuses = PreviewSession.readItemStatuses(resultPath)
+		local destDir = PreviewSession.readDestDir(resultPath)
+		for _, item in ipairs(previewBatch) do
+			logPath = item.logPath or previewLog
+			local status = itemStatuses[item.id]
+			local encoded = status and status.encoded == true
+			local skipped = status and status.skipped == true
+			if skipped or not encoded then
+				Log.append(
+					logPath,
+					"Skipping promote for preview item "
+						.. tostring(item.id)
+						.. " (skipped="
+						.. tostring(skipped)
+						.. ", encoded="
+						.. tostring(encoded)
+						.. ")\n"
+				)
+				if not propertyTable[UHDR.KEY.keepIntermediates] then
+					safeDeleteTree(item.tempDir)
+				end
+			else
+				local folder = destDir or LrPathUtils.parent(item.finalOut) or "."
+				LrFileUtils.createDirectory(folder)
+				local destFile = LrPathUtils.child(folder, LrPathUtils.leafName(item.finalOut) or "export.jpg")
+				local srcFile = (status and status.out) or item.out
+				if not pathEqual(srcFile, destFile) then
+					local promoteOk, promoteErr = promoteEncodedFile(srcFile, destFile, logPath, item.sdrSize)
+					if not promoteOk then
+						error(
+							"Ultra HDR: could not promote preview-encoded JPEG: "
+								.. tostring(promoteErr)
+								.. " ("
+								.. tostring(destFile)
+								.. ")"
+						)
+					end
+					Log.append(logPath, "Promoted preview output to: " .. tostring(destFile) .. "\n")
+				else
+					Log.append(logPath, "Encoded in place: " .. tostring(destFile) .. "\n")
+				end
+
+				if status and status.slices then
+					for _, stagedSlice in ipairs(status.slices) do
+						local destSlice = LrPathUtils.child(folder, LrPathUtils.leafName(stagedSlice) or "")
+						if destSlice and destSlice ~= "" and LrFileUtils.exists(stagedSlice) then
+							if pathEqual(stagedSlice, destSlice) then
+								Log.append(logPath, "Slice already at destination: " .. tostring(destSlice) .. "\n")
+							elseif promoteSliceFile(stagedSlice, destSlice, logPath) then
+								Log.append(logPath, "Promoted slice to: " .. tostring(destSlice) .. "\n")
+							end
+						end
+					end
+				end
+				assertFinalUltraHdr(binary, destFile, logPath, item.sdrSize)
+				if not propertyTable[UHDR.KEY.keepIntermediates] then
+					safeDeleteTree(item.tempDir)
+				end
+			end
 		end
 	end
 
@@ -974,4 +997,4 @@ function ExportHDRFilterProvider.postProcessRenderedPhotos(functionContext, filt
 	end)
 end
 
-return ExportHDRFilterProvider
+return ExportHDRServiceProvider

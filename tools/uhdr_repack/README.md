@@ -42,8 +42,8 @@ flowchart TB
 ```
 
 - **HDR path** — Core Image (macOS) or WIC (Windows) → **linear BT.2020** half-float for libultrahdr.
-- **SDR path** — Resize to match, then **BT.709 YCbCr 4:2:0** for the SDR primary JPEG.
-- **Encode** — Gain map + **XMP** (`hdrgm` / GContainer-style).
+- **SDR path** — Resize to match, then **Display P3 BT.601 YCbCr 4:2:0** for the SDR primary JPEG (Display P3 ICC from libultrahdr).
+- **Encode** — Gain map + **XMP** (`hdrgm` / GContainer-style). Primary and gain-map JPEGs are **progressive**. Primary (SDR) XMP also gets **xmpRights** (`WebStatement` https://hdr.karachun.by/, `UsageTerms` GitHub repo).
 
 ## Build
 
@@ -94,11 +94,49 @@ Each platform copies only that OS binary into **`ExportHDR.lrplugin/bin/`** (sel
 ./build/uhdr_repack --hdr-tiff export_hdr.tif --base export_sdr.jpg --out output_uhdr.jpg
 ```
 
-**Options** — `--base-quality` (92), `--gainmap-quality` (85), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (1000), `--target-display-peak` (1000 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5>`
+**Options** — `--base-quality` (95), `--gainmap-quality` (95), `--gainmap-scale` (1), `--min-content-boost` (1.0), `--max-content-boost` (16), `--target-display-peak` (3250 nits), `--monochrome-gainmap`, `--slice-aspect <none|1x1|4x5|3x4|191x100>`, `--slice-count <N|max>` (default 1), `--crop-offset` (0.5), `--out-width <px>` (0 = native crop, capped at 2×; height follows aspect), `--gainmap-in`, `--watermark-config`, `--metadata-patch`
+
+### Preview / edit (`--edit`)
+
+Requires **Qt 6.11+** and a system webview:
+
+- **macOS** — WKWebView (WebKit)
+- **Windows x64** — WebView2 Evergreen runtime + static `WebView2LoaderStatic` at link time
+
+The editor chrome is **embedded HTML/CSS/JS** (filmstrip, encode settings, gain-map painting, slice overlay). **Live HDR** and **Final** preview use a native `QRhiSwapChain` viewport (Metal EDR on macOS, Direct3D 11 scRGB/HDR on Windows) beside the web panel.
+
+Release builds require a genuinely static Qt kit; prebuilt `aqt`/Homebrew Qt packages are
+shared builds and are only suitable for local development:
+
+```bash
+./scripts/setup_qt_static.sh
+export QT_STATIC_ROOT=$HOME/Qt/6.11.0-static
+./scripts/build_plugin.sh build
+```
+
+The build fails if `UHDR_STATIC_QT=ON` and `otool`/`dumpbin` still finds a Qt dynamic
+library. For a local shared-Qt build, configure with `-DUHDR_STATIC_QT=OFF`.
+
+The editor provides an export filmstrip, SDR/Gain/HDR modes, encode settings, and slice overlays. Delivery presets: **Color map** (JPEG 95, RGB full-res Display P3 map, `--max-content-boost` 16 / 4 stops, 3250 nits, progressive), **Mono map** (JPEG 95, luma map at `--gainmap-scale 2`, `--max-content-boost` 4.92, `--monochrome-gainmap`), and **Custom** (unlocks the current values). A photo that is already 3:4, 4:5, 1:1, or 1.91:1 auto-selects that feed crop. Encode keeps the crop’s **native** pixels, capped at **2×** Instagram size (3:4 → 2160×2880). Sliders cannot go above 2× or below 1× (and never upscale). The editor warns if the aspect is outside **1.91:1–3:4** (Instagram will crop and HDR may drop). Uncheck Lightroom **Image Sizing** for camera-native pixels. Preview HUD warns only if the JPEG would exceed Instagram’s **8 MB** upload cap. **Gain** and **HDR** preview-encode the current photo. When `bridge.json` is present, the editor requests every missing HDR TIFF from Lightroom at open (the current filmstrip photo is rendered first). **Encode N photos** waits for any leftover TIFFs, then batch-encodes. Standalone `--edit` sessions that already include `hdr_tiff` paths work without Lightroom.
+
+```bash
+./scripts/run_uhdr_preview_demo.sh
+# or:
+./build/uhdr_repack --edit --session ../../test/ui/preview_session.json
+```
+
+Headless CI / encode-only builds can disable the GUI:
+
+```bash
+UHDR_ENABLE_GUI=OFF ./scripts/build_plugin.sh build
+```
+
 
 ### Optional slicing (`--slice-aspect`)
 
-When set to `1x1` or `4x5`, the encoder still writes the full-frame Ultra HDR JPEG to `--out`, then creates **numbered slice files** next to it (e.g. `photo_1x1_01.jpg`, `photo_4x5_02.jpg`). Each slice keeps the **full exported height**; tile width is `H` (1:1) or `even floor(H×4/5)` (4:5). Equal-width tiles are packed left-to-right and **centered** when the image is wider than `n × tileWidth`.
+When set to `1x1`, `4x5`, `3x4`, or `191x100`, the encoder cover-crops tiles of that aspect. Default output is the crop’s native size, capped at **2×** Instagram (2160-wide). `--out-width` (or the editor sliders) can request any even size in the 1×–2× range. Smaller crops are never upscaled. **Default is one slide** (`--slice-count 1`): leftover slack is centered (`--crop-offset 0.5`) and can be panned. `--slice-count max` packs as many matching tiles as fit, capped at 20 (Instagram gallery). Two or more slides write numbered files next to `--out` (e.g. `photo_4x5_01.jpg`); a single slide writes `--out` only.
+
+Wide frames pack left-to-right at full height; tall frames pack top-to-bottom at full width. In the editor, if more than one matching frame fits, a gallery picker appears so you can choose the slide count before **Encode**. Session JSON uses `slice_count` (0 = max).
 
 Gain maps are **re-derived per slice** from identically cropped HDR TIFF + SDR base buffers (never by cutting an existing Ultra HDR JPEG). Pass a preserved SDR copy as `--base` if `--out` overwrites the original base file (the Lightroom plug-in does this automatically).
 

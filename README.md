@@ -1,6 +1,12 @@
 # Ultra HDR Export for Lightroom Classic
 
-Lightroom Classic export filter that turns your normal export plus an internal HDR TIFF pass into one Ultra HDR gain-map JPEG (`.jpg`) via `uhdr_repack` (`google/libultrahdr`).
+> **Warning:** Want **pro** HDR for Instagram / Threads, with real image-science support? Use Greg Benz’s **[Web Sharp Pro](https://gregbenzphotography.com/web-sharp-pro-panel)** Photoshop panel.
+>
+> This Lightroom plugin is purely vibecoded. I had no knowledge of images or HDR concepts — the goal was just to get Ultra HDR working on Instagram, and probably other web services.
+
+> **Note:** Version 3 is only tested on macOS. Windows may have issues — please [open a GitHub issue](https://github.com/karachungen/lightroom-plugin-export-hdr/issues).
+
+Lightroom Classic export destination that turns an SDR JPEG plus an internal HDR TIFF pass into one Ultra HDR gain-map JPEG (`.jpg`) via `uhdr_repack` (`google/libultrahdr`).
 
 ## What problem it solves
 
@@ -8,17 +14,18 @@ Lightroom can edit/export HDR, but HDR support across apps is still uneven. Inst
 
 ## What the plugin does
 
-- Adds export filter `Ultra HDR Export -> Encode Ultra HDR JPEG (uhdr_repack)`.
-- Keeps your normal export as SDR base (usually JPEG) with your chosen sizing.
-- Runs a second internal export as temporary `32-bit` `Rec2020_hdr` TIFF.
-- Merges HDR TIFF + SDR base into one Ultra HDR `.jpg` at the same output path.
-- Optional slicing (`1:1` or `4:5`) writes numbered full-height Ultra HDR slices next to the main file.
+- Adds **Export To → ULTRA HDR**.
+- Renders JPEG as the SDR base with your chosen sizing. Leave **Image Sizing** off to keep the photo’s aspect and pixel size; Instagram crops in Ultra HDR are optional.
+- **Opens Ultra HDR** (`uhdr_repack --edit`) as soon as SDR JPEGs are ready.
+- Starts Lightroom HDR TIFF renders for the whole queue when the editor opens (the selected photo is first). **Encode** waits for any leftover TIFFs.
+- Replaces each exported base path with the final Ultra HDR `.jpg` for photos included in **Encode N photos**.
 
 ## How it works
 
 1. Lightroom renders the normal export (SDR base) using your export settings.
-2. The plugin runs an internal HDR TIFF export with matching dimensions.
-3. Bundled `uhdr_repack` encodes the gain-map JPEG and replaces the base file path with the final Ultra HDR `.jpg`.
+2. The plugin writes a session JSON and launches bundled **Ultra HDR** (web UI + native HDR viewport).
+3. The editor asks Lightroom for every photo’s HDR TIFF as soon as it opens (SDR review stays live). Opening **Gain** or **HDR** preview-encodes the current photo, jumping that TIFF to the front of the Lightroom queue if it is still pending.
+4. **Encode N photos** waits for any leftover HDR TIFFs, encodes Ultra HDR JPEGs, and the plugin promotes them to your export folder.
 
 ## Local development
 
@@ -37,6 +44,6 @@ Do **not** unzip release archives over the dev `ExportHDR.lrplugin` folder — t
 
 1. Download plugin from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases)
 2. Install in Lightroom: `File -> Plug-in Manager -> Add` and select `ExportHDR.lrplugin`
-3. In Export, keep `File Settings` as `JPEG` for the main pass.
-4. In `Post-Process Actions`, add `Ultra HDR Export -> Encode Ultra HDR JPEG (uhdr_repack)`.
-5. Export and review `uhdr_export_<timestamp>.log` next to the export folder when troubleshooting.
+3. In Export, choose **Export To → ULTRA HDR**. File Settings are JPEG for the SDR base.
+4. Export — Ultra HDR opens on the SDR JPEGs and starts Lightroom HDR TIFF renders in the background. Open **Gain** or **HDR** to preview-encode the current photo.
+5. Click **Encode N photos** to write Ultra HDR JPEGs for the non-skipped queue.

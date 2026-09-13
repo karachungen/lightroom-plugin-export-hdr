@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultra HDR</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body class="mode-sdr is-loading">
+  <header id="chrome">
+    <div class="brand">
+      <span class="brand-mark">Ultra HDR</span>
+    </div>
+    <div id="queue-count" class="chrome-meta">0 photos</div>
+    <div id="display-status" class="hdr-pill" data-hdr="unknown">Display</div>
+  </header>
+
+  <div id="app">
+    <aside id="queue" aria-label="Export queue">
+      <div class="queue-head">
+        <span class="eyebrow">Queue</span>
+        <span id="queue-hint" class="hint">Click to preview · tap skip to exclude</span>
+      </div>
+      <ul id="filmstrip"></ul>
+    </aside>
+
+    <main id="stage">
+      <div id="mode-buttons" class="mode-seg" role="tablist">
+        <button type="button" data-mode="sdr" class="mode-btn active" role="tab">SDR</button>
+        <button type="button" data-mode="gain" class="mode-btn" role="tab">Gain</button>
+        <button type="button" data-mode="hdr" class="mode-btn" role="tab">HDR</button>
+      </div>
+      <div id="canvas-wrap">
+        <div id="preview-frame">
+          <canvas id="preview-canvas"></canvas>
+          <div id="slice-overlay"></div>
+          <div id="hdr-loader" hidden>
+            <div class="hdr-spinner" aria-hidden="true"></div>
+            <p>Encoding Ultra HDR…</p>
+          </div>
+        </div>
+        <div id="preview-hud" aria-live="polite">
+          <span id="output-size">Waiting for photo…</span>
+          <span id="output-size-warn" hidden>Over Instagram’s 8 MB JPEG upload limit.</span>
+        </div>
+      </div>
+      <div id="stage-meta">
+        <div id="stage-title" class="stage-title">No image</div>
+        <div id="status-text" class="stage-status">Ready</div>
+      </div>
+      <div id="slice-thumbs" hidden></div>
+    </main>
+
+    <aside id="inspector">
+      <div class="inspector-scroll">
+        <p id="photo-title" class="photo-title">No image</p>
+
+        <section class="group" id="delivery-group">
+          <h3>Delivery</h3>
+          <p id="delivery-hint" class="group-hint">JPEG 95, RGB full-res Display P3 map, 4-stop (16×) boost. Original pixels; Instagram accepts up to 8 MB.</p>
+          <div id="delivery-presets" class="ig-presets" role="radiogroup" aria-label="Encode delivery">
+            <button type="button" class="ig-card active" data-value="color">
+              <span class="ig-name">Color map</span>
+              <span class="ig-size">JPEG 95 · RGB · 4-stop</span>
+            </button>
+            <button type="button" class="ig-card" data-value="mono">
+              <span class="ig-name">Mono map</span>
+              <span class="ig-size">JPEG 95 · luma ½</span>
+            </button>
+            <button type="button" class="ig-card" data-value="custom">
+              <span class="ig-name">Custom</span>
+              <span class="ig-size">You choose JPEG + gain map</span>
+            </button>
+          </div>
+          <p id="export-applied" class="export-applied">Color map · JPEG 95/95 · RGB map 1:1 · boost 1–16× · 3250 nits</p>
+          <div id="color-notice" class="custom-warn">
+            Instagram may compress a color gain map more on upload than a luma map.
+          </div>
+          <div id="mono-notice" class="custom-warn" hidden>
+            Instagram may compress a luma gain map less on upload than a color map.
+          </div>
+          <div id="quality-sliders" hidden>
+            <label class="slider-row">
+              <span>Base JPEG</span>
+              <input id="base-quality" type="range" min="0" max="100" value="95" />
+              <output id="base-quality-val">95</output>
+            </label>
+            <label class="slider-row">
+              <span>Gain map</span>
+              <input id="gainmap-quality" type="range" min="0" max="100" value="95" />
+              <output id="gainmap-quality-val">95</output>
+            </label>
+          </div>
+        </section>
+
+        <section class="group" id="hdr-group">
+          <h3>HDR</h3>
+          <p id="hdr-hint" class="group-hint">Applied on the next HDR encode</p>
+          <label class="slider-row">
+            <span>Min boost</span>
+            <input id="min-boost" type="range" min="10" max="1000" value="10" />
+            <output id="min-boost-val">1.0×</output>
+          </label>
+          <label class="slider-row">
+            <span>Max boost</span>
+            <input id="max-boost" type="range" min="10" max="20000" value="160" />
+            <output id="max-boost-val">16×</output>
+          </label>
+          <label class="slider-row">
+            <span>Peak nits</span>
+            <input id="display-peak" type="range" min="100" max="4000" step="50" value="3250" />
+            <output id="display-peak-val">3250</output>
+          </label>
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <label class="slider-row">
+              <span>Map scale</span>
+              <input id="gainmap-scale" type="range" min="1" max="16" value="1" />
+              <output id="gainmap-scale-val">1</output>
+            </label>
+            <label class="toggle">
+              <input id="monochrome-gainmap" type="checkbox" />
+              <span>Monochrome gain map</span>
+            </label>
+            <p class="group-hint">Luma-only JPEG. Unchecked stores RGB so hue differences survive.</p>
+          </details>
+        </section>
+
+        <section class="group">
+          <h3>Feed crop</h3>
+          <p class="group-hint">Pick an Instagram aspect. Encode keeps the crop’s original pixels, capped at 2× Instagram size (never upscale). Sliders stay inside 1×–2× — never below 1×, never above 2×. Drag the frame to recompose. Gallery slides are optional when the photo can hold more matching frames.</p>
+          <div id="ig-presets" class="ig-presets" role="radiogroup">
+            <button type="button" class="ig-card active" data-value="none">
+              <span class="ig-glyph ig-glyph-orig"></span>
+              <span class="ig-name">Original</span>
+              <span class="ig-size">1080–2160 wide</span>
+            </button>
+            <button type="button" class="ig-card" data-value="3x4">
+              <span class="ig-glyph" style="aspect-ratio:3/4"></span>
+              <span class="ig-name">3:4 grid</span>
+              <span class="ig-size">1080 × 1440–2160 × 2880</span>
+            </button>
+            <button type="button" class="ig-card" data-value="4x5">
+              <span class="ig-glyph" style="aspect-ratio:4/5"></span>
+              <span class="ig-name">4:5 feed</span>
+              <span class="ig-size">1080 × 1350–2160 × 2700</span>
+            </button>
+            <button type="button" class="ig-card" data-value="1x1">
+              <span class="ig-glyph" style="aspect-ratio:1/1"></span>
+              <span class="ig-name">1:1 square</span>
+              <span class="ig-size">1080 × 1080–2160 × 2160</span>
+            </button>
+            <button type="button" class="ig-card" data-value="191x100">
+              <span class="ig-glyph" style="aspect-ratio:1.91/1"></span>
+              <span class="ig-name">Landscape</span>
+              <span class="ig-size">1080 × 566–2160 × 1132</span>
+            </button>
+          </div>
+          <p id="ig-readout" class="ig-readout">Original · native pixels</p>
+          <div id="size-sliders" class="size-sliders">
+            <label class="size-field">
+              <span>Width</span>
+              <input id="out-width-val" type="number" min="1080" max="2160" step="2" value="1080" inputmode="numeric" autocomplete="off" aria-label="Width pixels" />
+              <input id="out-width" type="range" min="1080" max="2160" step="2" value="1080" />
+            </label>
+            <label class="size-field">
+              <span>Height</span>
+              <input id="out-height-val" type="number" min="1080" max="2160" step="2" value="1080" inputmode="numeric" autocomplete="off" aria-label="Height pixels" />
+              <input id="out-height" type="range" min="1080" max="2160" step="2" value="1080" />
+            </label>
+          </div>
+          <p id="ig-aspect-warn" class="custom-warn" hidden>
+            This aspect is outside Instagram’s 1.91:1–3:4 range. Instagram will crop it and HDR may not survive. Pick 3:4, 4:5, 1:1, or landscape.
+          </p>
+          <div id="gallery-picker" class="gallery-picker" hidden>
+            <p id="gallery-notice" class="gallery-notice"></p>
+            <div id="gallery-counts" class="gallery-counts" role="radiogroup" aria-label="Instagram gallery slides"></div>
+          </div>
+          <p id="slice-hint" class="slice-hint" hidden></p>
+          <button type="button" id="sync-others" class="ghost sync-others">Sync to others</button>
+          <p class="group-hint">Copy HDR, aspect, and size to the rest of the queue. Crop position stays per photo.</p>
+        </section>
+      </div>
+
+      <footer id="action-bar">
+        <div class="dest-row">
+          <span class="dest-label">Destination</span>
+          <input id="dest-dir" type="text" spellcheck="false" autocomplete="off" placeholder="Export folder" />
+          <button type="button" id="dest-browse" class="ghost">Browse</button>
+        </div>
+        <div class="action-buttons">
+          <button type="button" id="cancel-btn" class="ghost">Cancel</button>
+          <button type="button" id="apply-btn" class="primary">Encode 0 photos</button>
+        </div>
+      </footer>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

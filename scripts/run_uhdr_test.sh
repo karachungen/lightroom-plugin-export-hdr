@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke-test uhdr_repack: encode defaults + --inspect (gain map size vs dimensions, primary XMP).
-# Optional slice pass: original Ultra HDR + numbered 1x1 / 4x5 slices with per-file gain maps.
+# Optional slice pass: Instagram crop to --out (one slide by default).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -71,6 +71,15 @@ assert_inspect_ok() {
 		echo "FAIL: expected is_ultra_hdr: yes for $path" >&2
 		exit 7
 	fi
+
+	if ! grep -a -F "https://hdr.karachun.by/" "$path" >/dev/null; then
+		echo "FAIL: expected xmpRights WebStatement https://hdr.karachun.by/ in $path" >&2
+		exit 11
+	fi
+	if ! grep -a -F "https://github.com/karachungen/lightroom-plugin-export-hdr" "$path" >/dev/null; then
+		echo "FAIL: expected xmpRights UsageTerms GitHub URL in $path" >&2
+		exit 11
+	fi
 }
 
 echo "==> Using $BIN"
@@ -94,41 +103,61 @@ cp "$BASE" "$SDR_COPY"
 trap 'rm -f "$SDR_COPY"' EXIT
 
 rm -f "$SLICE_OUT" "$TEST_DIR"/out_slice_uhdr_*.jpg
-echo "==> Slice test (1x1 + 4x5, SDR copy preserved like Lightroom plug-in)"
+echo "==> Slice test (1x1 + 4x5 single-slide Instagram crop, below 1× stays native)"
 "$BIN" --hdr-tiff "$HDR" --base "$SDR_COPY" --out "$SLICE_OUT" --slice-aspect 1x1
 assert_inspect_ok "$SLICE_OUT"
-
-shopt -s nullglob
-slices_1x1=("$TEST_DIR"/out_slice_uhdr_1x1_*.jpg)
-if [[ ${#slices_1x1[@]} -lt 1 ]]; then
-	echo "FAIL: expected at least one 1x1 slice next to $SLICE_OUT" >&2
+dims_1x1="$(echo "$("$BIN" --inspect "$SLICE_OUT")" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\1x\2/p')"
+if [[ "$dims_1x1" != "1000x1000" ]]; then
+	echo "FAIL: 1x1 native crop was $dims_1x1, expected 1000x1000" >&2
 	exit 8
 fi
-for p in "${slices_1x1[@]}"; do
-	echo "==> inspect slice $p"
-	assert_inspect_ok "$p"
-done
+shopt -s nullglob
+slices_1x1=("$TEST_DIR"/out_slice_uhdr_1x1_*.jpg)
+if [[ ${#slices_1x1[@]} -ne 0 ]]; then
+	echo "FAIL: default 1x1 crop should write only $SLICE_OUT, found numbered slices" >&2
+	exit 8
+fi
 
 rm -f "$SLICE_OUT" "$TEST_DIR"/out_slice_uhdr_*.jpg
 "$BIN" --hdr-tiff "$HDR" --base "$SDR_COPY" --out "$SLICE_OUT" --slice-aspect 4x5
 assert_inspect_ok "$SLICE_OUT"
-
-slices_4x5=("$TEST_DIR"/out_slice_uhdr_4x5_*.jpg)
-if [[ ${#slices_4x5[@]} -lt 1 ]]; then
-	echo "FAIL: expected at least one 4x5 slice next to $SLICE_OUT" >&2
+inspect_4x5="$("$BIN" --inspect "$SLICE_OUT")"
+dims_4x5="$(echo "$inspect_4x5" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\1x\2/p')"
+if [[ "$dims_4x5" != "800x1000" ]]; then
+	echo "FAIL: 4x5 native crop was $dims_4x5, expected 800x1000" >&2
 	exit 9
 fi
-for p in "${slices_4x5[@]}"; do
-	echo "==> inspect slice $p"
-	assert_inspect_ok "$p"
-	# 4:5 full-height: width should be floor_to_even(H * 4/5) of slice height.
-	local_h="$(echo "$("$BIN" --inspect "$p")" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\2/p')"
-	local_w="$(echo "$("$BIN" --inspect "$p")" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\1/p')"
-	expected_w=$(( (local_h * 4 / 5) / 2 * 2 ))
-	if [[ "$local_w" -ne "$expected_w" ]]; then
-		echo "FAIL: 4x5 slice width $local_w != expected even floor(H*4/5)=$expected_w" >&2
-		exit 10
-	fi
-done
+slices_4x5=("$TEST_DIR"/out_slice_uhdr_4x5_*.jpg)
+if [[ ${#slices_4x5[@]} -ne 0 ]]; then
+	echo "FAIL: default 4x5 crop should write only $SLICE_OUT, found numbered slices" >&2
+	exit 9
+fi
 
-echo "OK: slice encode — original + numbered slices are valid Ultra HDR with gain maps."
+echo "OK: slice encode — crops below 1× stay native (no silent upscale)."
+
+DSC="$REPO_ROOT/test/ui/fixtures/DSC02993.jpg"
+DSC_HDR="$REPO_ROOT/test/ui/fixtures/DSC02993.tif"
+if [[ -f "$DSC" && -f "$DSC_HDR" ]]; then
+	FEED_OUT="$TEST_DIR/out_feed_1080.jpg"
+	rm -f "$FEED_OUT"
+	echo "==> Optional 4:5 --out-width 1080 on 1152x1440 fixture"
+	"$BIN" --hdr-tiff "$DSC_HDR" --base "$DSC" --out "$FEED_OUT" --slice-aspect 4x5 --out-width 1080
+	assert_inspect_ok "$FEED_OUT"
+	dims_feed="$(echo "$("$BIN" --inspect "$FEED_OUT")" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\1x\2/p')"
+	if [[ "$dims_feed" != "1080x1350" ]]; then
+		echo "FAIL: 4x5 --out-width 1080 was $dims_feed, expected 1080x1350" >&2
+		exit 12
+	fi
+	echo "OK: 4:5 --out-width 1080 scales 1152x1440 to 1080x1350."
+	SMART_OUT="$TEST_DIR/out_feed_smart.jpg"
+	rm -f "$SMART_OUT"
+	echo "==> Optional 4:5 smart pick (no --out-width) on 1152x1440 fixture"
+	"$BIN" --hdr-tiff "$DSC_HDR" --base "$DSC" --out "$SMART_OUT" --slice-aspect 4x5
+	assert_inspect_ok "$SMART_OUT"
+	dims_smart="$(echo "$("$BIN" --inspect "$SMART_OUT")" | sed -n 's/^dimensions: \([0-9]*\)x\([0-9]*\)/\1x\2/p')"
+	if [[ "$dims_smart" != "1152x1440" ]]; then
+		echo "FAIL: 4x5 smart pick was $dims_smart, expected 1152x1440" >&2
+		exit 13
+	fi
+	echo "OK: 4:5 smart pick keeps 1152x1440 (native, below 2×)."
+fi
