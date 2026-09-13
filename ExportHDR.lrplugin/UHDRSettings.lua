@@ -45,6 +45,58 @@ function UHDR.flattenExportSettings(propertyTable)
 	return out
 end
 
+--- Instagram 2× 3:4 long edge. HDR TIFF is 32-bit; larger short edges explode disk/RAM.
+UHDR.MAX_SHORT_EDGE_PX = 2880
+
+local function asPositiveNumber(v)
+	local n = tonumber(v)
+	if n and n > 0 then
+		return n
+	end
+	return 0
+end
+
+local function setShortEdgeCap(s, px)
+	s.LR_size_doConstrain = true
+	s.LR_size_resizeType = "shortEdge"
+	s.LR_size_maxWidth = px
+	s.LR_size_maxHeight = px
+	s.LR_size_units = "pixels"
+	s.LR_size_doNotEnlarge = true
+end
+
+--- Keep a tighter user Image Sizing; otherwise cap short edge at 2880 (never upscale).
+function UHDR.applyHdrTiffSizeCap(settings)
+	if not settings then
+		return
+	end
+	local maxShort = UHDR.MAX_SHORT_EDGE_PX
+	local constrained = settings.LR_size_doConstrain
+	local resizeType = tostring(settings.LR_size_resizeType or "")
+	local w = asPositiveNumber(settings.LR_size_maxWidth)
+	local h = asPositiveNumber(settings.LR_size_maxHeight)
+	local mp = asPositiveNumber(settings.LR_size_megapixels)
+
+	if constrained then
+		if (resizeType == "shortEdge" or resizeType == "longEdge") and w > 0 and w <= maxShort then
+			settings.LR_size_doNotEnlarge = true
+			return
+		end
+		if (resizeType == "dimensions" or resizeType == "wh") and w > 0 and h > 0 and w <= maxShort
+			and h <= maxShort
+		then
+			settings.LR_size_doNotEnlarge = true
+			return
+		end
+		if resizeType == "megapixels" and mp > 0 and mp <= 8 then
+			settings.LR_size_doNotEnlarge = true
+			return
+		end
+	end
+
+	setShortEdgeCap(settings, maxShort)
+end
+
 local function shouldCopyKeyForHdrAuxExport(key)
 	if type(key) ~= "string" then
 		return false
@@ -110,6 +162,7 @@ function UHDR.mergeHdrTiffSettings(baseExportSettings, tempDir)
 	s.LR_export_bitDepth = 32
 	s.LR_enableHDRDisplay = true
 	s.LR_maximumCompatibility = false
+	UHDR.applyHdrTiffSizeCap(s)
 
 	return s
 end

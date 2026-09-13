@@ -9,7 +9,8 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ### Changed
 
-- Ultra HDR no longer preloads every photo’s HDR TIFF when the editor opens. Lightroom renders a TIFF for the current photo (Gain/HDR preview) and **one photo at a time** on Encode, then deletes that TIFF so a batch of panos cannot fill the disk. Lightroom **Image Sizing** is left as you set it.
+- Ultra HDR no longer preloads every photo’s HDR TIFF when the editor opens. Lightroom renders a TIFF for the current photo (Gain/HDR preview) and **one photo at a time** on Encode, then deletes that TIFF so a batch of panos cannot fill the disk.
+- Internal HDR TIFF is capped at a **2880px short edge** (never upscaled). JPEG **Image Sizing** is left as you set it. The filmstrip warns when a photo was reduced for performance.
 
 ## v3.0.0 — 🌊🔥 Ocean burn
 

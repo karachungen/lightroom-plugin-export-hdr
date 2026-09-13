@@ -85,7 +85,7 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	local howTo = {
 		"How to use:",
 		"In Export To, choose ULTRA HDR.",
-		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes as you set it; the plug-in does not resize.",
+		"File Settings are JPEG for the SDR base. Image Sizing applies to the JPEG as you set it. The HDR TIFF pass is capped at a 2880px short edge (never upscaled) so large panoramas stay usable.",
 		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered for the current photo (Gain/HDR preview) or one photo at a time on Encode.",
 		"Existing files at the export path are always overwritten (no Ask / Skip prompt).",
 		"Use HDR editing in Develop when needed (Lightroom 14+).",

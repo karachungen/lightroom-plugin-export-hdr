@@ -17,7 +17,7 @@ Lightroom can edit/export HDR, but HDR support across apps is still uneven. Inst
 - Adds **Export To → ULTRA HDR**.
 - Renders JPEG as the SDR base with your chosen sizing. Leave **Image Sizing** off to keep the photo’s aspect and pixel size; Instagram crops in Ultra HDR are optional.
 - **Opens Ultra HDR** (`uhdr_repack --edit`) as soon as SDR JPEGs are ready.
-- Renders each Lightroom HDR TIFF on demand (Gain/HDR preview, or one photo at a time on **Encode**). **Encode** deletes the TIFF after that photo so a pano batch cannot fill the disk.
+- Renders each Lightroom HDR TIFF on demand (Gain/HDR preview, or one photo at a time on **Encode**). The TIFF short edge is capped at **2880px** (never upscaled); the filmstrip notes when that happened for performance. **Encode** deletes the TIFF after that photo.
 - Replaces each exported base path with the final Ultra HDR `.jpg` for photos included in **Encode N photos**.
 
 ## How it works

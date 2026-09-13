@@ -127,6 +127,14 @@ body {
   letter-spacing: 0.02em;
 }
 #filmstrip li.selected .meta { color: var(--text); opacity: 0.78; }
+#filmstrip .size-warn {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ember);
+  opacity: 0.92;
+  letter-spacing: 0.01em;
+}
 #filmstrip .skip {
   position: absolute;
   top: 6px;

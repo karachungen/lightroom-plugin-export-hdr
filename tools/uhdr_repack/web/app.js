@@ -165,6 +165,14 @@
     return String(preset).replace("x", ":");
   }
 
+  function hdrTiffReducedForPerformance(item) {
+    if (!item) return false;
+    const w = Number(item.imageWidth) || 0;
+    const h = Number(item.imageHeight) || 0;
+    if (w < 2 || h < 2) return false;
+    return Math.min(w, h) > 2880;
+  }
+
   function formatQueueMeta(item) {
     if (!item) return "";
     const label = aspectQueueLabel(item.sliceAspect);
@@ -243,6 +251,11 @@
         if (msg.outputHeight !== undefined) state.settings.outputHeight = Number(msg.outputHeight) || 0;
         if (msg.imageWidth !== undefined) state.imageWidth = Number(msg.imageWidth) || 0;
         if (msg.imageHeight !== undefined) state.imageHeight = Number(msg.imageHeight) || 0;
+        const readyItem = state.items.find((x) => x.id === msg.id);
+        if (readyItem) {
+          if (msg.imageWidth !== undefined) readyItem.imageWidth = Number(msg.imageWidth) || 0;
+          if (msg.imageHeight !== undefined) readyItem.imageHeight = Number(msg.imageHeight) || 0;
+        }
         const autoAspect = maybeAutoSelectAspect(!!msg.hasSliceOverride);
         syncIgPresets();
         loadImages(msg);
@@ -394,10 +407,15 @@
       const meta = document.createElement("div");
       meta.className = "meta";
       meta.textContent = formatQueueMeta(item);
-
       li.appendChild(frame);
       li.appendChild(label);
       li.appendChild(meta);
+      if (hdrTiffReducedForPerformance(item)) {
+        const note = document.createElement("div");
+        note.className = "size-warn";
+        note.textContent = "HDR TIFF reduced to 2880px short edge for performance";
+        li.appendChild(note);
+      }
       li.addEventListener("click", () => selectItem(item.id, true));
       filmstrip.appendChild(li);
     });
