@@ -10,6 +10,7 @@ namespace uhdr_repack {
 using fp16_t = uint16_t;
 
 uint16_t float_to_half(float value);
+float half_to_float(uint16_t value);
 void float_rgba_to_half_rgba(const float* src, fp16_t* dst, size_t num_floats);
 
 void even_normalize(unsigned orig_w, unsigned orig_h, unsigned* w, unsigned* h);

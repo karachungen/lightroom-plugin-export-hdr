@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "work_dir": "test/ui/preview_out",
+  "result_path": "test/ui/preview_out/result.json",
+  "items": [
+    {
+      "id": "dsc02993",
+      "label": "DSC02993 — court jump",
+      "sdr": "test/ui/fixtures/DSC02993.jpg",
+      "hdr_tiff": "test/ui/fixtures/DSC02993.tif",
+      "out": "test/ui/preview_out/DSC02993_uhdr.jpg"
+    },
+    {
+      "id": "dji_pano",
+      "label": "DJI pano square",
+      "sdr": "test/ui/fixtures/DJI_0001-20260316-184709-Pano.jpg",
+      "hdr_tiff": "test/ui/fixtures/DJI_0001-20260316-184709-Pano.tif",
+      "out": "test/ui/preview_out/DJI_pano_uhdr.jpg"
+    },
+    {
+      "id": "legacy_1000",
+      "label": "CI smoke pair",
+      "sdr": "test/sdr.jpg",
+      "hdr_tiff": "test/hdr-raw.tif",
+      "out": "test/ui/preview_out/legacy_uhdr.jpg"
+    }
+  ]
+}

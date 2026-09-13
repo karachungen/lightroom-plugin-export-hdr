@@ -112,6 +112,148 @@ fi
 if [[ -n "${UHDR_ROOT:-}" ]]; then
 	cmake_extra+=("-DUHDR_ROOT=$UHDR_ROOT")
 fi
+if [[ "${UHDR_ENABLE_GUI:-}" == "0" || "${UHDR_ENABLE_GUI:-}" == "OFF" ]]; then
+	cmake_extra+=("-DUHDR_ENABLE_GUI=OFF")
+fi
+QT_RESOLVED=0
+
+qt_config_present() {
+	[[ -f "$1/lib/cmake/Qt6/Qt6Config.cmake" ]]
+}
+
+qt_version_at_prefix() {
+	local prefix="$1"
+	local qmake=""
+	if [[ -x "$prefix/bin/qmake6" ]]; then
+		qmake="$prefix/bin/qmake6"
+	elif command -v qmake6 &>/dev/null; then
+		local reported
+		reported="$(qtpaths6 --install-prefix 2>/dev/null || true)"
+		if [[ "$reported" == "$prefix" ]]; then
+			qmake="$(command -v qmake6)"
+		fi
+	fi
+	if [[ -z "$qmake" ]]; then
+		return 1
+	fi
+	"$qmake" -query QT_VERSION 2>/dev/null
+}
+
+qt_version_ge_611() {
+	local ver="$1" major minor
+	IFS='.' read -r major minor _ <<<"$ver"
+	[[ "$major" -gt 6 ]] && return 0
+	[[ "$major" -eq 6 && "$minor" -ge 11 ]] && return 0
+	return 1
+}
+
+find_qt_static_root() {
+	local candidates=()
+	if [[ -n "${QT_STATIC_ROOT:-}" ]]; then
+		candidates+=("$QT_STATIC_ROOT")
+	fi
+	candidates+=("$HOME/Qt/${QT_VERSION:-6.11.0}-static")
+
+	local candidate
+	for candidate in "${candidates[@]}"; do
+		if qt_config_present "$candidate"; then
+			echo "$candidate"
+			return 0
+		fi
+	done
+	return 1
+}
+
+find_qt_shared_prefix() {
+	local candidates=() candidate seen="" version
+
+	if [[ -n "${CMAKE_PREFIX_PATH:-}" ]]; then
+		local path_entry
+		IFS=':' read -ra path_entries <<<"${CMAKE_PREFIX_PATH}"
+		for path_entry in "${path_entries[@]}"; do
+			[[ -n "$path_entry" ]] && candidates+=("$path_entry")
+		done
+	fi
+
+	if command -v brew &>/dev/null; then
+		local brew_qt
+		brew_qt="$(brew --prefix qt 2>/dev/null || true)"
+		[[ -n "$brew_qt" ]] && candidates+=("$brew_qt")
+	fi
+
+	if command -v qtpaths6 &>/dev/null; then
+		local qt_prefix
+		qt_prefix="$(qtpaths6 --install-prefix 2>/dev/null || true)"
+		[[ -n "$qt_prefix" ]] && candidates+=("$qt_prefix")
+	fi
+
+	local qt_install_dir
+	for qt_install_dir in "$HOME/Qt"/*/macos; do
+		[[ -d "$qt_install_dir" ]] && candidates+=("$qt_install_dir")
+	done
+
+	for candidate in "${candidates[@]}"; do
+		[[ "$seen" == *"|$candidate|"* ]] && continue
+		seen="${seen}|$candidate|"
+		if ! qt_config_present "$candidate"; then
+			continue
+		fi
+		version="$(qt_version_at_prefix "$candidate" || true)"
+		if [[ -n "$version" ]] && ! qt_version_ge_611 "$version"; then
+			continue
+		fi
+		echo "$candidate"
+		return 0
+	done
+	return 1
+}
+
+resolve_qt_for_build() {
+	if [[ "$QT_RESOLVED" -eq 1 ]]; then
+		return 0
+	fi
+
+	if [[ "${UHDR_ENABLE_GUI:-ON}" == "0" || "${UHDR_ENABLE_GUI:-ON}" == "OFF" ]]; then
+		QT_RESOLVED=1
+		return 0
+	fi
+
+	local static_root shared_prefix
+
+	if [[ "${UHDR_STATIC_QT:-ON}" == "0" || "${UHDR_STATIC_QT:-ON}" == "OFF" ]]; then
+		shared_prefix="$(find_qt_shared_prefix || true)"
+		if [[ -z "$shared_prefix" ]]; then
+			echo "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found." >&2
+			echo "Install Qt locally (e.g. brew install qt) or set CMAKE_PREFIX_PATH." >&2
+			exit 1
+		fi
+		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
+		echo "==> Using shared Qt at $shared_prefix (development build)"
+		QT_RESOLVED=1
+		return 0
+	fi
+
+	static_root="$(find_qt_static_root || true)"
+	if [[ -n "$static_root" ]]; then
+		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON")
+		echo "==> Using static Qt at $static_root"
+		QT_RESOLVED=1
+		return 0
+	fi
+
+	shared_prefix="$(find_qt_shared_prefix || true)"
+	if [[ -n "$shared_prefix" ]]; then
+		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
+		echo "==> Using shared Qt at $shared_prefix (local development build)"
+		echo "    For a release single-file binary, run ./scripts/setup_qt_static.sh and export QT_STATIC_ROOT." >&2
+		QT_RESOLVED=1
+		return 0
+	fi
+
+	echo "No Qt 6.11+ installation found." >&2
+	echo "Install Qt locally (e.g. brew install qt), or run ./scripts/setup_qt_static.sh for a static release kit." >&2
+	exit 1
+}
 
 assert_cmake_version() {
 	if ! command -v cmake &>/dev/null; then
@@ -155,6 +297,7 @@ cmd_install_deps() {
 
 cmd_build() {
 	assert_cmake_version
+	resolve_qt_for_build
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
 		rm -rf "$BUILD_DIR"
@@ -255,6 +398,7 @@ bundle_windows() {
 }
 
 cmd_bundle() {
+	"$SCRIPT_DIR/copy_ui_fixtures.sh"
 	case "$PRESET" in
 	macos-arm64-release) bundle_macos ;;
 	windows-x64-release) bundle_windows ;;

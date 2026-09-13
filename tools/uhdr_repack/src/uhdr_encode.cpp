@@ -1,6 +1,7 @@
 #include "uhdr_encode.h"
 
 #include "gainmap_metadata.h"
+#include "jpeg_xmp_rights.h"
 #include "path_io.h"
 
 #include <ultrahdr_api.h>
@@ -9,6 +10,7 @@
 #include <cstring>
 #include <fstream>
 #include <string>
+#include <vector>
 
 namespace uhdr_repack {
 
@@ -68,13 +70,21 @@ bool encode_ultra_hdr_jpeg(const RawImageHolder& hdr_holder, const RawImageHolde
     return false;
   }
 
+  std::vector<uint8_t> jpeg(static_cast<const uint8_t*>(out->data),
+                            static_cast<const uint8_t*>(out->data) + out->data_sz);
+  if (!inject_sdr_xmp_rights(&jpeg, error)) {
+    uhdr_release_encoder(enc);
+    return false;
+  }
+
   std::ofstream ofs = open_output_binary(output_path);
   if (!ofs) {
     uhdr_release_encoder(enc);
     if (error) *error = "Could not open output file: " + output_path;
     return false;
   }
-  ofs.write(static_cast<const char*>(out->data), static_cast<std::streamsize>(out->data_sz));
+  ofs.write(reinterpret_cast<const char*>(jpeg.data()),
+            static_cast<std::streamsize>(jpeg.size()));
   ofs.close();
 
   uhdr_release_encoder(enc);

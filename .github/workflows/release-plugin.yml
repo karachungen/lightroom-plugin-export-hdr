@@ -1,25 +1,6 @@
 name: Release Lightroom plugin (macOS + Windows)
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - "ExportHDR.lrplugin/**"
-      - "tools/uhdr_repack/**"
-      - "CHANGELOG.md"
-      - "scripts/build_plugin.sh"
-      - "scripts/build_plugin.ps1"
-      - "scripts/package_plugin.sh"
-      - "scripts/parse_plugin_version.sh"
-      - "scripts/build_release_notes.sh"
-      - "scripts/bundle_uhdr_for_plugin.sh"
-      - "scripts/bundle_uhdr_for_plugin_windows.ps1"
-      - "scripts/run_uhdr_test.sh"
-      - "scripts/run_uhdr_test.ps1"
-      - "scripts/test_macos_shell_quote.sh"
-      - "scripts/test_windows_cmd_quote.ps1"
-      - "scripts/windows_build_common.ps1"
-      - "scripts/setup_windows_build.ps1"
   workflow_dispatch:
 
 concurrency:
@@ -114,7 +95,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Ultra HDR Export v${{ steps.ver.outputs.semver }}
+          name: ${{ steps.ver.outputs.codename }} · v${{ steps.ver.outputs.semver }}
           body_path: RELEASE_NOTES.md
           files: |
             release-assets/ExportHDR.lrplugin-macos-arm64.zip
