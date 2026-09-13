@@ -74,10 +74,6 @@ end
 function ExportHDRServiceProvider.updateExportSettings(exportSettings)
 	UHDR.applyDefaults(exportSettings)
 	UHDR.forceOverwriteExistingFiles(exportSettings)
-	-- Native (unchecked) Image Sizing on a panorama writes multi-GB 32-bit TIFFs.
-	if not exportSettings.LR_size_doConstrain then
-		UHDR.applyOutputSizeCap(exportSettings)
-	end
 end
 
 function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
@@ -89,7 +85,7 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	local howTo = {
 		"How to use:",
 		"In Export To, choose ULTRA HDR.",
-		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes. If it is off (or larger than Instagram 2×), the short edge is capped at 2880px so 32-bit HDR TIFFs of panoramas do not fill the disk.",
+		"File Settings are JPEG for the SDR base. Image Sizing applies to both passes as you set it; the plug-in does not resize.",
 		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered for the current photo (Gain/HDR preview) or one photo at a time on Encode.",
 		"Existing files at the export path are always overwritten (no Ask / Skip prompt).",
 		"Use HDR editing in Develop when needed (Lightroom 14+).",

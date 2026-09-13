@@ -15,7 +15,7 @@ Lightroom can edit/export HDR, but HDR support across apps is still uneven. Inst
 ## What the plugin does
 
 - Adds **Export To → ULTRA HDR**.
-- Renders JPEG as the SDR base with your chosen sizing, capped at a **2880px short edge** (Instagram 2×). Leave **Image Sizing** off to keep the photo’s aspect; larger panoramas are downscaled so 32-bit HDR TIFFs stay manageable. Instagram crops in Ultra HDR are optional.
+- Renders JPEG as the SDR base with your chosen sizing. Leave **Image Sizing** off to keep the photo’s aspect and pixel size; Instagram crops in Ultra HDR are optional.
 - **Opens Ultra HDR** (`uhdr_repack --edit`) as soon as SDR JPEGs are ready.
 - Renders each Lightroom HDR TIFF on demand (Gain/HDR preview, or one photo at a time on **Encode**). **Encode** deletes the TIFF after that photo so a pano batch cannot fill the disk.
 - Replaces each exported base path with the final Ultra HDR `.jpg` for photos included in **Encode N photos**.
@@ -45,5 +45,5 @@ Do **not** unzip release archives over the dev `ExportHDR.lrplugin` folder — t
 1. Download plugin from [GitHub Releases](https://github.com/karachungen/lightroom-plugin-export-hdr/releases)
 2. Install in Lightroom: `File -> Plug-in Manager -> Add` and select `ExportHDR.lrplugin`
 3. In Export, choose **Export To → ULTRA HDR**. File Settings are JPEG for the SDR base.
-4. Export — Ultra HDR opens on the SDR JPEGs. Open **Gain** or **HDR** to preview-encode the current photo (Lightroom then renders that HDR TIFF). Large panoramas are capped at a 2880px short edge so the 32-bit TIFF does not fill the disk.
+4. Export — Ultra HDR opens on the SDR JPEGs. Open **Gain** or **HDR** to preview-encode the current photo (Lightroom then renders that HDR TIFF).
 5. Click **Encode N photos** to write Ultra HDR JPEGs for the non-skipped queue.

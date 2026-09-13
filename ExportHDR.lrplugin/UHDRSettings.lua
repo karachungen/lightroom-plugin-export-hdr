@@ -26,10 +26,6 @@ local function copyTable(t)
 	return o
 end
 
---- Instagram 2× 3:4 long edge. Lightroom HDR TIFF is 32-bit, so a native pano
---- (tens of thousands of pixels) can be multiple GB on disk and in RAM.
-UHDR.MAX_SHORT_EDGE_PX = 2880
-
 function UHDR.flattenExportSettings(propertyTable)
 	local out = {}
 	if not propertyTable then
@@ -47,56 +43,6 @@ function UHDR.flattenExportSettings(propertyTable)
 		end
 	end
 	return out
-end
-
-local function asPositiveNumber(v)
-	local n = tonumber(v)
-	if n and n > 0 then
-		return n
-	end
-	return 0
-end
-
-local function setShortEdgeCap(s, px)
-	s.LR_size_doConstrain = true
-	s.LR_size_resizeType = "shortEdge"
-	s.LR_size_maxWidth = px
-	s.LR_size_maxHeight = px
-	s.LR_size_units = "pixels"
-	s.LR_size_doNotEnlarge = true
-end
-
---- Keep a user-chosen size if it cannot exceed MAX_SHORT_EDGE_PX; otherwise cap
---- the short edge so panoramas still have width for Instagram gallery tiles.
-function UHDR.applyOutputSizeCap(settings)
-	if not settings then
-		return
-	end
-	local maxShort = UHDR.MAX_SHORT_EDGE_PX
-	local constrained = settings.LR_size_doConstrain
-	local resizeType = tostring(settings.LR_size_resizeType or "")
-	local w = asPositiveNumber(settings.LR_size_maxWidth)
-	local h = asPositiveNumber(settings.LR_size_maxHeight)
-	local mp = asPositiveNumber(settings.LR_size_megapixels)
-
-	if constrained then
-		if (resizeType == "shortEdge" or resizeType == "longEdge") and w > 0 and w <= maxShort then
-			settings.LR_size_doNotEnlarge = true
-			return
-		end
-		if (resizeType == "dimensions" or resizeType == "wh") and w > 0 and h > 0 and w <= maxShort
-			and h <= maxShort
-		then
-			settings.LR_size_doNotEnlarge = true
-			return
-		end
-		if resizeType == "megapixels" and mp > 0 and mp <= 8 then
-			settings.LR_size_doNotEnlarge = true
-			return
-		end
-	end
-
-	setShortEdgeCap(settings, maxShort)
 end
 
 local function shouldCopyKeyForHdrAuxExport(key)
@@ -164,7 +110,6 @@ function UHDR.mergeHdrTiffSettings(baseExportSettings, tempDir)
 	s.LR_export_bitDepth = 32
 	s.LR_enableHDRDisplay = true
 	s.LR_maximumCompatibility = false
-	UHDR.applyOutputSizeCap(s)
 
 	return s
 end
