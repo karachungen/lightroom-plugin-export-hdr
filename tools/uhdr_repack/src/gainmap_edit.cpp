@@ -20,12 +20,22 @@ void GainMapEditor::setAutoGainMap(const std::vector<float>& gain, int w, int h)
   height = h;
   gain_map = gain;
   auto_gain_map = gain;
+  gain_rgb.clear();
   clearUndoHistory();
   if (!gain.empty()) {
     const auto minmax = std::minmax_element(gain.begin(), gain.end());
     visualization_min = std::max(0.0001f, *minmax.first);
     visualization_max = std::max(visualization_min + 0.0001f, *minmax.second);
   }
+}
+
+void GainMapEditor::setRgbGainMap(const std::vector<float>& rgb) {
+  if (width <= 0 || height <= 0 ||
+      rgb.size() != static_cast<size_t>(width) * static_cast<size_t>(height) * 3u) {
+    gain_rgb.clear();
+    return;
+  }
+  gain_rgb = rgb;
 }
 
 void GainMapEditor::setContentBoost(float min_b, float max_b) {
@@ -131,25 +141,38 @@ float GainMapEditor::valueAt(int gx, int gy) const {
   return gain_map[static_cast<size_t>(gy) * static_cast<size_t>(width) + static_cast<size_t>(gx)];
 }
 
-QImage GainMapEditor::renderHeatmap() const {
+QImage GainMapEditor::renderHeatmap(bool monochrome) const {
   if (width <= 0 || height <= 0 || gain_map.empty()) {
     return {};
   }
 
   const float data_min = std::max(visualization_min, 0.0001f);
   const float data_max = std::max(visualization_max, data_min + 1e-4f);
+  const float cap = std::max(max_boost, data_min + 1e-4f);
+  const float vis_max = std::min(data_max, cap);
+  const float vis_min = std::min(std::max(min_boost, data_min), vis_max - 1e-4f);
 
   QImage img(width, height, QImage::Format_RGB32);
-  const float log_min = std::log(data_min);
-  const float log_max = std::log(data_max);
-  const float log_span = std::max(log_max - log_min, 1e-4f);
+  const float log_min = std::log(vis_min);
+  const float log_span = std::max(std::log(vis_max) - log_min, 1e-4f);
+  const auto t_of = [&](float g) {
+    return (std::log(std::clamp(g, vis_min, vis_max)) - log_min) / log_span;
+  };
+  const bool rgb =
+      !monochrome && gain_rgb.size() == static_cast<size_t>(width) * static_cast<size_t>(height) * 3u;
 
   for (int y = 0; y < height; ++y) {
     auto* line = reinterpret_cast<QRgb*>(img.scanLine(y));
     for (int x = 0; x < width; ++x) {
-      const float g =
-          gain_map[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)];
-      const float t = (std::log(std::clamp(g, data_min, data_max)) - log_min) / log_span;
+      const size_t p = static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x);
+      if (rgb) {
+        const size_t i = p * 3u;
+        line[x] = qRgb(static_cast<int>(std::clamp(t_of(gain_rgb[i]), 0.0f, 1.0f) * 255.0f),
+                       static_cast<int>(std::clamp(t_of(gain_rgb[i + 1]), 0.0f, 1.0f) * 255.0f),
+                       static_cast<int>(std::clamp(t_of(gain_rgb[i + 2]), 0.0f, 1.0f) * 255.0f));
+        continue;
+      }
+      const float t = t_of(gain_map[p]);
       const int r = static_cast<int>(std::clamp(t, 0.0f, 1.0f) * 255.0f);
       const int gch =
           static_cast<int>(std::clamp(1.0f - std::abs(t - 0.5f) * 2.0f, 0.0f, 1.0f) * 200.0f);

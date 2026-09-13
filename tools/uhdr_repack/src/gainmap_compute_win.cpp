@@ -65,7 +65,8 @@ bool hdr_half_to_linear(const uhdr_raw_image_t& hdr, std::vector<float>* rgba) {
 }  // namespace
 
 bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_tiff_path,
-                          std::vector<float>* gain, int* width, int* height, std::string* error) {
+                          std::vector<float>* gain, int* width, int* height, std::string* error,
+                          std::vector<float>* gain_rgb) {
   if (!gain || !width || !height) {
     if (error) *error = "null output";
     return false;
@@ -83,6 +84,7 @@ bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_ti
     return false;
   }
   gain->resize(static_cast<size_t>(w) * h);
+  if (gain_rgb) gain_rgb->resize(gain->size() * 3u);
   for (size_t pixel = 0; pixel < gain->size(); ++pixel) {
     const size_t i = pixel * 4u;
     const float sdr_l =
@@ -90,6 +92,14 @@ bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_ti
     const float hdr_l =
         luminance_bt709(hdr_linear[i], hdr_linear[i + 1], hdr_linear[i + 2]);
     (*gain)[pixel] = std::clamp(hdr_l / std::max(sdr_l, 1e-4f), 1.0f, 1000.0f);
+    if (gain_rgb) {
+      (*gain_rgb)[pixel * 3u] =
+          std::clamp(hdr_linear[i] / std::max(sdr_linear[i], 1e-4f), 1.0f, 1000.0f);
+      (*gain_rgb)[pixel * 3u + 1] =
+          std::clamp(hdr_linear[i + 1] / std::max(sdr_linear[i + 1], 1e-4f), 1.0f, 1000.0f);
+      (*gain_rgb)[pixel * 3u + 2] =
+          std::clamp(hdr_linear[i + 2] / std::max(sdr_linear[i + 2], 1e-4f), 1.0f, 1000.0f);
+    }
   }
   *width = static_cast<int>(w);
   *height = static_cast<int>(h);

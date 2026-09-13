@@ -178,6 +178,48 @@ bool test_session_item_gainmap(const SessionItem& item, int* checks) {
   std::cout << "OK heatmap render " << item.id << "\n";
   (*checks)++;
 
+  {
+    GainMapEditor maps;
+    maps.setAutoGainMap(gain, w, h);
+    std::vector<float> rgb(static_cast<size_t>(w) * static_cast<size_t>(h) * 3u);
+    for (size_t p = 0; p < static_cast<size_t>(w) * static_cast<size_t>(h); ++p) {
+      rgb[p * 3u] = std::max(gain[p] * 1.8f, 2.0f);
+      rgb[p * 3u + 1] = std::max(gain[p] * 0.6f, 1.0f);
+      rgb[p * 3u + 2] = std::max(gain[p] * 0.6f, 1.0f);
+    }
+    maps.setRgbGainMap(rgb);
+    maps.setContentBoost(1.0f, 16.0f);
+    const QImage color_heat = maps.renderHeatmap(false);
+    maps.setContentBoost(1.0f, 4.92f);
+    const QImage mono_heat = maps.renderHeatmap(true);
+    if (color_heat.size() != mono_heat.size() || color_heat.isNull()) {
+      std::cerr << "color/mono heatmap size mismatch\n";
+      return false;
+    }
+    int differ = 0;
+    int samples = 0;
+    const int y_step = std::max(1, color_heat.height() / 16);
+    const int x_step = std::max(1, color_heat.width() / 16);
+    for (int y = 0; y < color_heat.height(); y += y_step) {
+      for (int x = 0; x < color_heat.width(); x += x_step) {
+        const QRgb a = color_heat.pixel(x, y);
+        const QRgb b = mono_heat.pixel(x, y);
+        if (std::abs(qRed(a) - qRed(b)) + std::abs(qGreen(a) - qGreen(b)) +
+                std::abs(qBlue(a) - qBlue(b)) >
+            40) {
+          ++differ;
+        }
+        ++samples;
+      }
+    }
+    if (samples < 1 || differ * 4 < samples) {
+      std::cerr << "color and mono gain overlays look the same\n";
+      return false;
+    }
+    std::cout << "OK color vs mono heatmap " << item.id << "\n";
+    (*checks)++;
+  }
+
   HdrRhiViewport preview;
   preview.setSdrImage(sdr);
   preview.setGainMap(gain, w, h);
@@ -577,8 +619,8 @@ bool test_instagram_preview_cache_invalidation(int* checks) {
   }
 
   document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 1, 1, 2160, 2700);
-  if (!document.state(0).final_dirty) {
-    std::cerr << "aspect/size should invalidate HDR preview cache\n";
+  if (document.state(0).final_dirty) {
+    std::cerr << "aspect/size should keep HDR preview cache\n";
     return false;
   }
   if (document.item(0).slice_aspect != SliceAspect::k4x5 || document.item(0).output_width != 2160 ||
@@ -587,24 +629,29 @@ bool test_instagram_preview_cache_invalidation(int* checks) {
     return false;
   }
 
-  document.testingSeedFinalPreview(0);
   document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 3, 1, 2160, 2700);
-  if (!document.state(0).final_dirty || !document.state(0).final_hdr.rgba_half.empty()) {
-    std::cerr << "slice count should invalidate HDR preview cache\n";
+  if (document.state(0).final_dirty || document.state(0).final_hdr.rgba_half.empty()) {
+    std::cerr << "slice count should keep HDR preview cache\n";
     return false;
   }
 
-  document.testingSeedFinalPreview(0);
   document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 3, 2, 2160, 2700);
-  if (!document.state(0).final_dirty) {
-    std::cerr << "preview slice should invalidate HDR preview cache\n";
+  if (document.state(0).final_dirty) {
+    std::cerr << "preview slice should keep HDR preview cache\n";
     return false;
   }
 
-  document.testingSeedFinalPreview(0);
   document.setItemInstagram(0, SliceAspect::k4x5, 0.2f, 3, 2, 2160, 2700);
+  if (document.state(0).final_dirty) {
+    std::cerr << "crop offset should keep HDR preview cache\n";
+    return false;
+  }
+
+  EncodeOptions opt;
+  opt.base_quality = 80;
+  document.setSharedEncodeOptions(opt);
   if (!document.state(0).final_dirty) {
-    std::cerr << "crop offset should invalidate HDR preview cache\n";
+    std::cerr << "encode options should invalidate HDR preview cache\n";
     return false;
   }
 

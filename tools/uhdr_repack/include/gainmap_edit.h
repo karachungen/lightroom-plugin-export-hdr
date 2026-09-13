@@ -14,6 +14,7 @@ class GainMapEditor {
  public:
   std::vector<float> gain_map;
   std::vector<float> auto_gain_map;
+  std::vector<float> gain_rgb;
   int width = 0;
   int height = 0;
 
@@ -26,6 +27,7 @@ class GainMapEditor {
   float visualization_max = 2.0f;
 
   void setAutoGainMap(const std::vector<float>& gain, int w, int h);
+  void setRgbGainMap(const std::vector<float>& rgb);
   void setContentBoost(float min_boost, float max_boost);
   void setTool(GainTool tool);
   void setBrushRadius(int px);
@@ -38,7 +40,8 @@ class GainMapEditor {
   void applyNormalizedStroke(const std::vector<std::array<float, 3>>& points);
 
   float valueAt(int gx, int gy) const;
-  QImage renderHeatmap() const;
+  QImage renderHeatmap() const { return renderHeatmap(true); }
+  QImage renderHeatmap(bool monochrome) const;
 
   void pushUndo();
   bool undo();

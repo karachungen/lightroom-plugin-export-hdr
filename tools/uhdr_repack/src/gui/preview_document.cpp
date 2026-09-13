@@ -163,8 +163,9 @@ void PreviewDocument::requestGainMap(int index) {
   if (index < 0 || index >= itemCount()) return;
   auto& state = d_->states[static_cast<size_t>(index)];
   if (!state.loaded) return;
-  if (!state.gain.empty()) {
-    activity_log_append(item(index).id, "gainmap", "cache hit");
+  const bool have_rgb = !state.gain_rgb.empty();
+  if (!state.gain.empty() && (have_rgb || item(index).hdr_tiff.empty())) {
+    activity_log_append(item(index).id, "gainmap", have_rgb ? "cache hit" : "cache hit (luma)");
     emit itemReady(index);
     return;
   }
@@ -191,9 +192,19 @@ void PreviewDocument::requestGainMap(int index) {
                                            &result.state.gain_width,
                                            &result.state.gain_height, &error);
     }
-    if (!loaded_cache &&
-        !compute_auto_gainmap(item_copy.sdr, item_copy.hdr_tiff, &result.state.gain,
-                              &result.state.gain_width, &result.state.gain_height, &error)) {
+    if (loaded_cache) {
+      std::vector<float> luma_unused;
+      int rw = 0;
+      int rh = 0;
+      std::string rgb_err;
+      if (compute_auto_gainmap(item_copy.sdr, item_copy.hdr_tiff, &luma_unused, &rw, &rh, &rgb_err,
+                               &result.state.gain_rgb) &&
+          (rw != result.state.gain_width || rh != result.state.gain_height)) {
+        result.state.gain_rgb.clear();
+      }
+    } else if (!compute_auto_gainmap(item_copy.sdr, item_copy.hdr_tiff, &result.state.gain,
+                                     &result.state.gain_width, &result.state.gain_height, &error,
+                                     &result.state.gain_rgb)) {
       result.state.error = QString::fromStdString(error);
       const int ms = static_cast<int>(
           std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0)
@@ -232,8 +243,20 @@ void PreviewDocument::requestGainMap(int index) {
       return;
     }
     state.gain = result.state.gain;
+    state.gain_rgb = result.state.gain_rgb;
     state.gain_width = result.state.gain_width;
     state.gain_height = result.state.gain_height;
+    const size_t pixels =
+        static_cast<size_t>(std::max(0, state.gain_width)) *
+        static_cast<size_t>(std::max(0, state.gain_height));
+    if (state.gain_rgb.size() != pixels * 3u && state.gain.size() == pixels) {
+      state.gain_rgb.resize(pixels * 3u);
+      for (size_t p = 0; p < pixels; ++p) {
+        state.gain_rgb[p * 3u] = state.gain[p];
+        state.gain_rgb[p * 3u + 1] = state.gain[p];
+        state.gain_rgb[p * 3u + 2] = state.gain[p];
+      }
+    }
     state.gain_min = result.state.gain_min;
     state.gain_max = result.state.gain_max;
     if (result.state.gainmap_override) state.gainmap_override = true;
@@ -275,12 +298,6 @@ void PreviewDocument::requestFinalPreview(int index) {
   const SessionItem item_copy = d_->session.items[static_cast<size_t>(index)];
   const bool bake_gainmap = state.gainmap_override && !item_copy.gainmap_in.empty();
   const EncodeOptions options = effective_encode_options(d_->session, item_copy);
-  const SliceAspect aspect = effective_slice_aspect(d_->session, item_copy);
-  const float crop_offset = effective_crop_offset(item_copy);
-  const unsigned slice_count = effective_slice_count(item_copy);
-  const unsigned preview_slice =
-      aspect == SliceAspect::kNone ? 0u
-                                   : (item_copy.preview_slice_index < 1 ? 1u : item_copy.preview_slice_index);
   const uint64_t seq = ++g_final_preview_seq;
   const std::string work_root =
       d_->session.work_dir.empty() ? fs::u8path(item_copy.out).parent_path().u8string()
@@ -296,7 +313,7 @@ void PreviewDocument::requestFinalPreview(int index) {
                           std::to_string(options.gainmap_quality));
 
   auto future = QtConcurrent::run([index, generation, item_copy, options, preview_path,
-                                   bake_gainmap, aspect, crop_offset, slice_count, preview_slice]() {
+                                   bake_gainmap]() {
     FinalResult result;
     result.index = index;
     result.generation = generation;
@@ -306,13 +323,9 @@ void PreviewDocument::requestFinalPreview(int index) {
     request.base_path = item_copy.sdr;
     request.out_path = preview_path;
     request.options = options;
-    request.slice_aspect = aspect;
-    request.crop_offset = crop_offset;
-    request.slice_count = slice_count;
-    request.preview_slice_index = preview_slice;
+    request.slice_aspect = SliceAspect::kNone;
+    request.preview_slice_index = 0;
     request.preview_max_edge = kPreviewEncodeMaxEdge;
-    request.output_width = item_copy.output_width;
-    request.output_height = item_copy.output_height;
     if (bake_gainmap) request.gainmap_in = item_copy.gainmap_in;
     std::string error;
     fs::create_directories(fs::u8path(preview_path).parent_path());
@@ -448,7 +461,6 @@ void PreviewDocument::setItemInstagram(int index, SliceAspect aspect, float crop
   item.preview_slice_index = preview;
   item.output_width = output_width;
   item.output_height = output_height;
-  d_->invalidateFinal(index);
   emit itemChanged(index);
 }
 

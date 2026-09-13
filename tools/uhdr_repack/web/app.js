@@ -284,6 +284,7 @@
         if (msg.previewSlice !== undefined) state.settings.previewSlice = Number(msg.previewSlice);
         if (msg.outputWidth !== undefined) state.settings.outputWidth = Number(msg.outputWidth) || 0;
         if (msg.outputHeight !== undefined) state.settings.outputHeight = Number(msg.outputHeight) || 0;
+        drawPreview();
         renderSliceOverlay();
         syncSizeSliders();
         updateIgReadout();
@@ -352,8 +353,6 @@
       state.heatmapImage = new Image();
       state.heatmapImage.onload = drawPreview;
       state.heatmapImage.src = msg.heatmapDataUrl;
-    } else {
-      state.heatmapImage = null;
     }
   }
 
@@ -919,20 +918,13 @@
     if (!el) return;
     const showWarn = (Number(state.encodedBytes) || 0) > IG_UPLOAD_MAX_BYTES;
     if (warn) warn.hidden = !showWarn;
-    let text = "";
-    const encodedW = Number(state.encodedWidth) || 0;
-    const encodedH = Number(state.encodedHeight) || 0;
-    if (state.mode === "hdr" && encodedW >= 2 && encodedH >= 2) {
-      text = `${encodedW} × ${encodedH}`;
-    } else {
-      const resolved = resolveOutputSize();
-      if (!resolved) {
-        el.textContent = "Waiting for photo…";
-        if (warn) warn.hidden = true;
-        return;
-      }
-      text = `${resolved.w} × ${resolved.h}`;
+    const resolved = resolveOutputSize();
+    if (!resolved) {
+      el.textContent = "Waiting for photo…";
+      if (warn) warn.hidden = true;
+      return;
     }
+    const text = `${resolved.w} × ${resolved.h}`;
     const file = formatFileSize(state.encodedBytes);
     el.textContent = file ? `${text} · ${file}` : text;
   }
@@ -1155,6 +1147,7 @@
   function loadImages(msg) {
     state.overlayCache = { key: "", sdr: null, count: 0 };
     state.lastPreviewRect = null;
+    state.heatmapImage = null;
     state.sdrImage = new Image();
     state.sdrImage.onload = () => {
       applyPlannedSlices();

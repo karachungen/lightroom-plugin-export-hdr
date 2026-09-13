@@ -269,9 +269,12 @@ void GuiBridge::sendItemReady(int index) {
   if (!st.loaded) return;
 
   auto* editor = editorForIndex(index);
-  if (editor && editor->gain_map.empty()) {
+  const EncodeOptions opt = effective_encode_options(document_->session(), item);
+  if (editor && editor->gain_map.empty() && !st.gain.empty()) {
     editor->setAutoGainMap(st.gain, st.gain_width, st.gain_height);
-    EncodeOptions opt = effective_encode_options(document_->session(), item);
+  }
+  if (editor) {
+    editor->setRgbGainMap(st.gain_rgb);
     editor->setContentBoost(opt.min_content_boost, opt.max_content_boost);
   }
 
@@ -295,12 +298,13 @@ void GuiBridge::sendItemReady(int index) {
   root["previewSlice"] = static_cast<int>(item.preview_slice_index < 1 ? 1 : item.preview_slice_index);
   root["outputWidth"] = static_cast<int>(item.output_width);
   root["outputHeight"] = static_cast<int>(item.output_height);
-  if (editor) {
+  if (editor && !editor->gain_map.empty()) {
     const bool encoded = !st.final_dirty && !st.final_hdr.gainmap_jpeg.empty();
-    root["heatmapDataUrl"] = imageToDataUrl(previewSized(editor->renderHeatmap(), 1024), "JPEG")
-                                 .toStdString();
+    const QString heat =
+        imageToDataUrl(previewSized(editor->renderHeatmap(opt.monochrome_gainmap), 1024), "JPEG");
+    if (!heat.isEmpty()) root["heatmapDataUrl"] = heat.toStdString();
     root["encoded"] = encoded;
-    root["gainmapChannels"] = encoded && st.final_hdr.gainmap_is_rgb ? "rgb" : "luma";
+    root["gainmapChannels"] = opt.monochrome_gainmap ? "luma" : "rgb";
   }
   chrome_->postToPage(QString::fromStdString(root.dump()));
   sendSlices(index);
@@ -391,12 +395,17 @@ void GuiBridge::sendHeatmap(int index) {
   stats["h"] = st.gain_height;
   root["gainStats"] = stats;
   auto* editor = editorForIndex(index);
-  if (!editor) return;
+  if (!editor || editor->gain_map.empty()) return;
+  const EncodeOptions opt = effective_encode_options(document_->session(), document_->item(index));
+  editor->setRgbGainMap(st.gain_rgb);
+  editor->setContentBoost(opt.min_content_boost, opt.max_content_boost);
+  const QString data_url =
+      imageToDataUrl(previewSized(editor->renderHeatmap(opt.monochrome_gainmap), 1024), "JPEG");
+  if (data_url.isEmpty()) return;
   const bool encoded = !st.final_dirty && !st.final_hdr.gainmap_jpeg.empty();
-  root["heatmapDataUrl"] = imageToDataUrl(previewSized(editor->renderHeatmap(), 1024), "JPEG")
-                               .toStdString();
+  root["heatmapDataUrl"] = data_url.toStdString();
   root["encoded"] = encoded;
-  root["gainmapChannels"] = encoded && st.final_hdr.gainmap_is_rgb ? "rgb" : "luma";
+  root["gainmapChannels"] = opt.monochrome_gainmap ? "luma" : "rgb";
   chrome_->postToPage(QString::fromStdString(root.dump()));
 }
 
@@ -451,7 +460,7 @@ bool GuiBridge::hasEncodedHdr() const {
 }
 
 bool GuiBridge::needsEncodedPreview() const {
-  return preview_mode_ == PreviewMode::kFinalHdr || preview_mode_ == PreviewMode::kGainMap;
+  return preview_mode_ == PreviewMode::kFinalHdr;
 }
 
 void GuiBridge::syncGainVisualization() {
@@ -565,21 +574,19 @@ void GuiBridge::scheduleFinalPreview() {
 void GuiBridge::ensureHdrThenPreview(int index) {
   if (!needsEncodedPreview() || index != current_index_ || !document_) return;
   const std::string id = document_->item(index).id;
-  const char* mode = preview_mode_ == PreviewMode::kGainMap ? "gain" : "hdr";
   const auto& st = document_->state(index);
   if (!st.loaded) {
-    activity_log_append(id, "encode", std::string("waiting for SDR (") + mode + ")");
+    activity_log_append(id, "encode", "waiting for SDR (hdr)");
     return;
   }
   if (hasEncodedHdr()) {
-    activity_log_append(id, "encode", std::string("preview cache hit (") + mode + ")");
+    activity_log_append(id, "encode", "preview cache hit (hdr)");
     const auto& frame = document_->state(index).final_hdr;
-    if (viewport_ && preview_mode_ == PreviewMode::kFinalHdr) {
+    if (viewport_) {
       viewport_->setFinalHdr(frame.rgba_half, frame.width, frame.height, frame.color_gamut);
       viewport_->setPreviewMode(PreviewMode::kFinalHdr);
     }
     sendHdrLoading(false, true);
-    if (preview_mode_ == PreviewMode::kGainMap) sendHeatmap(current_index_);
     emitOverlay();
     emitSliceGuides();
     return;
@@ -601,17 +608,53 @@ void GuiBridge::ensureHdrThenPreview(int index) {
     });
     return;
   }
-  if (preview_mode_ == PreviewMode::kGainMap && st.gain.empty()) {
-    sendHdrLoading(true, false, QStringLiteral("gainmap"));
-    emitOverlay();
-    emitSliceGuides();
-    document_->requestGainMap(index);
-    return;
-  }
   sendHdrLoading(true, false, QStringLiteral("encode"));
   emitOverlay();
   emitSliceGuides();
   document_->requestFinalPreview(index);
+}
+
+void GuiBridge::ensureGainHeatmap(int index) {
+  if (preview_mode_ != PreviewMode::kGainMap || index != current_index_ || !document_) return;
+  emitOverlay();
+  emitSliceGuides();
+  const auto& st = document_->state(index);
+  if (!st.loaded) return;
+  auto* editor = editorForIndex(index);
+  const EncodeOptions opt =
+      effective_encode_options(document_->session(), document_->item(index));
+  if (editor && editor->gain_map.empty() && !st.gain.empty()) {
+    editor->setAutoGainMap(st.gain, st.gain_width, st.gain_height);
+  }
+  if (editor) {
+    editor->setRgbGainMap(st.gain_rgb);
+    editor->setContentBoost(opt.min_content_boost, opt.max_content_boost);
+  }
+  const bool have_luma = editor && !editor->gain_map.empty();
+  if (have_luma) {
+    sendHeatmap(index);
+    sendHdrLoading(false, false);
+  }
+  const bool need_rgb = !opt.monochrome_gainmap && st.gain_rgb.empty();
+  if (!have_luma || need_rgb) {
+    if (document_->item(index).hdr_tiff.empty()) {
+      sendHdrLoading(true, false, QStringLiteral("wait_tiff"));
+      const int requested = index;
+      ensureHdrTiffs({index}, [this, requested](bool ok, const QString& error) {
+        if (requested != current_index_ || preview_mode_ != PreviewMode::kGainMap) return;
+        if (!ok) {
+          activity_log_append(document_->item(requested).id, "wait_tiff",
+                              "gain map fail " + error.toStdString());
+          onFinalPreviewFailed(requested, error);
+          return;
+        }
+        ensureGainHeatmap(requested);
+      });
+      return;
+    }
+    sendHdrLoading(true, false, QStringLiteral("gainmap"));
+    document_->requestGainMap(index);
+  }
 }
 
 void GuiBridge::handleSyncToOthers() {
@@ -732,8 +775,15 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
     }
   }
 
-  applyLiveSettings(instagram_changed, false);
-  if (needsEncodedPreview() && (encode_changed || instagram_changed)) {
+  applyLiveSettings(instagram_changed, encode_changed && preview_mode_ == PreviewMode::kGainMap);
+  if (encode_changed && preview_mode_ == PreviewMode::kGainMap && current_index_ >= 0) {
+    ensureGainHeatmap(current_index_);
+  }
+  if (instagram_changed) {
+    emitOverlay();
+    emitSliceGuides();
+  }
+  if (needsEncodedPreview() && encode_changed) {
     emitOverlay();
     emitSliceGuides();
     final_preview_timer_->start();
@@ -743,7 +793,7 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
 void GuiBridge::emitOverlay() {
   const QRect hole = selectedHdrHole();
   const bool visible = preview_mode_ == PreviewMode::kFinalHdr && hasEncodedHdr() &&
-                       !crop_dragging_ && hole.width() >= 8 && hole.height() >= 8;
+                       hole.width() >= 8 && hole.height() >= 8;
   emit previewOverlayChanged(preview_rect_, hole, visible);
 }
 
@@ -764,23 +814,7 @@ QRect GuiBridge::letterboxedImageRect(QRect* local) const {
 }
 
 QRect GuiBridge::selectedHdrHole() const {
-  QRect local;
-  const QRect image = letterboxedImageRect(&local);
-  if (!image.isValid()) return {};
-  if (!document_ || current_index_ < 0) return image;
-  const auto& item = document_->item(current_index_);
-  const auto& st = document_->state(current_index_);
-  const SliceAspect aspect = effective_slice_aspect(document_->session(), item);
-  if (aspect == SliceAspect::kNone || st.sdr.isNull()) return image;
-  std::vector<CropRect> slices;
-  std::string err;
-  compute_slices(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
-                 aspect, &slices, &err, effective_crop_offset(item), effective_slice_count(item));
-  if (slices.empty()) return image;
-  unsigned idx = item.preview_slice_index < 1 ? 1u : item.preview_slice_index;
-  if (idx > slices.size()) idx = static_cast<unsigned>(slices.size());
-  const QRect hole_local = mapCropToLocal(slices[idx - 1], st.sdr.width(), st.sdr.height(), local);
-  return hole_local.translated(preview_rect_.topLeft());
+  return letterboxedImageRect();
 }
 
 void GuiBridge::sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack_px) const {
@@ -839,14 +873,10 @@ void GuiBridge::onCropOffsetChanged(float offset) {
 void GuiBridge::onCropDragFinished(float offset) {
   if (document_ && current_index_ >= 0) {
     document_->setLiveCropOffset(current_index_, offset);
-    document_->invalidateFinalPreview(current_index_);
   }
   crop_dragging_ = false;
   emitOverlay();
   emitSliceGuides();
-  if (needsEncodedPreview()) {
-    final_preview_timer_->start();
-  }
 }
 
 void GuiBridge::handleMessage(const QString& json_text) {
@@ -916,12 +946,14 @@ void GuiBridge::handleMessage(const QString& json_text) {
                                                                         : preview_mode_);
     }
     applyLiveSettings(false, preview_mode_ == PreviewMode::kGainMap);
-    if (needsEncodedPreview() && current_index_ >= 0) {
+    emitOverlay();
+    emitSliceGuides();
+    if (preview_mode_ == PreviewMode::kGainMap && current_index_ >= 0) {
+      ensureGainHeatmap(current_index_);
+    } else if (needsEncodedPreview() && current_index_ >= 0) {
       scheduleFinalPreview();
     } else {
       sendHdrLoading(false, false);
-      emitOverlay();
-      emitSliceGuides();
     }
     return;
   }
@@ -984,8 +1016,13 @@ void GuiBridge::onItemReady(int index) {
       }
     }
     applyLiveSettings(false, preview_mode_ == PreviewMode::kGainMap);
-    if (needsEncodedPreview()) {
+    if (preview_mode_ == PreviewMode::kGainMap) {
+      ensureGainHeatmap(index);
+    } else if (needsEncodedPreview()) {
       scheduleFinalPreview();
+    } else {
+      emitOverlay();
+      emitSliceGuides();
     }
   }
 }
@@ -1008,16 +1045,14 @@ void GuiBridge::onFinalPreviewReady(int index) {
     viewport_->setFinalHdr(frame.rgba_half, frame.width, frame.height, frame.color_gamut);
     viewport_->setPreviewMode(PreviewMode::kFinalHdr);
   }
-  sendHeatmap(index);
+  if (preview_mode_ == PreviewMode::kGainMap) sendHeatmap(index);
   sendHdrLoading(false, preview_mode_ == PreviewMode::kFinalHdr);
   emitOverlay();
   emitSliceGuides();
   if (chrome_) {
     json status;
     status["type"] = "status";
-    status["text"] = preview_mode_ == PreviewMode::kGainMap
-                         ? (frame.gainmap_is_rgb ? "Encoded RGB gain map" : "Encoded luma gain map")
-                         : "Encoded Ultra HDR";
+    status["text"] = QStringLiteral("Encoded Ultra HDR").toStdString();
     chrome_->postToPage(QString::fromStdString(status.dump()));
   }
 }

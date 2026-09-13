@@ -16,6 +16,7 @@ namespace uhdr_repack {
 struct PreviewItemState {
   QImage sdr;
   std::vector<float> gain;
+  std::vector<float> gain_rgb;
   int gain_width = 0;
   int gain_height = 0;
   float gain_min = 1.0f;

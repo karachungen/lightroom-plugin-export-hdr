@@ -91,9 +91,11 @@ bool load_sdr_linear_rgba(const std::string& path, unsigned master_width, unsign
 }
 
 bool gain_from_buffers(const std::vector<float>& sdr_linear, const std::vector<float>& hdr_linear,
-                       unsigned width, unsigned height, std::vector<float>* gain) {
+                       unsigned width, unsigned height, std::vector<float>* gain,
+                       std::vector<float>* gain_rgb) {
   const size_t pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
   gain->resize(pixels);
+  if (gain_rgb) gain_rgb->resize(pixels * 3u);
   for (size_t p = 0; p < pixels; ++p) {
     const size_t i = p * 4;
     const float sdr_l = luminance_bt709(sdr_linear[i], sdr_linear[i + 1], sdr_linear[i + 2]);
@@ -101,6 +103,14 @@ bool gain_from_buffers(const std::vector<float>& sdr_linear, const std::vector<f
     float g = hdr_l / std::max(sdr_l, 1e-4f);
     g = std::clamp(g, 1.0f, 1000.0f);
     (*gain)[p] = g;
+    if (gain_rgb) {
+      (*gain_rgb)[p * 3u] =
+          std::clamp(hdr_linear[i] / std::max(sdr_linear[i], 1e-4f), 1.0f, 1000.0f);
+      (*gain_rgb)[p * 3u + 1] =
+          std::clamp(hdr_linear[i + 1] / std::max(sdr_linear[i + 1], 1e-4f), 1.0f, 1000.0f);
+      (*gain_rgb)[p * 3u + 2] =
+          std::clamp(hdr_linear[i + 2] / std::max(sdr_linear[i + 2], 1e-4f), 1.0f, 1000.0f);
+    }
   }
   return true;
 }
@@ -127,7 +137,8 @@ bool hdr_half_to_linear(const uhdr_raw_image_t& hdr, std::vector<float>* rgba) {
 }  // namespace
 
 bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_tiff_path,
-                          std::vector<float>* gain, int* width, int* height, std::string* error) {
+                          std::vector<float>* gain, int* width, int* height, std::string* error,
+                          std::vector<float>* gain_rgb) {
   if (!gain || !width || !height) {
     if (error) *error = "null output";
     return false;
@@ -156,7 +167,7 @@ bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_ti
     return false;
   }
 
-  if (!gain_from_buffers(sdr_linear, hdr_linear, master_w, master_h, gain)) {
+  if (!gain_from_buffers(sdr_linear, hdr_linear, master_w, master_h, gain, gain_rgb)) {
     if (error) *error = "gain map computation failed";
     return false;
   }

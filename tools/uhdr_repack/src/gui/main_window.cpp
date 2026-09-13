@@ -33,6 +33,9 @@ class SliceGuideOverlay : public QWidget {
   explicit SliceGuideOverlay(QWidget* parent = nullptr) : QWidget(parent) {
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_NoSystemBackground);
+    setAttribute(Qt::WA_OpaquePaintEvent, false);
+    setAutoFillBackground(false);
+    setStyleSheet(QStringLiteral("background: transparent;"));
     setFocusPolicy(Qt::NoFocus);
     hide();
   }
@@ -57,11 +60,8 @@ class SliceGuideOverlay : public QWidget {
   void paintEvent(QPaintEvent*) override {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
-    painter.fillRect(rect(), QColor(0, 0, 0, 120));
     painter.setCompositionMode(QPainter::CompositionMode_Clear);
-    for (const QRect& crop : rects_) {
-      painter.fillRect(crop, Qt::transparent);
-    }
+    painter.fillRect(rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     QPen pen(QColor(227, 154, 82));
     pen.setWidth(2);

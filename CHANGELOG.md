@@ -7,6 +7,12 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+### Fixed
+
+- HDR crop overlay is a frame on the full uncropped preview. Dragging the box no longer recrops or re-encodes HDR; Encode still writes the cropped file.
+- Gain tab shows the luma heatmap as soon as the gain map exists (including with a feed crop). It no longer waits on an HDR preview encode, which left a plain photo under the crop box.
+- Switching **Color map** / **Mono map** on the Gain tab updates the overlay: Color uses RGB channel ratios (and a 16× boost cap); Mono stays the luma false-color heatmap (4.92× cap).
+
 ### Changed
 
 - Ultra HDR no longer preloads every photo’s HDR TIFF when the editor opens. Lightroom renders a TIFF for the current photo (Gain/HDR preview) and **one photo at a time** on Encode, then deletes that TIFF so a batch of panos cannot fill the disk.

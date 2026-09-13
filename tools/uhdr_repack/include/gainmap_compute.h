@@ -8,9 +8,11 @@
 
 namespace uhdr_repack {
 
-/** Per-pixel scalar gain (HDR luma / SDR luma) from an SDR base + HDR TIFF pair. */
+/** Per-pixel scalar gain (HDR luma / SDR luma) from an SDR base + HDR TIFF pair.
+ *  Optional gain_rgb is interleaved R,G,B channel ratios (width*height*3). */
 bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_tiff_path,
-                          std::vector<float>* gain, int* width, int* height, std::string* error);
+                          std::vector<float>* gain, int* width, int* height, std::string* error,
+                          std::vector<float>* gain_rgb = nullptr);
 
 /**
  * Bake an edited luma gain map into the HDR buffer in Rec.2020:
