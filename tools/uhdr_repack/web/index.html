@@ -6,13 +6,12 @@
   <title>Ultra HDR</title>
   <link rel="stylesheet" href="app.css" />
 </head>
-<body class="mode-sdr is-loading">
+<body class="mode-hdr is-loading">
   <header id="chrome">
     <div class="brand">
       <span class="brand-mark">Ultra HDR</span>
     </div>
     <div id="queue-count" class="chrome-meta">0 photos</div>
-    <div id="display-status" class="hdr-pill" data-hdr="unknown">Display</div>
   </header>
 
   <div id="app">
@@ -26,9 +25,9 @@
 
     <main id="stage">
       <div id="mode-buttons" class="mode-seg" role="tablist">
-        <button type="button" data-mode="sdr" class="mode-btn active" role="tab">SDR</button>
+        <button type="button" data-mode="hdr" class="mode-btn active" role="tab">HDR</button>
+        <button type="button" data-mode="sdr" class="mode-btn" role="tab">SDR</button>
         <button type="button" data-mode="gain" class="mode-btn" role="tab">Gain</button>
-        <button type="button" data-mode="hdr" class="mode-btn" role="tab">HDR</button>
       </div>
       <div id="canvas-wrap">
         <div id="preview-frame">
@@ -57,28 +56,22 @@
 
         <section class="group" id="delivery-group">
           <h3>Delivery</h3>
-          <p id="delivery-hint" class="group-hint">JPEG 95, RGB full-res Display P3 map, 4-stop (16×) boost. Original pixels; Instagram accepts up to 8 MB.</p>
+          <p id="delivery-hint" class="group-hint">Full-resolution RGB Display P3 gain map with a 4-stop (16×) boost. Highlight color stays in the HDR layer; pixel size is unchanged.</p>
           <div id="delivery-presets" class="ig-presets" role="radiogroup" aria-label="Encode delivery">
             <button type="button" class="ig-card active" data-value="color">
               <span class="ig-name">Color map</span>
-              <span class="ig-size">JPEG 95 · RGB · 4-stop</span>
+              <span class="ig-size">Full-res RGB, 4-stop boost</span>
             </button>
             <button type="button" class="ig-card" data-value="mono">
               <span class="ig-name">Mono map</span>
-              <span class="ig-size">JPEG 95 · luma ½</span>
+              <span class="ig-size">Half-res luma, milder boost</span>
             </button>
             <button type="button" class="ig-card" data-value="custom">
               <span class="ig-name">Custom</span>
-              <span class="ig-size">You choose JPEG + gain map</span>
+              <span class="ig-size">Set JPEG quality and gain map</span>
             </button>
           </div>
           <p id="export-applied" class="export-applied">Color map · JPEG 95/95 · RGB map 1:1 · boost 1–16× · 3250 nits</p>
-          <div id="color-notice" class="custom-warn">
-            Instagram may compress a color gain map more on upload than a luma map.
-          </div>
-          <div id="mono-notice" class="custom-warn" hidden>
-            Instagram may compress a luma gain map less on upload than a color map.
-          </div>
           <div id="quality-sliders" hidden>
             <label class="slider-row">
               <span>Base JPEG</span>
@@ -93,7 +86,7 @@
           </div>
         </section>
 
-        <section class="group" id="hdr-group">
+        <section class="group" id="hdr-group" hidden>
           <h3>HDR</h3>
           <p id="hdr-hint" class="group-hint">Applied on the next HDR encode</p>
           <label class="slider-row">

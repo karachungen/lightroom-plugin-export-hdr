@@ -564,6 +564,54 @@ bool test_copy_feed_crop_to_others(int* checks) {
   return true;
 }
 
+bool test_instagram_preview_cache_invalidation(int* checks) {
+  PreviewSession session;
+  session.items.resize(1);
+  session.items[0].id = "cache";
+  PreviewDocument document(session);
+  document.testingSeedFinalPreview(0);
+  if (document.state(0).final_dirty || document.state(0).final_hdr.rgba_half.empty()) {
+    std::cerr << "testingSeedFinalPreview should mark final_hdr clean\n";
+    return false;
+  }
+
+  document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 1, 1, 2160, 2700);
+  if (!document.state(0).final_dirty) {
+    std::cerr << "aspect/size should invalidate HDR preview cache\n";
+    return false;
+  }
+  if (document.item(0).slice_aspect != SliceAspect::k4x5 || document.item(0).output_width != 2160 ||
+      document.item(0).output_height != 2700) {
+    std::cerr << "aspect/size should still update session item\n";
+    return false;
+  }
+
+  document.testingSeedFinalPreview(0);
+  document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 3, 1, 2160, 2700);
+  if (!document.state(0).final_dirty || !document.state(0).final_hdr.rgba_half.empty()) {
+    std::cerr << "slice count should invalidate HDR preview cache\n";
+    return false;
+  }
+
+  document.testingSeedFinalPreview(0);
+  document.setItemInstagram(0, SliceAspect::k4x5, 0.5f, 3, 2, 2160, 2700);
+  if (!document.state(0).final_dirty) {
+    std::cerr << "preview slice should invalidate HDR preview cache\n";
+    return false;
+  }
+
+  document.testingSeedFinalPreview(0);
+  document.setItemInstagram(0, SliceAspect::k4x5, 0.2f, 3, 2, 2160, 2700);
+  if (!document.state(0).final_dirty) {
+    std::cerr << "crop offset should invalidate HDR preview cache\n";
+    return false;
+  }
+
+  std::cout << "OK instagram preview cache invalidation\n";
+  (*checks)++;
+  return true;
+}
+
 bool test_slice_plan_overlay(int* checks) {
   std::vector<CropRect> slices;
   std::string err;
@@ -842,6 +890,9 @@ int gui_self_test_main(const std::string& session_path) {
   if (!test_copy_feed_crop_to_others(&checks)) {
     return fail("copy feed crop to others");
   }
+  if (!test_instagram_preview_cache_invalidation(&checks)) {
+    return fail("instagram preview cache invalidation");
+  }
   if (!test_activity_log(&checks)) {
     return fail("activity log");
   }
@@ -945,6 +996,29 @@ int gui_self_test_main(const std::string& session_path) {
                   std::to_string(cap.width) + "x" + std::to_string(cap.height) + " " + err);
     }
     std::cout << "OK preview encode cap " << cap.width << "x" << cap.height << "\n";
+    checks++;
+  }
+
+  {
+    EncodeRequest sliced = req;
+    sliced.out_path =
+        (fs::path(encode_item.out).parent_path() / "legacy_uhdr_preview_slice_cap.jpg").u8string();
+    sliced.slice_aspect = SliceAspect::k3x4;
+    sliced.preview_slice_index = 1;
+    sliced.preview_max_edge = 512;
+    sliced.crop_offset = 0.5f;
+    if (encode_from_paths(sliced, &err) != 0) {
+      return fail("sliced preview_max_edge encode: " + err);
+    }
+    DecodedHdrFrame slice_cap;
+    if (!decode_ultrahdr_preview(sliced.out_path, 4.0f, &slice_cap, &err) || slice_cap.width > 512 ||
+        slice_cap.height > 512 || slice_cap.width < 2 || slice_cap.height < 2) {
+      return fail("sliced preview_max_edge should encode a matching HDR/SDR frame, got " +
+                  std::to_string(slice_cap.width) + "x" + std::to_string(slice_cap.height) + " " +
+                  err);
+    }
+    std::cout << "OK sliced preview encode cap " << slice_cap.width << "x" << slice_cap.height
+              << "\n";
     checks++;
   }
 

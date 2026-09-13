@@ -452,6 +452,28 @@ void PreviewDocument::setItemInstagram(int index, SliceAspect aspect, float crop
   emit itemChanged(index);
 }
 
+void PreviewDocument::setLiveCropOffset(int index, float crop_offset) {
+  if (index < 0 || index >= itemCount()) return;
+  auto& item = d_->session.items[static_cast<size_t>(index)];
+  item.crop_offset = std::clamp(crop_offset, 0.0f, 1.0f);
+  item.has_slice_override = true;
+}
+
+void PreviewDocument::invalidateFinalPreview(int index) {
+  if (index < 0 || index >= itemCount()) return;
+  d_->invalidateFinal(index);
+}
+
+void PreviewDocument::testingSeedFinalPreview(int index) {
+  if (index < 0 || index >= itemCount()) return;
+  auto& state = d_->states[static_cast<size_t>(index)];
+  state.final_hdr = {};
+  state.final_hdr.width = 1;
+  state.final_hdr.height = 1;
+  state.final_hdr.rgba_half.assign(4, 0);
+  state.final_dirty = false;
+}
+
 int PreviewDocument::copyFeedCropToOthers(int from_index) {
   if (from_index < 0 || from_index >= itemCount()) return 0;
   const SessionItem& src = item(from_index);

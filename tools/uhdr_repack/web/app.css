@@ -59,19 +59,13 @@ body {
   letter-spacing: -0.02em;
 }
 .brand-rest { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; }
-.chrome-meta { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
-.hdr-pill {
+.chrome-meta {
   margin-left: auto;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
   color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-.hdr-pill[data-hdr="true"] { color: var(--ok); border-color: rgba(143, 191, 138, 0.4); }
-.hdr-pill[data-hdr="false"] { color: var(--ember); border-color: rgba(208, 138, 74, 0.35); }
 
 #app {
   display: grid;
@@ -490,6 +484,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .custom-warn[hidden] { display: none; }
 #quality-sliders[hidden] { display: none; }
+#hdr-group[hidden] { display: none; }
 #delivery-presets .ig-card {
   min-height: 64px;
   justify-content: center;
@@ -643,32 +638,38 @@ button:focus-visible, .chip:focus-visible, .mode-btn:focus-visible, .skip:focus-
   outline-offset: 2px;
 }
 
-body.mode-hdr.mode-hdr-ready #preview-canvas { opacity: 0; }
-
 #hdr-loader {
   position: absolute;
-  inset: 0;
+  left: 14px;
+  bottom: 14px;
   z-index: 6;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  background: rgba(7, 6, 5, 0.58);
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 12px 8px 10px;
+  width: auto;
+  max-width: min(420px, calc(100% - 28px));
+  background: rgba(7, 6, 5, 0.78);
+  border: 1px solid var(--line);
+  border-radius: 999px;
   color: var(--text);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: 11px;
   pointer-events: none;
 }
+#hdr-loader p { margin: 0; }
 #hdr-loader[hidden] { display: none; }
 .hdr-spinner {
-  width: 36px;
-  height: 36px;
+  width: 16px;
+  height: 16px;
   border: 2px solid rgba(243, 234, 220, 0.18);
   border-top-color: var(--ember);
   border-radius: 50%;
   animation: hdr-spin 0.9s linear infinite;
+  flex: 0 0 auto;
 }
 @keyframes hdr-spin {
   to { transform: rotate(360deg); }

@@ -57,7 +57,7 @@
   const state = {
     items: [],
     currentId: null,
-    mode: "sdr",
+    mode: "hdr",
     encodePreset: "color",
     settings: {
       baseQuality: COLOR_MAP.baseQuality,
@@ -80,6 +80,7 @@
     encodedWidth: 0,
     encodedHeight: 0,
     encodedBytes: 0,
+    hdrCached: false,
     heatmapImage: null,
     gainmapEncoded: false,
     gainmapChannels: "luma",
@@ -284,11 +285,6 @@
           document.getElementById("status-text").textContent = msg.text || "";
         }
         break;
-      case "displayStatus":
-        const pill = document.getElementById("display-status");
-        pill.textContent = msg.text || "Display";
-        pill.dataset.hdr = msg.hdrActive === true ? "true" : msg.hdrActive === false ? "false" : "unknown";
-        break;
       case "busy":
         document.getElementById("apply-btn").disabled = !!msg.busy;
         break;
@@ -305,18 +301,27 @@
         break;
       case "hdrLoading":
         if (msg.loading) {
+          state.hdrCached = false;
           state.encodedWidth = 0;
           state.encodedHeight = 0;
           state.encodedBytes = 0;
-        } else if (msg.ready === true) {
-          state.encodedWidth = Number(msg.encodedWidth) || 0;
-          state.encodedHeight = Number(msg.encodedHeight) || 0;
-          state.encodedBytes = Number(msg.encodedBytes) || 0;
+        } else {
+          const encodedW = Number(msg.encodedWidth) || 0;
+          const encodedH = Number(msg.encodedHeight) || 0;
+          if (msg.ready === true || encodedW > 0) {
+            state.hdrCached = true;
+            state.encodedWidth = encodedW;
+            state.encodedHeight = encodedH;
+            state.encodedBytes = Number(msg.encodedBytes) || 0;
+          }
         }
         setHdrLoading(!!msg.loading, msg.phase);
-        if (!msg.loading && msg.ready === true && state.mode === "hdr") {
+        if (!msg.loading && state.hdrCached && state.mode === "hdr") {
           document.body.classList.add("mode-hdr-ready");
+        } else if (!msg.loading && !state.hdrCached) {
+          document.body.classList.remove("mode-hdr-ready");
         }
+        drawPreview();
         updateOutputSize();
         break;
       case "settings":
@@ -424,6 +429,8 @@
     state.encodedWidth = 0;
     state.encodedHeight = 0;
     state.encodedBytes = 0;
+    state.hdrCached = false;
+    document.body.classList.remove("mode-hdr-ready");
     updateOutputSize();
     if (notify) post({ type: "selectItem", id });
   }
@@ -531,25 +538,23 @@
       card.classList.toggle("active", card.dataset.value === state.encodePreset);
     });
     document.getElementById("quality-sliders").hidden = !custom;
+    document.getElementById("hdr-group").hidden = !custom;
     document.getElementById("base-quality").disabled = !custom;
     document.getElementById("gainmap-quality").disabled = !custom;
     ["min-boost", "max-boost", "display-peak", "gainmap-scale"].forEach((id) => {
       document.getElementById(id).disabled = !custom;
     });
     document.getElementById("monochrome-gainmap").disabled = !custom;
-    const colorNotice = document.getElementById("color-notice");
-    const monoNotice = document.getElementById("mono-notice");
-    if (colorNotice) colorNotice.hidden = !color;
-    if (monoNotice) monoNotice.hidden = !mono;
     const hdrHint = document.getElementById("hdr-hint");
     if (color) {
       document.getElementById("delivery-hint").textContent =
-        "JPEG 95, RGB full-res Display P3 map, 4-stop (16×) boost. Original pixels; Instagram accepts up to 8 MB.";
+        "Full-resolution RGB Display P3 gain map with a 4-stop (16×) boost. Highlight color stays in the HDR layer; pixel size is unchanged.";
     } else if (mono) {
       document.getElementById("delivery-hint").textContent =
-        "Luma gain map at half resolution, boost capped at 4.9×. Instagram may compress this less than color.";
+        "Half-resolution luma gain map with boost capped at 4.9×. HDR adds brightness only, not color, and the map is smaller.";
     } else {
-      document.getElementById("delivery-hint").textContent = "Shown in the encoded HDR preview.";
+      document.getElementById("delivery-hint").textContent =
+        "Unlocks JPEG quality, boost, peak nits, and RGB vs luma map. Shown in the encoded HDR preview.";
     }
     if (hdrHint) {
       hdrHint.textContent = custom
@@ -1079,10 +1084,6 @@
     SETTINGS_KEYS.forEach((key) => {
       payload[key] = state.settings[key];
     });
-    state.encodedWidth = 0;
-    state.encodedHeight = 0;
-    state.encodedBytes = 0;
-    updateOutputSize();
     post(payload);
   }
 
@@ -1178,11 +1179,10 @@
       ctx.globalAlpha = 0.76;
       ctx.drawImage(state.heatmapImage, s.offsetX, s.offsetY, s.dw, s.dh);
       ctx.globalAlpha = 1;
-    } else if (state.mode !== "hdr" || !document.body.classList.contains("mode-hdr-ready")) {
+    } else {
       ctx.drawImage(state.sdrImage, s.offsetX, s.offsetY, s.dw, s.dh);
     }
-    if (state.slices.length && state.settings.sliceAspect !== "none" &&
-        (state.mode !== "hdr" || !document.body.classList.contains("mode-hdr-ready"))) {
+    if (state.slices.length && state.settings.sliceAspect !== "none" && state.mode !== "hdr") {
       const ux = Math.min.apply(null, state.slices.map((r) => r.x));
       const uy = Math.min.apply(null, state.slices.map((r) => r.y));
       const u2 = Math.max.apply(null, state.slices.map((r) => r.x + r.w));
@@ -1288,7 +1288,7 @@
     const thumbs = !opts || opts.thumbs !== false;
     const reportRect = !opts || opts.reportRect !== false;
     updateSliceHint();
-    const htmlGuides = state.mode !== "hdr" || !document.body.classList.contains("mode-hdr-ready");
+    const htmlGuides = state.mode !== "hdr";
     const showThumbs = state.slices.length && state.sdrImage && state.settings.sliceAspect !== "none";
     sliceThumbs.hidden = !showThumbs;
     sliceOverlay.classList.toggle("is-active", showThumbs && htmlGuides && state.cropMeta.slack > 0);
@@ -1403,8 +1403,14 @@
   function setMode(mode) {
     if (mode === "live" || mode === "final") mode = "hdr";
     state.mode = mode;
+    const keepHdrReady = mode === "hdr" && state.hdrCached;
     document.body.className = `mode-${mode}${state.loaded ? "" : " is-loading"}`;
-    document.body.classList.remove("is-hdr-loading", "mode-hdr-ready");
+    document.body.classList.remove("is-hdr-loading");
+    if (keepHdrReady) {
+      document.body.classList.add("mode-hdr-ready");
+    } else {
+      document.body.classList.remove("mode-hdr-ready");
+    }
     const loader = document.getElementById("hdr-loader");
     if (loader) loader.hidden = true;
     stopLoadTicker();

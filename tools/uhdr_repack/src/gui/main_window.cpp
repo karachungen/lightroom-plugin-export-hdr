@@ -10,13 +10,20 @@
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QPoint>
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QUrl>
+#include <QVector>
 #include <QWidget>
 #include <QtConcurrent/QtConcurrentRun>
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
 #include <vector>
 
 namespace uhdr_repack {
@@ -24,14 +31,24 @@ namespace uhdr_repack {
 class SliceGuideOverlay : public QWidget {
  public:
   explicit SliceGuideOverlay(QWidget* parent = nullptr) : QWidget(parent) {
-    setAttribute(Qt::WA_TransparentForMouseEvents);
     setAttribute(Qt::WA_TranslucentBackground);
     setAttribute(Qt::WA_NoSystemBackground);
+    setFocusPolicy(Qt::NoFocus);
     hide();
   }
 
-  void setRects(const QVector<QRect>& rects) {
+  std::function<void()> onDragStarted;
+  std::function<void(float)> onOffsetChanged;
+  std::function<void(float)> onDragFinished;
+
+  void setGuides(const QVector<QRect>& rects, bool interactive, bool axis_x, int slack_px,
+                 float crop_offset) {
     rects_ = rects;
+    interactive_ = interactive;
+    axis_x_ = axis_x;
+    slack_px_ = slack_px;
+    if (!dragging_) crop_offset_ = crop_offset;
+    setCursor(interactive_ && slack_px_ >= 2 ? Qt::OpenHandCursor : Qt::ArrowCursor);
     setVisible(!rects_.isEmpty());
     update();
   }
@@ -58,8 +75,48 @@ class SliceGuideOverlay : public QWidget {
     }
   }
 
+  void mousePressEvent(QMouseEvent* event) override {
+    if (!interactive_ || slack_px_ < 2 || event->button() != Qt::LeftButton) return;
+    dragging_ = true;
+    press_pos_ = event->pos();
+    press_offset_ = crop_offset_;
+    grabMouse();
+    setCursor(Qt::ClosedHandCursor);
+    if (onDragStarted) onDragStarted();
+    event->accept();
+  }
+
+  void mouseMoveEvent(QMouseEvent* event) override {
+    if (!dragging_) return;
+    const int delta =
+        axis_x_ ? event->pos().x() - press_pos_.x() : event->pos().y() - press_pos_.y();
+    const float next =
+        std::clamp(press_offset_ + static_cast<float>(delta) / static_cast<float>(slack_px_), 0.0f,
+                   1.0f);
+    if (std::abs(next - crop_offset_) < 0.0001f) return;
+    crop_offset_ = next;
+    if (onOffsetChanged) onOffsetChanged(crop_offset_);
+    event->accept();
+  }
+
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    if (!dragging_ || event->button() != Qt::LeftButton) return;
+    dragging_ = false;
+    releaseMouse();
+    setCursor(interactive_ && slack_px_ >= 2 ? Qt::OpenHandCursor : Qt::ArrowCursor);
+    if (onDragFinished) onDragFinished(crop_offset_);
+    event->accept();
+  }
+
  private:
   QVector<QRect> rects_;
+  bool interactive_ = false;
+  bool axis_x_ = true;
+  int slack_px_ = 0;
+  float crop_offset_ = 0.5f;
+  bool dragging_ = false;
+  QPoint press_pos_;
+  float press_offset_ = 0.5f;
 };
 
 class MainWindow::Ui {
@@ -124,6 +181,15 @@ MainWindow::MainWindow(PreviewSession session, QWidget* parent)
   connect(bridge_, &GuiBridge::chooseDestRequested, this, &MainWindow::onChooseDest);
   connect(bridge_, &GuiBridge::previewOverlayChanged, this, &MainWindow::onPreviewOverlayChanged);
   connect(bridge_, &GuiBridge::sliceGuidesChanged, this, &MainWindow::onSliceGuidesChanged);
+  ui_->slice_overlay->onDragStarted = [this]() {
+    if (bridge_) bridge_->onCropDragStarted();
+  };
+  ui_->slice_overlay->onOffsetChanged = [this](float offset) {
+    if (bridge_) bridge_->onCropOffsetChanged(offset);
+  };
+  ui_->slice_overlay->onDragFinished = [this](float offset) {
+    if (bridge_) bridge_->onCropDragFinished(offset);
+  };
 }
 
 MainWindow::~MainWindow() {
@@ -161,25 +227,28 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
   applyOverlayGeometry();
 }
 
-void MainWindow::onPreviewOverlayChanged(const QRect& rect, bool visible) {
-  overlay_rect_ = rect;
+void MainWindow::onPreviewOverlayChanged(const QRect& preview_rect, const QRect& hdr_rect,
+                                         bool visible) {
+  overlay_rect_ = preview_rect;
+  hdr_hole_rect_ = hdr_rect;
   overlay_visible_ = visible;
   applyOverlayGeometry();
 }
 
-void MainWindow::onSliceGuidesChanged(const QVector<QRect>& rects) {
+void MainWindow::onSliceGuidesChanged(const QVector<QRect>& rects, bool interactive, int axis_x,
+                                     int slack_px, float crop_offset) {
   if (ui_->slice_overlay) {
-    ui_->slice_overlay->setRects(rects);
+    ui_->slice_overlay->setGuides(rects, interactive, axis_x != 0, slack_px, crop_offset);
     applyOverlayGeometry();
   }
 }
 
 void MainWindow::applyOverlayGeometry() {
   if (ui_->viewport_container) {
-    if (!overlay_visible_ || overlay_rect_.width() < 8 || overlay_rect_.height() < 8) {
+    if (!overlay_visible_ || hdr_hole_rect_.width() < 8 || hdr_hole_rect_.height() < 8) {
       ui_->viewport_container->hide();
     } else {
-      ui_->viewport_container->setGeometry(overlay_rect_);
+      ui_->viewport_container->setGeometry(hdr_hole_rect_);
       ui_->viewport_container->show();
       ui_->viewport_container->raise();
     }

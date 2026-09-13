@@ -50,13 +50,17 @@ class GuiBridge : public QObject {
   void onFinalPreviewReady(int index);
   void onFinalPreviewFailed(int index, const QString& message);
   void onViewportStatusChanged(const HdrViewportStatus& status);
+  void onCropDragStarted();
+  void onCropOffsetChanged(float offset);
+  void onCropDragFinished(float offset);
 
  signals:
   void applyRequested();
   void cancelRequested();
   void chooseDestRequested();
-  void previewOverlayChanged(const QRect& rect, bool visible);
-  void sliceGuidesChanged(const QVector<QRect>& rects);
+  void previewOverlayChanged(const QRect& preview_rect, const QRect& hdr_rect, bool hdr_visible);
+  void sliceGuidesChanged(const QVector<QRect>& rects, bool interactive, int axis_x, int slack_px,
+                          float crop_offset);
 
  private:
   void handleSelectItem(const QString& id);
@@ -79,6 +83,9 @@ class GuiBridge : public QObject {
   void syncGainVisualization();
   PreviewMode parsePreviewMode(const std::string& mode) const;
   int indexForId(const QString& id) const;
+  QRect letterboxedImageRect(QRect* local = nullptr) const;
+  QRect selectedHdrHole() const;
+  void sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack_px) const;
 
   PreviewDocument* document_ = nullptr;
   HdrRhiViewport* viewport_ = nullptr;
@@ -86,8 +93,9 @@ class GuiBridge : public QObject {
   HdrTiffClient* hdr_client_ = nullptr;
   QTimer* final_preview_timer_ = nullptr;
   int current_index_ = 0;
-  PreviewMode preview_mode_ = PreviewMode::kSdr;
+  PreviewMode preview_mode_ = PreviewMode::kFinalHdr;
   bool approved_ = false;
+  bool crop_dragging_ = false;
   SliceAspect slice_aspect_ = SliceAspect::kNone;
   QRect preview_rect_;
 

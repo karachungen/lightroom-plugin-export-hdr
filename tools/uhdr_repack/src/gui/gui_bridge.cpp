@@ -17,7 +17,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace uhdr_repack {
 
@@ -132,6 +134,19 @@ bool encode_inspector_equal(const EncodeOptions& a, const EncodeOptions& b) {
          a.max_content_boost == b.max_content_boost &&
          a.target_display_peak_nits == b.target_display_peak_nits &&
          a.monochrome_gainmap == b.monochrome_gainmap;
+}
+
+QRect mapCropToLocal(const CropRect& crop, int img_w, int img_h, const QRect& image_local) {
+  if (img_w < 1 || img_h < 1) return {};
+  const int x = image_local.x() + static_cast<int>(std::lround(
+                                      static_cast<double>(crop.x) / img_w * image_local.width()));
+  const int y = image_local.y() + static_cast<int>(std::lround(
+                                      static_cast<double>(crop.y) / img_h * image_local.height()));
+  const int w =
+      static_cast<int>(std::lround(static_cast<double>(crop.w) / img_w * image_local.width()));
+  const int h =
+      static_cast<int>(std::lround(static_cast<double>(crop.h) / img_h * image_local.height()));
+  return QRect(x, y, std::max(1, w), std::max(1, h));
 }
 
 }  // namespace
@@ -401,9 +416,10 @@ void GuiBridge::sendHdrLoading(bool loading, bool ready, const QString& phase) {
   root["loading"] = loading;
   root["ready"] = ready;
   if (!phase.isEmpty()) root["phase"] = phase.toStdString();
-  if (ready && document_ && current_index_ >= 0 && current_index_ < document_->itemCount()) {
-    const auto& frame = document_->state(current_index_).final_hdr;
-    if (frame.width > 0 && frame.height > 0) {
+  if (document_ && current_index_ >= 0 && current_index_ < document_->itemCount()) {
+    const auto& st = document_->state(current_index_);
+    const auto& frame = st.final_hdr;
+    if (!st.final_dirty && frame.width > 0 && frame.height > 0) {
       root["encodedWidth"] = frame.width;
       root["encodedHeight"] = frame.height;
       if (frame.jpeg_bytes > 0) root["encodedBytes"] = frame.jpeg_bytes;
@@ -512,8 +528,19 @@ void GuiBridge::applyLiveSettings(bool send_slices, bool send_heatmap) {
 }
 
 void GuiBridge::emitSliceGuides() {
-  QVector<QRect> out;
-  emit sliceGuidesChanged(out);
+  if (preview_mode_ != PreviewMode::kFinalHdr) {
+    emit sliceGuidesChanged({}, false, 1, 0, 0.5f);
+    return;
+  }
+  QVector<QRect> local;
+  bool axis_x = true;
+  int slack_px = 0;
+  sliceGuideLayout(&local, &axis_x, &slack_px);
+  float offset = 0.5f;
+  if (document_ && current_index_ >= 0) {
+    offset = effective_crop_offset(document_->item(current_index_));
+  }
+  emit sliceGuidesChanged(local, slack_px >= 2, axis_x ? 1 : 0, slack_px, offset);
 }
 
 void GuiBridge::ensureHdrTiffs(const std::vector<int>& indices, HdrTiffClient::Finished finished) {
@@ -555,11 +582,15 @@ void GuiBridge::ensureHdrThenPreview(int index) {
   }
   if (hasEncodedHdr()) {
     activity_log_append(id, "encode", std::string("preview cache hit (") + mode + ")");
-    sendHdrLoading(false, preview_mode_ == PreviewMode::kFinalHdr);
+    const auto& frame = document_->state(index).final_hdr;
+    if (viewport_ && preview_mode_ == PreviewMode::kFinalHdr) {
+      viewport_->setFinalHdr(frame.rgba_half, frame.width, frame.height, frame.color_gamut);
+      viewport_->setPreviewMode(PreviewMode::kFinalHdr);
+    }
+    sendHdrLoading(false, true);
     if (preview_mode_ == PreviewMode::kGainMap) sendHeatmap(current_index_);
     emitOverlay();
     emitSliceGuides();
-    document_->requestFinalPreview(current_index_);
     return;
   }
   if (document_->item(index).hdr_tiff.empty()) {
@@ -654,6 +685,7 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
   }
 
   bool instagram_changed = false;
+  bool slice_geometry_changed = false;
   if (current_index_ >= 0) {
     const SessionItem& item = document_->item(current_index_);
     SliceAspect aspect = effective_slice_aspect(session, item);
@@ -697,8 +729,9 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
             : document_->item(current_index_).preview_slice_index;
     const unsigned cur_ow = document_->item(current_index_).output_width;
     const unsigned cur_oh = document_->item(current_index_).output_height;
-    instagram_changed = aspect != cur_aspect || offset != cur_offset || slice_count != cur_count ||
-                        preview_slice != cur_preview || output_width != cur_ow ||
+    slice_geometry_changed =
+        offset != cur_offset || slice_count != cur_count || preview_slice != cur_preview;
+    instagram_changed = aspect != cur_aspect || slice_geometry_changed || output_width != cur_ow ||
                         output_height != cur_oh;
     if (instagram_changed) {
       document_->setItemInstagram(current_index_, aspect, offset, slice_count, preview_slice,
@@ -717,8 +750,112 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
 }
 
 void GuiBridge::emitOverlay() {
-  const bool visible = preview_mode_ == PreviewMode::kFinalHdr && hasEncodedHdr();
-  emit previewOverlayChanged(preview_rect_, visible);
+  const QRect hole = selectedHdrHole();
+  const bool visible = preview_mode_ == PreviewMode::kFinalHdr && hasEncodedHdr() &&
+                       !crop_dragging_ && hole.width() >= 8 && hole.height() >= 8;
+  emit previewOverlayChanged(preview_rect_, hole, visible);
+}
+
+QRect GuiBridge::letterboxedImageRect(QRect* local) const {
+  if (preview_rect_.width() < 8 || preview_rect_.height() < 8 || !document_ || current_index_ < 0) {
+    return {};
+  }
+  const QImage& sdr = document_->state(current_index_).sdr;
+  if (sdr.isNull() || sdr.width() < 2 || sdr.height() < 2) return {};
+  const double scale = std::min(preview_rect_.width() / static_cast<double>(sdr.width()),
+                                preview_rect_.height() / static_cast<double>(sdr.height()));
+  const int dw = std::max(1, static_cast<int>(std::lround(sdr.width() * scale)));
+  const int dh = std::max(1, static_cast<int>(std::lround(sdr.height() * scale)));
+  const int ox = (preview_rect_.width() - dw) / 2;
+  const int oy = (preview_rect_.height() - dh) / 2;
+  if (local) *local = QRect(ox, oy, dw, dh);
+  return QRect(preview_rect_.x() + ox, preview_rect_.y() + oy, dw, dh);
+}
+
+QRect GuiBridge::selectedHdrHole() const {
+  QRect local;
+  const QRect image = letterboxedImageRect(&local);
+  if (!image.isValid()) return {};
+  if (!document_ || current_index_ < 0) return image;
+  const auto& item = document_->item(current_index_);
+  const auto& st = document_->state(current_index_);
+  const SliceAspect aspect = effective_slice_aspect(document_->session(), item);
+  if (aspect == SliceAspect::kNone || st.sdr.isNull()) return image;
+  std::vector<CropRect> slices;
+  std::string err;
+  compute_slices(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
+                 aspect, &slices, &err, effective_crop_offset(item), effective_slice_count(item));
+  if (slices.empty()) return image;
+  unsigned idx = item.preview_slice_index < 1 ? 1u : item.preview_slice_index;
+  if (idx > slices.size()) idx = static_cast<unsigned>(slices.size());
+  const QRect hole_local = mapCropToLocal(slices[idx - 1], st.sdr.width(), st.sdr.height(), local);
+  return hole_local.translated(preview_rect_.topLeft());
+}
+
+void GuiBridge::sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack_px) const {
+  if (local) local->clear();
+  if (axis_x) *axis_x = true;
+  if (slack_px) *slack_px = 0;
+  QRect image_local;
+  if (!letterboxedImageRect(&image_local).isValid() || !document_ || current_index_ < 0) return;
+  const auto& item = document_->item(current_index_);
+  const auto& st = document_->state(current_index_);
+  const SliceAspect aspect = effective_slice_aspect(document_->session(), item);
+  if (aspect == SliceAspect::kNone || st.sdr.isNull()) return;
+  std::vector<CropRect> slices;
+  std::string err;
+  compute_slices(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
+                 aspect, &slices, &err, effective_crop_offset(item), effective_slice_count(item));
+  if (slices.empty()) return;
+  if (local) {
+    for (const auto& crop : slices) {
+      local->push_back(mapCropToLocal(crop, st.sdr.width(), st.sdr.height(), image_local));
+    }
+  }
+  const bool horizontal = slices[0].h + 1 >= static_cast<unsigned>(st.sdr.height());
+  if (axis_x) *axis_x = horizontal;
+  const unsigned count = static_cast<unsigned>(slices.size());
+  int slack = 0;
+  if (horizontal) {
+    slack = st.sdr.width() - static_cast<int>(count * slices[0].w);
+  } else {
+    slack = st.sdr.height() - static_cast<int>(count * slices[0].h);
+  }
+  if (slack < 0) slack = 0;
+  if (slack_px) {
+    if (horizontal) {
+      *slack_px = static_cast<int>(
+          std::lround(static_cast<double>(slack) / st.sdr.width() * image_local.width()));
+    } else {
+      *slack_px = static_cast<int>(
+          std::lround(static_cast<double>(slack) / st.sdr.height() * image_local.height()));
+    }
+  }
+}
+
+void GuiBridge::onCropDragStarted() {
+  crop_dragging_ = true;
+  emitOverlay();
+}
+
+void GuiBridge::onCropOffsetChanged(float offset) {
+  if (!document_ || current_index_ < 0) return;
+  document_->setLiveCropOffset(current_index_, offset);
+  sendSlices(current_index_);
+  emitOverlay();
+}
+
+void GuiBridge::onCropDragFinished(float offset) {
+  if (document_ && current_index_ >= 0) {
+    document_->setLiveCropOffset(current_index_, offset);
+    document_->invalidateFinalPreview(current_index_);
+  }
+  crop_dragging_ = false;
+  emitOverlay();
+  emitSliceGuides();
+  if (needsEncodedPreview()) {
+    final_preview_timer_->start();
+  }
 }
 
 void GuiBridge::handleMessage(const QString& json_text) {

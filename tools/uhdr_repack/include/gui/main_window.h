@@ -33,8 +33,9 @@ class MainWindow : public QMainWindow {
   void encodeApprovedQueue();
   void onCancel();
   void onChooseDest();
-  void onPreviewOverlayChanged(const QRect& rect, bool visible);
-  void onSliceGuidesChanged(const QVector<QRect>& rects);
+  void onPreviewOverlayChanged(const QRect& preview_rect, const QRect& hdr_rect, bool visible);
+  void onSliceGuidesChanged(const QVector<QRect>& rects, bool interactive, int axis_x, int slack_px,
+                            float crop_offset);
 
  private:
   void applyOverlayGeometry();
@@ -48,6 +49,7 @@ class MainWindow : public QMainWindow {
   bool windows_notice_shown_ = false;
 #endif
   QRect overlay_rect_;
+  QRect hdr_hole_rect_;
   bool overlay_visible_ = false;
 
   class Ui;

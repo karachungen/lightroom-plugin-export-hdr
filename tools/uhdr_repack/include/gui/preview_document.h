@@ -56,6 +56,11 @@ class PreviewDocument final : public QObject {
   void setItemInstagram(int index, SliceAspect aspect, float crop_offset, unsigned slice_count,
                         unsigned preview_slice_index, unsigned output_width = 0,
                         unsigned output_height = 0);
+  /** Update crop offset without invalidating the encoded HDR cache (live drag). */
+  void setLiveCropOffset(int index, float crop_offset);
+  void invalidateFinalPreview(int index);
+  /** Test helper: mark a 1x1 final_hdr cache as valid without encoding. */
+  void testingSeedFinalPreview(int index);
   /** Copy current item aspect and requested output size onto every other queue item. */
   int copyFeedCropToOthers(int from_index);
   /** Inspector-wide encode settings applied to the whole queue. */

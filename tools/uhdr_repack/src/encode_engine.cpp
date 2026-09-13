@@ -66,16 +66,17 @@ bool encode_target_size(const EncodeRequest& req, unsigned src_w, unsigned src_h
 bool encode_crop(const EncodeRequest& req, unsigned master_w, unsigned master_h,
                  const CropRect& crop, const EncodeOptions& opt, const std::string& out_path,
                  std::string* err) {
-  unsigned dst_w = 0;
-  unsigned dst_h = 0;
+  unsigned out_w = 0;
+  unsigned out_h = 0;
+  encode_target_size(req, crop.w, crop.h, &out_w, &out_h);
   const bool scale_in_load =
-      req.preview_max_edge >= 2 && req.gainmap_in.empty() &&
-      encode_target_size(req, crop.w, crop.h, &dst_w, &dst_h);
+      req.preview_max_edge >= 2 && req.gainmap_in.empty() && out_w >= 2 && out_h >= 2 &&
+      (out_w != crop.w || out_h != crop.h);
 
   RawImageHolder hdr_slice;
   RawImageHolder sdr_slice;
   if (!load_hdr_tiff_raw(req.hdr_tiff, &hdr_slice, err, master_w, master_h, &crop,
-                         scale_in_load ? dst_w : 0, scale_in_load ? dst_h : 0)) {
+                         scale_in_load ? out_w : 0, scale_in_load ? out_h : 0)) {
     return false;
   }
   if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr_slice, err, &crop)) {
@@ -87,13 +88,11 @@ bool encode_crop(const EncodeRequest& req, unsigned master_w, unsigned master_h,
     return false;
   }
 
-  unsigned out_w = 0;
-  unsigned out_h = 0;
   RawImageHolder hdr_out;
   RawImageHolder sdr_out;
   const RawImageHolder* hdr_enc = &hdr_slice;
   const RawImageHolder* sdr_enc = &sdr_slice;
-  if (encode_target_size(req, hdr_slice.ref().w, hdr_slice.ref().h, &out_w, &out_h)) {
+  if (out_w >= 2 && out_h >= 2) {
     if (hdr_slice.ref().w != out_w || hdr_slice.ref().h != out_h) {
       if (!resize_hdr_lanczos(hdr_slice, out_w, out_h, &hdr_out, err)) {
         return false;
