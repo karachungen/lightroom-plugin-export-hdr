@@ -12,10 +12,20 @@ find_bin() {
 	if [[ -x "$BIN" ]]; then
 		return 0
 	fi
-	if [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack" ]]; then
-		BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack"
-		return 0
-	fi
+	case "$(uname -s)" in
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		if [[ -f "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe" ]]; then
+			BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe"
+			return 0
+		fi
+		;;
+	*)
+		if [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack" ]]; then
+			BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack"
+			return 0
+		fi
+		;;
+	esac
 	return 1
 }
 

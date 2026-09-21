@@ -10,18 +10,55 @@ HDR="$TEST_DIR/hdr-raw.tif"
 BASE="$TEST_DIR/sdr.jpg"
 OUT="$TEST_DIR/out_uhdr.jpg"
 
+is_windows_shell() {
+	case "$(uname -s)" in
+	MINGW* | MSYS* | CYGWIN* | Windows_NT) return 0 ;;
+	esac
+	return 1
+}
+
+find_uhdr_bin() {
+	local plugin_bin="$REPO_ROOT/ExportHDR.lrplugin/bin"
+	local build_dir="$REPO_ROOT/tools/uhdr_repack/build"
+
+	# Git Bash treats uhdr_repack and uhdr_repack.exe as the same path; always use .exe on Windows.
+	if is_windows_shell; then
+		if [[ -f "$plugin_bin/uhdr_repack.exe" ]]; then
+			echo "$plugin_bin/uhdr_repack.exe"
+			return 0
+		fi
+		if [[ -f "$build_dir/uhdr_repack.exe" ]]; then
+			echo "$build_dir/uhdr_repack.exe"
+			return 0
+		fi
+		if [[ -f "$build_dir/Release/uhdr_repack.exe" ]]; then
+			echo "$build_dir/Release/uhdr_repack.exe"
+			return 0
+		fi
+		return 1
+	fi
+
+	if [[ -x "$plugin_bin/uhdr_repack" ]]; then
+		echo "$plugin_bin/uhdr_repack"
+		return 0
+	fi
+	if [[ -x "$build_dir/uhdr_repack" ]]; then
+		echo "$build_dir/uhdr_repack"
+		return 0
+	fi
+	if [[ -x "$build_dir/uhdr_repack.exe" ]]; then
+		echo "$build_dir/uhdr_repack.exe"
+		return 0
+	fi
+	if [[ -x "$build_dir/Release/uhdr_repack.exe" ]]; then
+		echo "$build_dir/Release/uhdr_repack.exe"
+		return 0
+	fi
+	return 1
+}
+
 BIN=""
-if [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack" ]]; then
-	BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack"
-elif [[ -x "$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe" ]]; then
-	BIN="$REPO_ROOT/ExportHDR.lrplugin/bin/uhdr_repack.exe"
-elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack" ]]; then
-	BIN="$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack"
-elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack.exe" ]]; then
-	BIN="$REPO_ROOT/tools/uhdr_repack/build/uhdr_repack.exe"
-elif [[ -x "$REPO_ROOT/tools/uhdr_repack/build/Release/uhdr_repack.exe" ]]; then
-	BIN="$REPO_ROOT/tools/uhdr_repack/build/Release/uhdr_repack.exe"
-else
+if ! BIN="$(find_uhdr_bin)"; then
 	echo "uhdr_repack not found. Build with:" >&2
 	echo "  ./scripts/build_plugin.sh" >&2
 	echo "or: ./scripts/bundle_uhdr_for_plugin.sh (macOS) / .\\scripts\\build_plugin.ps1 (Windows)" >&2
