@@ -1,5 +1,9 @@
 #ifdef _WIN32
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "gainmap_compute.h"
 
 #include "color_primaries.h"
