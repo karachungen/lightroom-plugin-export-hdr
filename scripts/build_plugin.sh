@@ -278,7 +278,7 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake ninja qt
+		brew install cmake ninja
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
 		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -373,8 +373,27 @@ bundle_shared_qt_macos() {
 		return 0
 	fi
 
+	local staging="$PLUGIN_BIN/.qtdeploy"
+	local app="$staging/uhdr_repack.app"
+	rm -rf "$staging"
+	mkdir -p "$app/Contents/MacOS"
+	cp "$exe" "$app/Contents/MacOS/uhdr_repack"
+	chmod +x "$app/Contents/MacOS/uhdr_repack"
+
 	echo "==> Bundling shared Qt dependencies with macdeployqt"
-	"$macdeployqt" "$exe" -always-overwrite
+	"$macdeployqt" "$app" -always-overwrite -no-codesign
+
+	cp "$app/Contents/MacOS/uhdr_repack" "$exe"
+	chmod +x "$exe"
+	if [[ -d "$app/Contents/Frameworks" ]]; then
+		rm -rf "$PLUGIN_BIN/Frameworks"
+		cp -R "$app/Contents/Frameworks" "$PLUGIN_BIN/"
+	fi
+	if [[ -d "$app/Contents/PlugIns" ]]; then
+		rm -rf "$PLUGIN_BIN/PlugIns"
+		cp -R "$app/Contents/PlugIns" "$PLUGIN_BIN/"
+	fi
+	rm -rf "$staging"
 }
 
 codesign_macos_bundle() {
