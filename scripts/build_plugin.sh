@@ -278,7 +278,7 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake ninja
+		brew install cmake ninja qt
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
 		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -339,6 +339,8 @@ find_build_exe() {
 }
 
 clean_plugin_bin() {
+	local plugin_root
+	plugin_root="$(dirname "$PLUGIN_BIN")"
 	mkdir -p "$PLUGIN_BIN"
 	if is_windows_host; then
 		# MSYS: rm uhdr_repack can delete uhdr_repack.exe — remove by explicit extension only.
@@ -347,8 +349,9 @@ clean_plugin_bin() {
 		find "$PLUGIN_BIN" -maxdepth 1 -type f \( \
 			-name "uhdr_repack" -o -name "uhdr_repack.exe" -o -name "*.dylib" -o -name "*.dll" \
 			\) -exec rm -f {} + 2>/dev/null || true
-		rm -rf "$PLUGIN_BIN"/{Frameworks,PlugIns,Resources,lib,share,tls,translations} 2>/dev/null || true
+		rm -rf "$PLUGIN_BIN"/{Resources,lib,share,tls,translations} 2>/dev/null || true
 	fi
+	rm -rf "$plugin_root"/{Frameworks,PlugIns} 2>/dev/null || true
 }
 
 uhdr_links_shared_qt_macos() {
@@ -375,6 +378,8 @@ bundle_shared_qt_macos() {
 
 	local staging="$PLUGIN_BIN/.qtdeploy"
 	local app="$staging/uhdr_repack.app"
+	local plugin_root
+	plugin_root="$(dirname "$PLUGIN_BIN")"
 	rm -rf "$staging"
 	mkdir -p "$app/Contents/MacOS"
 	cp "$exe" "$app/Contents/MacOS/uhdr_repack"
@@ -386,12 +391,12 @@ bundle_shared_qt_macos() {
 	cp "$app/Contents/MacOS/uhdr_repack" "$exe"
 	chmod +x "$exe"
 	if [[ -d "$app/Contents/Frameworks" ]]; then
-		rm -rf "$PLUGIN_BIN/Frameworks"
-		cp -R "$app/Contents/Frameworks" "$PLUGIN_BIN/"
+		rm -rf "$plugin_root/Frameworks"
+		cp -R "$app/Contents/Frameworks" "$plugin_root/"
 	fi
 	if [[ -d "$app/Contents/PlugIns" ]]; then
-		rm -rf "$PLUGIN_BIN/PlugIns"
-		cp -R "$app/Contents/PlugIns" "$PLUGIN_BIN/"
+		rm -rf "$plugin_root/PlugIns"
+		cp -R "$app/Contents/PlugIns" "$plugin_root/"
 	fi
 	rm -rf "$staging"
 }

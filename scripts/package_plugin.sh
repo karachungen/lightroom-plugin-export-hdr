@@ -61,6 +61,7 @@ windows-x64)
 	artifact="ExportHDR.lrplugin-windows-x64.zip"
 	# Do not rm "$PLUGIN_BIN/uhdr_repack" on MSYS — it can delete uhdr_repack.exe (same base name).
 	rm -f "$PLUGIN_BIN"/*.dylib
+	rm -rf "$PLUGIN_DIR/Frameworks" "$PLUGIN_DIR/PlugIns"
 	if [[ -f "$PLUGIN_BIN/uhdr_repack" ]] && [[ ! -f "$PLUGIN_BIN/uhdr_repack.exe" ]]; then
 		rm -f "$PLUGIN_BIN/uhdr_repack"
 	fi
