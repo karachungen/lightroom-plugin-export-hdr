@@ -30,6 +30,10 @@ if [[ -z "${UHDR_FIXTURES_SRC:-}" ]]; then
     echo "==> UHDR_FIXTURES_SRC unset; using existing files in $DEST"
     exit 0
   fi
+  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "WARN: UI fixtures missing in CI; optional preview tests will be skipped." >&2
+    exit 0
+  fi
   echo "copy_ui_fixtures: no source folder and missing files in $DEST." >&2
   echo "Set UHDR_FIXTURES_SRC to a folder containing UI preview JPEG/TIFF pairs." >&2
   exit 1
