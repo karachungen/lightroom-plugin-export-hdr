@@ -116,13 +116,20 @@ USED_STUB=0
 
 if REAL_BIN="$(find_uhdr_binary)" && binary_runs "$REAL_BIN"; then
 	cp "$REAL_BIN" "$STAGED_BIN"
-	# Bundle colocated dylibs when present (real macOS plugin layout).
+	# Bundle colocated dylibs and shared Qt runtimes when present.
 	REAL_DIR="$(dirname "$REAL_BIN")"
+	PLUGIN_ROOT="$(dirname "$REAL_DIR")"
 	shopt -s nullglob
 	for dylib in "$REAL_DIR"/*.dylib; do
 		cp "$dylib" "$PLUGIN_BIN/"
 	done
 	shopt -u nullglob
+	if [[ -d "$PLUGIN_ROOT/Frameworks" ]]; then
+		cp -R "$PLUGIN_ROOT/Frameworks" "$STAGING_ROOT/ExportHDR.lrplugin/"
+	fi
+	if [[ -d "$PLUGIN_ROOT/PlugIns" ]]; then
+		cp -R "$PLUGIN_ROOT/PlugIns" "$STAGING_ROOT/ExportHDR.lrplugin/"
+	fi
 	echo "==> Using real encoder: $REAL_BIN"
 else
 	install_quote_stub "$STAGED_BIN"

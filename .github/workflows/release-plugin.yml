@@ -78,7 +78,11 @@ jobs:
           if [[ "${{ matrix.id }}" == "macos-arm64" ]]; then
             export CMAKE_PREFIX_PATH="$(brew --prefix qt)"
           elif [[ -n "${QT_ROOT_DIR:-}" ]]; then
-            export CMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+            if command -v cygpath &>/dev/null; then
+              export CMAKE_PREFIX_PATH="$(cygpath -u "$QT_ROOT_DIR")"
+            else
+              export CMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+            fi
           fi
           bash scripts/build_plugin.sh all
 

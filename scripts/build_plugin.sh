@@ -175,6 +175,10 @@ find_qt_shared_prefix() {
 		done
 	fi
 
+	if [[ -n "${QT_ROOT_DIR:-}" ]]; then
+		candidates+=("$QT_ROOT_DIR")
+	fi
+
 	if command -v brew &>/dev/null; then
 		local brew_qt
 		brew_qt="$(brew --prefix qt 2>/dev/null || true)"
