@@ -1,4 +1,4 @@
-# Smoke-test uhdr_repack on Windows — prefers run_uhdr_test.sh via Git Bash (same as CI).
+# Smoke-test uhdr_repack on Windows - prefers run_uhdr_test.sh via Git Bash (same as CI).
 #Requires -Version 5.1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -43,7 +43,7 @@ $BinDir = Split-Path -Parent $Bin
 $env:PATH = "$BinDir;$env:PATH"
 
 if (-not (Test-Path -LiteralPath $Hdr) -or -not (Test-Path -LiteralPath $Base)) {
-	Write-Error "Missing test inputs. See test/README.md — need:`n  $Hdr`n  $Base"
+	Write-Error "Missing test inputs. See test/README.md - need:`n  $Hdr`n  $Base"
 }
 
 function Assert-InspectOk {
@@ -85,7 +85,7 @@ if ($LASTEXITCODE -ne 0) {
 	throw "encode failed (exit $LASTEXITCODE): $Bin --hdr-tiff $Hdr --base $Base --out $Out"
 }
 Assert-InspectOk $Out
-Write-Host "OK: default encode — gain map matches dimensions and primary_xmp is present."
+Write-Host "OK: default encode - gain map matches dimensions and primary_xmp is present."
 
 $CyrDir = Join-Path $TestDir "тест"
 New-Item -ItemType Directory -Force -Path $CyrDir | Out-Null
@@ -97,7 +97,7 @@ if ($LASTEXITCODE -ne 0) {
 	throw "Cyrillic folder encode failed (exit $LASTEXITCODE): $Bin --hdr-tiff $Hdr --base $Base --out $CyrOut"
 }
 Assert-InspectOk $CyrOut
-Write-Host "OK: Cyrillic folder encode — UTF-8 paths work."
+Write-Host "OK: Cyrillic folder encode - UTF-8 paths work."
 
 $SliceOut = Join-Path $TestDir "out_slice_uhdr.jpg"
 $SdrCopy = [System.IO.Path]::GetTempFileName() + ".jpg"
@@ -180,7 +180,7 @@ if ((Test-Path -LiteralPath $Dsc) -and (Test-Path -LiteralPath $DscHdr)) {
 		Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
 		throw "FAIL: 4x5 smart pick was $($dimSmart.Groups[1].Value)x$($dimSmart.Groups[2].Value), expected 1152x1440"
 	}
-	Write-Host "OK: 4:5 smart pick keeps 1152x1440 (native, below 2x)."
+	Write-Host 'OK: 4:5 smart pick keeps 1152x1440 (native, below 2x).'
 }
 
 Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
