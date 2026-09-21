@@ -7,6 +7,7 @@
 
 #include <QAbstractButton>
 #include <QDesktopServices>
+#include <QPushButton>
 #include <QFileDialog>
 #include <QFutureWatcher>
 #include <QIcon>
@@ -210,10 +211,10 @@ void MainWindow::showEvent(QShowEvent* event) {
   box.setText(tr("Version 3 is only tested on macOS."));
   box.setInformativeText(
       tr("Windows may have issues. If something breaks, please open a GitHub issue."));
-  QAbstractButton* issues = box.addButton(tr("Open issues"), QMessageBox::ActionRole);
+  QPushButton* issues = box.addButton(tr("Open issues"), QMessageBox::ActionRole);
   box.addButton(QMessageBox::Ok);
   box.exec();
-  if (box.clickedButton() == issues) {
+  if (box.clickedButton() == static_cast<QAbstractButton*>(issues)) {
     QDesktopServices::openUrl(
         QUrl(QStringLiteral("https://github.com/karachungen/lightroom-plugin-export-hdr/issues")));
   }
