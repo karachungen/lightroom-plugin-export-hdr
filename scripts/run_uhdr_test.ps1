@@ -8,7 +8,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $ScriptDir "windows_build_common.ps1")
 
 $bash = Get-BashExe
-if ($bash) {
+if ($bash -and $env:GITHUB_ACTIONS -ne "true") {
 	& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
 	exit $LASTEXITCODE
 }

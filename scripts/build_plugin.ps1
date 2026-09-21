@@ -241,7 +241,7 @@ function Invoke-CmakeBuild {
 
 function Invoke-TestStep {
 	$bash = Get-BashExe
-	if ($bash) {
+	if ($bash -and $env:GITHUB_ACTIONS -ne "true") {
 		& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
 		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 		return

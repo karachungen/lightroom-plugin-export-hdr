@@ -414,6 +414,47 @@ codesign_macos_bundle() {
 	fi
 }
 
+using_shared_qt_windows() {
+	[[ "${UHDR_STATIC_QT:-ON}" == "OFF" || "${UHDR_STATIC_QT:-ON}" == "0" ]]
+}
+
+find_windeployqt() {
+	local candidate=""
+	if command -v windeployqt6 &>/dev/null; then
+		command -v windeployqt6
+		return 0
+	fi
+	if command -v windeployqt &>/dev/null; then
+		command -v windeployqt
+		return 0
+	fi
+
+	local prefixes=()
+	if [[ -n "${QT_ROOT_DIR:-}" ]]; then
+		prefixes+=("$QT_ROOT_DIR")
+	fi
+	if [[ -n "${CMAKE_PREFIX_PATH:-}" ]]; then
+		local entry
+		IFS=':' read -ra entries <<<"${CMAKE_PREFIX_PATH}"
+		for entry in "${entries[@]}"; do
+			prefixes+=("$entry")
+		done
+	fi
+
+	local prefix
+	for prefix in "${prefixes[@]}"; do
+		for candidate in \
+			"$prefix/bin/windeployqt6.exe" \
+			"$prefix/bin/windeployqt.exe"; do
+			if [[ -f "$candidate" ]]; then
+				echo "$candidate"
+				return 0
+			fi
+		done
+	done
+	return 1
+}
+
 uhdr_links_shared_qt_windows() {
 	local exe="$1"
 	if ! command -v dumpbin &>/dev/null; then
@@ -424,20 +465,15 @@ uhdr_links_shared_qt_windows() {
 
 bundle_shared_qt_windows() {
 	local exe="$1"
-	if ! uhdr_links_shared_qt_windows "$exe"; then
+	if ! using_shared_qt_windows; then
 		return 0
 	fi
 
 	local windeployqt=""
-	if command -v windeployqt6 &>/dev/null; then
-		windeployqt="$(command -v windeployqt6)"
-	elif command -v windeployqt &>/dev/null; then
-		windeployqt="$(command -v windeployqt)"
-	fi
-	if [[ -z "$windeployqt" ]]; then
-		echo "Warning: uhdr_repack links shared Qt but windeployqt was not found." >&2
+	windeployqt="$(find_windeployqt)" || {
+		echo "Warning: shared Qt build but windeployqt was not found." >&2
 		return 0
-	fi
+	}
 
 	echo "==> Bundling shared Qt dependencies with windeployqt"
 	"$windeployqt" --no-translations --no-compiler-runtime "$exe"
@@ -503,6 +539,10 @@ cmd_bundle() {
 }
 
 cmd_test() {
+	if is_windows_host && [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/run_uhdr_test.ps1"
+		return
+	fi
 	"$SCRIPT_DIR/run_uhdr_test.sh"
 }
 
