@@ -278,7 +278,7 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake ninja
+		brew install cmake ninja qt
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
 		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
@@ -347,7 +347,72 @@ clean_plugin_bin() {
 		find "$PLUGIN_BIN" -maxdepth 1 -type f \( \
 			-name "uhdr_repack" -o -name "uhdr_repack.exe" -o -name "*.dylib" -o -name "*.dll" \
 			\) -exec rm -f {} + 2>/dev/null || true
+		rm -rf "$PLUGIN_BIN"/{Frameworks,PlugIns,Resources,lib,share,tls,translations} 2>/dev/null || true
 	fi
+}
+
+uhdr_links_shared_qt_macos() {
+	local exe="$1"
+	otool -L "$exe" 2>/dev/null | grep -qE '[[:space:]]+(@rpath/|.*/)(Qt[A-Za-z0-9_-]*\.framework|Qt[A-Za-z0-9_-]*\.dylib)'
+}
+
+bundle_shared_qt_macos() {
+	local exe="$1"
+	if ! uhdr_links_shared_qt_macos "$exe"; then
+		return 0
+	fi
+
+	local macdeployqt=""
+	if command -v macdeployqt6 &>/dev/null; then
+		macdeployqt="$(command -v macdeployqt6)"
+	elif command -v macdeployqt &>/dev/null; then
+		macdeployqt="$(command -v macdeployqt)"
+	fi
+	if [[ -z "$macdeployqt" ]]; then
+		echo "Warning: uhdr_repack links shared Qt but macdeployqt was not found." >&2
+		return 0
+	fi
+
+	echo "==> Bundling shared Qt dependencies with macdeployqt"
+	"$macdeployqt" "$exe" -always-overwrite
+}
+
+codesign_macos_bundle() {
+	echo "==> Ad-hoc codesign (required after copying into the plug-in bundle)"
+	if uhdr_links_shared_qt_macos "$PLUGIN_BIN/uhdr_repack"; then
+		codesign --force --deep --sign - "$PLUGIN_BIN/uhdr_repack"
+	else
+		codesign --force --sign - "$PLUGIN_BIN/uhdr_repack"
+	fi
+}
+
+uhdr_links_shared_qt_windows() {
+	local exe="$1"
+	if ! command -v dumpbin &>/dev/null; then
+		return 1
+	fi
+	dumpbin /nologo /dependents "$exe" 2>/dev/null | grep -qi 'Qt[0-9A-Za-z_-]*\.dll'
+}
+
+bundle_shared_qt_windows() {
+	local exe="$1"
+	if ! uhdr_links_shared_qt_windows "$exe"; then
+		return 0
+	fi
+
+	local windeployqt=""
+	if command -v windeployqt6 &>/dev/null; then
+		windeployqt="$(command -v windeployqt6)"
+	elif command -v windeployqt &>/dev/null; then
+		windeployqt="$(command -v windeployqt)"
+	fi
+	if [[ -z "$windeployqt" ]]; then
+		echo "Warning: uhdr_repack links shared Qt but windeployqt was not found." >&2
+		return 0
+	fi
+
+	echo "==> Bundling shared Qt dependencies with windeployqt"
+	"$windeployqt" --no-translations --no-compiler-runtime "$exe"
 }
 
 bundle_macos() {
@@ -366,11 +431,10 @@ bundle_macos() {
 	clean_plugin_bin
 	cp "$build_exe" "$PLUGIN_BIN/uhdr_repack"
 	chmod +x "$PLUGIN_BIN/uhdr_repack"
+	bundle_shared_qt_macos "$PLUGIN_BIN/uhdr_repack"
 
-	# uhdr_repack links libuhdr and libjpeg-turbo statically (see tools/uhdr_repack/CMakeLists.txt),
-	# so the only remaining dependencies are Apple system frameworks/libraries — no bundling needed.
-	echo "==> Ad-hoc codesign (required after copying into the plug-in bundle)"
-	codesign --force --sign - "$PLUGIN_BIN/uhdr_repack"
+	# libuhdr and libjpeg-turbo are linked statically; shared Qt (CI) is bundled above.
+	codesign_macos_bundle
 
 	echo "==> Bundled encoder: $PLUGIN_BIN/uhdr_repack"
 }
@@ -385,6 +449,7 @@ bundle_windows() {
 	echo "==> Cleaning old Windows bundle in $PLUGIN_BIN"
 	clean_plugin_bin
 	cp "$build_exe" "$PLUGIN_BIN/uhdr_repack.exe"
+	bundle_shared_qt_windows "$PLUGIN_BIN/uhdr_repack.exe"
 
 	local plugin_exe="$PLUGIN_BIN/uhdr_repack.exe"
 	echo "==> Smoke: uhdr_repack.exe (usage if no args)"
