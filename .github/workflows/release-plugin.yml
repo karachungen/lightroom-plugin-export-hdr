@@ -81,6 +81,29 @@ jobs:
           }
           "QT_ROOT_DIR=$prefix" >> $env:GITHUB_ENV
 
+      - name: Install WebView2 SDK (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: pwsh
+        run: |
+          $sdkRoot = "C:\WebView2Sdk"
+          $marker = Join-Path $sdkRoot "include\WebView2.h"
+          if (-not (Test-Path -LiteralPath $marker)) {
+            $pkgRoot = Join-Path $env:RUNNER_TEMP "webview2-nuget"
+            $nuget = Join-Path $env:RUNNER_TEMP "nuget.exe"
+            if (-not (Test-Path -LiteralPath $nuget)) {
+              Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile $nuget
+            }
+            if (Test-Path -LiteralPath $pkgRoot) {
+              Remove-Item -LiteralPath $pkgRoot -Recurse -Force
+            }
+            & $nuget install Microsoft.Web.WebView2 -OutputDirectory $pkgRoot -ExcludeVersion
+            $pkg = Join-Path $pkgRoot "Microsoft.Web.WebView2"
+            New-Item -ItemType Directory -Force -Path (Join-Path $sdkRoot "include"), (Join-Path $sdkRoot "lib\x64") | Out-Null
+            Copy-Item -Path (Join-Path $pkg "build\native\include\*") -Destination (Join-Path $sdkRoot "include") -Recurse -Force
+            Copy-Item -Path (Join-Path $pkg "build\native\x64\WebView2LoaderStatic.lib") -Destination (Join-Path $sdkRoot "lib\x64") -Force
+          }
+          "WEBVIEW2_SDK=$sdkRoot" >> $env:GITHUB_ENV
+
       - name: Build, test, and package plugin
         shell: bash
         env:
