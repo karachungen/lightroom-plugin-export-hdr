@@ -50,25 +50,31 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/Qt/6.11.0
-          key: qt-6.11.0-windows-msvc2022-${{ hashFiles('.github/workflows/release-plugin.yml') }}
+          key: qt-6.11.0-windows-msvc2022-v2-${{ hashFiles('.github/workflows/release-plugin.yml') }}
           restore-keys: |
-            qt-6.11.0-windows-msvc2022-
+            qt-6.11.0-windows-msvc2022-v2-
 
       - name: Install Qt 6.11 (Windows)
         if: matrix.id == 'windows-x64'
         shell: pwsh
         run: |
           $qtRoot = Join-Path $env:USERPROFILE "Qt"
-          $marker = Join-Path $qtRoot "6.11.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake"
-          if (-not (Test-Path -LiteralPath $marker)) {
+          $prefix = Join-Path $qtRoot "6.11.0\msvc2022_64"
+          $marker = Join-Path $prefix "lib\cmake\Qt6\Qt6Config.cmake"
+          $helper = Join-Path $prefix "lib\cmake\Qt6\QtPublicTargetHelpers.cmake"
+          if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath $helper)) {
+            if (Test-Path -LiteralPath (Join-Path $qtRoot "6.11.0")) {
+              Write-Host "Removing incomplete Qt cache at $(Join-Path $qtRoot '6.11.0')"
+              Remove-Item -LiteralPath (Join-Path $qtRoot "6.11.0") -Recurse -Force
+            }
             python -m pip install --upgrade pip "git+https://github.com/miurahr/aqtinstall.git"
             python -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 `
               -m qtshadertools `
               --outputdir $qtRoot
           } else {
-            Write-Host "Qt already present at $(Split-Path -Parent (Split-Path -Parent $marker))"
+            Write-Host "Qt already present at $prefix"
           }
-          "QT_ROOT_DIR=$qtRoot/6.11.0/msvc2022_64" >> $env:GITHUB_ENV
+          "QT_ROOT_DIR=$prefix" >> $env:GITHUB_ENV
 
       - name: Build, test, and package plugin
         shell: bash
