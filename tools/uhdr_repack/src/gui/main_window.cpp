@@ -209,7 +209,7 @@ void MainWindow::showEvent(QShowEvent* event) {
   box.setText(tr("Version 3 is only tested on macOS."));
   box.setInformativeText(
       tr("Windows may have issues. If something breaks, please open a GitHub issue."));
-  auto* issues = box.addButton(tr("Open issues"), QMessageBox::ActionRole);
+  QAbstractButton* issues = box.addButton(tr("Open issues"), QMessageBox::ActionRole);
   box.addButton(QMessageBox::Ok);
   box.exec();
   if (box.clickedButton() == issues) {
