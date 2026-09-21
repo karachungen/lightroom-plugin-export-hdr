@@ -93,7 +93,8 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
 }
 
 bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string* error,
-                       unsigned master_w, unsigned master_h, const CropRect* crop) {
+                       unsigned master_w, unsigned master_h, const CropRect* crop, unsigned dst_w,
+                       unsigned dst_h) {
   if (!out) {
     if (error) {
       *error = "internal: null output";
@@ -156,7 +157,25 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
     unsigned h = crop ? crop->h : norm_h;
     const CGFloat ox = CGRectGetMinX(extent) + (crop ? (CGFloat)crop->x : 0.0);
     const CGFloat oy = CGRectGetMinY(extent) + (crop ? (CGFloat)crop->y : 0.0);
-    const CGRect renderBounds = CGRectMake(ox, oy, (CGFloat)w, (CGFloat)h);
+    CGRect renderBounds = CGRectMake(ox, oy, (CGFloat)w, (CGFloat)h);
+    CIImage* render_im = im;
+    if (dst_w >= 2 && dst_h >= 2 && (dst_w != w || dst_h != h)) {
+      if (dst_w % 2) --dst_w;
+      if (dst_h % 2) --dst_h;
+      if (dst_w < 2 || dst_h < 2) {
+        if (error) *error = "HDR downsample size must be even and >= 2";
+        return false;
+      }
+      render_im = [im imageByCroppingToRect:renderBounds];
+      const CGFloat sx = (CGFloat)dst_w / (CGFloat)w;
+      const CGFloat sy = (CGFloat)dst_h / (CGFloat)h;
+      render_im = [render_im imageByApplyingTransform:CGAffineTransformMakeScale(sx, sy)];
+      const CGRect scaled = [render_im extent];
+      renderBounds = CGRectMake(std::floor(scaled.origin.x), std::floor(scaled.origin.y),
+                                (CGFloat)dst_w, (CGFloat)dst_h);
+      w = dst_w;
+      h = dst_h;
+    }
 
     CGColorSpaceRef linear2020 = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearITUR_2020);
     if (linear2020 == NULL) {
@@ -182,7 +201,7 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
     const size_t fbytes = (size_t)w * (size_t)h * 16;
     std::vector<float> fbuf(fbytes / sizeof(float));
 
-    [ctx render:im
+    [ctx render:render_im
         toBitmap:fbuf.data()
         rowBytes:(size_t)w * 16
           bounds:renderBounds

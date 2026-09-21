@@ -3,9 +3,50 @@
 All notable changes to **Ultra HDR Export** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `major` / `minor` / `revision`. Older releases used a `-rN` build suffix (see historical sections below).
+Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `major` / `minor` / `revision`. GitHub Release titles are `{codename} · vX.Y.Z` (see [`RELEASING.md`](RELEASING.md)). Older releases used a `-rN` build suffix (see historical sections below).
 
-## Unreleased
+## v3.0.0 — 🌊🔥 Ocean burn
+
+> 💸 Tokens were spent in industrial quantities. The GPUs hummed, the context windows overflowed, and the only scientifically unverified side effect is that the ocean is now a little warmer — all so this plugin could ship Ultra HDR. The sea did not ask for this.
+
+### Added
+
+- **Ultra HDR** editor — cross-platform window for encode quality, gain-map edit, slice preview, and a native HDR viewport. Export always opens the editor (`uhdr_repack --edit`).
+- **Sync to others** in Feed crop copies HDR encode settings plus aspect, width, and height to the rest of the queue. Crop position stays per photo.
+- Queue thumbnails show each photo’s final aspect and pixel size (for example `4:5 · 2160×2700`).
+- Delivery presets **Color map** (JPEG 95, RGB full-res Display P3, 4-stop / 16× boost at 3250 nits) and **Mono map** (JPEG 95, luma at half resolution, 4.9× / 1000 nits). **Custom** unlocks the current settings instead of jumping to studio quality.
+- Preview HUD at the bottom left of the photo shows encoded pixel size plus JPEG file size (KB/MB) after Gain/HDR preview encode, and warns when the encoded JPEG is over **8 MB** (Instagram’s JPEG upload cap).
+- Linked **Width** / **Height** sliders and pixel fields on Feed crop: range is Instagram **1×–2×** (3:4 = 1080×1440–2160×2880). Default is the crop’s native size, capped at 2× (never upscale). Sliders can still go down to 1×.
+- Warns when the output aspect is outside Instagram’s **1.91:1–3:4** HDR-safe range.
+- Ultra HDR editor window and `uhdr_repack` use an application icon in the dock, taskbar, and Windows executable.
+- Encoded Ultra HDR JPEGs stamp **xmpRights** on the SDR primary XMP: `WebStatement` `https://hdr.karachun.by/` and `UsageTerms` `https://github.com/karachungen/lightroom-plugin-export-hdr`.
+
+### Fixed
+
+- Lightroom RAM from nested HDR TIFF export is released after Ultra HDR finishes (success, cancel, or error). Nested export sessions are torn down per TIFF, parent SDR renditions are dropped before the editor opens, and temp work dirs are cleaned up on every exit path.
+- HDR crop overlay is a frame on the full uncropped preview. Dragging the box no longer recrops or re-encodes HDR; Encode still writes the cropped file.
+- Cancelling Ultra HDR (editor Cancel or Lightroom progress Cancel) finishes the export quietly instead of throwing “preview cancelled or failed (exit 512)”.
+- Editor can open JPEGs larger than Qt’s 256 MB image allocation cap. The preview overlay shows pixel size and file size while a large SDR is loading.
+
+### Changed
+
+- Gain tab shows the encoded Ultra HDR gain-map JPEG (Adobe-style): grayscale for **Mono map**, RGB recovery map for **Color map**. It no longer overlays a false-color heatmap on the SDR photo. Preview encode is shared with HDR (cache hit when you switch tabs).
+- Ultra HDR no longer preloads every photo’s HDR TIFF when the editor opens. Lightroom renders a TIFF for the current photo (Gain/HDR preview) and **one photo at a time** on Encode, then deletes that TIFF so a batch of panos cannot fill the disk.
+- Internal HDR TIFF is capped at a **2880px short edge** (never upscaled). JPEG **Image Sizing** is left as you set it. The filmstrip warns when a photo was reduced for performance.
+- **Export To → ULTRA HDR** replaces the post-process filter. Choose this destination in the Export dialog instead of adding a Post-Process Action.
+- **Export To → ULTRA HDR** opens the editor as soon as SDR JPEGs are ready.
+- Encoder settings moved out of the Lua export dialog into the editor.
+- Encoder default JPEG quality is 95 / 95 (Color map). The Custom “recompress to about quality 63” warning is gone.
+- Color map HDR matches Instagram Ultra HDR etalons: `--max-content-boost` **16** (4 stops) and 3250 nits, Display P3 primary, progressive JPEG. Feed crop defaults to the crop’s **native** pixels, capped at **2×** Instagram size (e.g. 2160×2880 for 3:4). Sliders can still go down to **1×**. A 3:4 / 4:5 / 1:1 / 1.91:1 source auto-selects that preset instead of Original. Mono map stays 4.92× luma ½.
+- Export To → ULTRA HDR always overwrites existing files (`LR_collisionHandling = overwrite`) instead of asking Ask / Skip / Rename.
+- HDR preview and **Apply All** share the same libultrahdr TIFF+JPEG path (no Rec.2020 oversaturation from baking the auto luma gain map into the HDR TIFF).
+- Inspector **Image size** group is gone; encoded pixel size and JPEG file size live on the preview HUD.
+- Editor window and chrome are named **Ultra HDR** (no longer Studio). Existing presets that only attached the old post-process action need to be recreated against the new destination.
+- Instagram crops default to **one slide**. When the photo can hold more matching frames, the editor offers a gallery count picker (capped at 20) instead of packing every tile automatically.
+
+### Removed
+
+- Inspector **Activity** panel (live log and copy-path). Phases still write to the activity log file next to the export folder or work dir.
 
 ## v2.0.7
 

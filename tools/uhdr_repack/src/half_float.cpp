@@ -55,6 +55,37 @@ uint16_t float_to_half(float value) {
 #endif
 }
 
+float half_to_float(uint16_t value) {
+#if defined(__APPLE__) && defined(__fp16)
+  __fp16 h;
+  std::memcpy(&h, &value, sizeof(h));
+  return static_cast<float>(h);
+#else
+  const uint32_t sign = (static_cast<uint32_t>(value) & 0x8000u) << 16;
+  const uint32_t exp = (value >> 10) & 0x1Fu;
+  const uint32_t mant = value & 0x3FFu;
+  if (exp == 0) {
+    if (mant == 0) {
+      uint32_t f = sign;
+      float out;
+      std::memcpy(&out, &f, sizeof(out));
+      return out;
+    }
+    return std::ldexp(static_cast<float>(mant) / 1024.f, -14) * (sign ? -1.f : 1.f);
+  }
+  if (exp == 31) {
+    uint32_t f = sign | 0x7F800000u | (mant << 13);
+    float out;
+    std::memcpy(&out, &f, sizeof(out));
+    return out;
+  }
+  uint32_t f = sign | ((exp + 112) << 23) | (mant << 13);
+  float out;
+  std::memcpy(&out, &f, sizeof(out));
+  return out;
+#endif
+}
+
 void float_rgba_to_half_rgba(const float* src, fp16_t* dst, size_t num_floats) {
   for (size_t i = 0; i < num_floats; ++i) {
     float f = src[i];

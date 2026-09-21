@@ -69,22 +69,44 @@ if [[ "$dry_run" -eq 0 && -z "$override_tag" ]] && git -C "$repo_root" rev-parse
   exit 1
 fi
 
-section_header="## ${tag}"
+header_line=$(grep -E "^## ${tag}($| — )" "$changelog" | head -1 || true)
+if [[ -z "$header_line" ]]; then
+  echo "CHANGELOG.md is missing section: ## ${tag}" >&2
+  exit 1
+fi
+
+codename=""
+if [[ "$header_line" == *" — "* ]]; then
+  codename="${header_line#* — }"
+  codename="${codename%"${codename##*[![:space:]]}"}"
+  codename="${codename#"${codename%%[![:space:]]*}"}"
+fi
+
+# Current Info.lua version must have a vibe-coding name; historical --tag dry-runs may omit it.
+if [[ -z "$override_tag" && -z "$codename" ]]; then
+  echo "CHANGELOG.md section for ${tag} must include a vibe-coding name: ## ${tag} — Name" >&2
+  exit 1
+fi
+
 changelog_section=$(
-  awk -v header="$section_header" '
-    $0 == header { found = 1; next }
+  awk -v tag="$tag" '
+    $0 == "## " tag || index($0, "## " tag " — ") == 1 { found = 1; next }
     found && /^## / { exit }
     found { print }
   ' "$changelog"
 )
 
 if [[ -z "${changelog_section//[[:space:]]/}" ]]; then
-  echo "CHANGELOG.md is missing section: ${section_header}" >&2
+  echo "CHANGELOG.md is missing section body for: ## ${tag}" >&2
   exit 1
 fi
 
 if [[ "$check_only" -eq 1 ]]; then
-  echo "OK: version ${semver}, tag ${tag}, changelog section present"
+  if [[ -n "$codename" ]]; then
+    echo "OK: version ${semver}, tag ${tag}, codename ${codename}, changelog section present"
+  else
+    echo "OK: version ${semver}, tag ${tag}, changelog section present"
+  fi
   exit 0
 fi
 

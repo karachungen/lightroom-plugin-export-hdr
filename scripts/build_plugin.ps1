@@ -30,6 +30,135 @@ if ($env:UHDR_USE_SYSTEM -eq "1" -or $env:UHDR_USE_SYSTEM -eq "ON") {
 if ($env:UHDR_ROOT) {
 	$CmakeExtra += "-DUHDR_ROOT=$($env:UHDR_ROOT)"
 }
+if ($env:UHDR_ENABLE_GUI -eq "0" -or $env:UHDR_ENABLE_GUI -eq "OFF") {
+	$CmakeExtra += "-DUHDR_ENABLE_GUI=OFF"
+}
+
+$QtResolved = $false
+
+function Test-QtConfigPresent {
+	param([string]$Prefix)
+	return Test-Path -LiteralPath (Join-Path $Prefix "lib\cmake\Qt6\Qt6Config.cmake")
+}
+
+function Get-QtVersionAtPrefix {
+	param([string]$Prefix)
+	$qmake = Join-Path $Prefix "bin\qmake6.exe"
+	if (-not (Test-Path -LiteralPath $qmake)) {
+		$cmd = Get-Command qmake6 -ErrorAction SilentlyContinue
+		if ($cmd) { $qmake = $cmd.Source }
+		else { return $null }
+	}
+	try {
+		return (& $qmake -query QT_VERSION 2>$null | Select-Object -First 1)
+	} catch {
+		return $null
+	}
+}
+
+function Test-QtVersionGe611 {
+	param([string]$Version)
+	if (-not $Version) { return $false }
+	$parts = $Version.Split(".")
+	if ($parts.Count -lt 2) { return $false }
+	$major = [int]$parts[0]
+	$minor = [int]$parts[1]
+	return ($major -gt 6) -or ($major -eq 6 -and $minor -ge 11)
+}
+
+function Find-QtStaticRoot {
+	$candidates = @()
+	if ($env:QT_STATIC_ROOT) { $candidates += $env:QT_STATIC_ROOT }
+	$qtVersion = if ($env:QT_VERSION) { $env:QT_VERSION } else { "6.11.0" }
+	$candidates += (Join-Path $env:USERPROFILE "Qt\$qtVersion-static")
+	foreach ($candidate in $candidates) {
+		if (Test-QtConfigPresent $candidate) { return $candidate }
+	}
+	return $null
+}
+
+function Find-QtSharedPrefix {
+	$seen = @{}
+	$candidates = @()
+
+	if ($env:CMAKE_PREFIX_PATH) {
+		foreach ($entry in $env:CMAKE_PREFIX_PATH.Split(";")) {
+			if ($entry) { $candidates += $entry }
+		}
+	}
+
+	$qtpaths = Get-Command qtpaths6 -ErrorAction SilentlyContinue
+	if ($qtpaths) {
+		$prefix = & $qtpaths.Source --install-prefix 2>$null | Select-Object -First 1
+		if ($prefix) { $candidates += $prefix }
+	}
+
+	$qtRoot = Join-Path $env:USERPROFILE "Qt"
+	if (Test-Path -LiteralPath $qtRoot) {
+		foreach ($dir in Get-ChildItem -LiteralPath $qtRoot -Directory -ErrorAction SilentlyContinue) {
+			foreach ($kit in @("msvc2019_64", "msvc2022_64", "clang_64")) {
+				$candidates += (Join-Path $dir.FullName $kit)
+			}
+		}
+	}
+
+	foreach ($candidate in $candidates) {
+		if ($seen.ContainsKey($candidate)) { continue }
+		$seen[$candidate] = $true
+		if (-not (Test-QtConfigPresent $candidate)) { continue }
+		$version = Get-QtVersionAtPrefix $candidate
+		if ($version -and -not (Test-QtVersionGe611 $version)) { continue }
+		return $candidate
+	}
+	return $null
+}
+
+function Resolve-QtForBuild {
+	if ($script:QtResolved) { return }
+
+	if ($env:UHDR_ENABLE_GUI -eq "0" -or $env:UHDR_ENABLE_GUI -eq "OFF") {
+		$script:QtResolved = $true
+		return
+	}
+
+	$staticEnabled = -not ($env:UHDR_STATIC_QT -eq "0" -or $env:UHDR_STATIC_QT -eq "OFF")
+
+	if (-not $staticEnabled) {
+		$sharedPrefix = Find-QtSharedPrefix
+		if (-not $sharedPrefix) {
+			throw "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found. Install Qt locally or set CMAKE_PREFIX_PATH."
+		}
+		$script:CmakeExtra += "-DUHDR_STATIC_QT=OFF"
+		$script:CmakeExtra += "-DCMAKE_PREFIX_PATH=$sharedPrefix"
+		Write-Host "==> Using shared Qt at $sharedPrefix (development build)"
+		$script:QtResolved = $true
+		return
+	}
+
+	$staticRoot = Find-QtStaticRoot
+	if ($staticRoot) {
+		$script:CmakeExtra += "-DQT_STATIC_ROOT=$staticRoot"
+		$script:CmakeExtra += "-DUHDR_STATIC_QT=ON"
+		Write-Host "==> Using static Qt at $staticRoot"
+		$script:QtResolved = $true
+		return
+	}
+
+	$sharedPrefix = Find-QtSharedPrefix
+	if ($sharedPrefix) {
+		$script:CmakeExtra += "-DUHDR_STATIC_QT=OFF"
+		$script:CmakeExtra += "-DCMAKE_PREFIX_PATH=$sharedPrefix"
+		Write-Host "==> Using shared Qt at $sharedPrefix (local development build)"
+		Write-Warning "For a release single-file binary, configure a static Qt 6.11 MSVC kit and set QT_STATIC_ROOT."
+		$script:QtResolved = $true
+		return
+	}
+
+	throw @"
+No Qt 6.11+ installation found.
+Install Qt locally or configure a static Qt 6.11 MSVC kit and set QT_STATIC_ROOT.
+"@
+}
 
 function Find-BuildExe {
 	$candidates = @(
@@ -56,6 +185,13 @@ function Clear-PluginBin {
 }
 
 function Invoke-BundleWindows {
+	$copyFixtures = Join-Path $ScriptDir "copy_ui_fixtures.sh"
+	if (Test-Path -LiteralPath $copyFixtures) {
+		Write-Host "==> Copying UI fixtures"
+		& bash $copyFixtures
+		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	}
+
 	$buildExe = Find-BuildExe
 	if (-not $buildExe) {
 		throw "Build failed: missing uhdr_repack.exe under $BuildDir"
@@ -79,6 +215,7 @@ function Invoke-BundleWindows {
 }
 
 function Invoke-CmakeBuild {
+	Resolve-QtForBuild
 	if ($Clean -and (Test-Path -LiteralPath $BuildDir)) {
 		Write-Host "==> Cleaning $BuildDir"
 		Remove-Item -LiteralPath $BuildDir -Recurse -Force

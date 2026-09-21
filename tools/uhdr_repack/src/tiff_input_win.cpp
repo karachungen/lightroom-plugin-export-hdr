@@ -3,6 +3,7 @@
 #include "tiff_input.h"
 
 #include "half_float.h"
+#include "resize_lanczos.h"
 #include "wic_utils.h"
 
 #include <cstdio>
@@ -52,7 +53,8 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
 }
 
 bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string* error,
-                       unsigned master_w, unsigned master_h, const CropRect* crop) {
+                       unsigned master_w, unsigned master_h, const CropRect* crop, unsigned dst_w,
+                       unsigned dst_h) {
   if (!out) {
     if (error) {
       *error = "internal: null output";
@@ -147,6 +149,16 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
   r.h = h;
   r.planes[UHDR_PLANE_PACKED] = hdata;
   r.stride[UHDR_PLANE_PACKED] = w;
+
+  if (dst_w >= 2 && dst_h >= 2 && (dst_w != w || dst_h != h)) {
+    if (dst_w % 2) --dst_w;
+    if (dst_h % 2) --dst_h;
+    RawImageHolder scaled;
+    if (!resize_hdr_lanczos(*out, dst_w, dst_h, &scaled, error)) {
+      return false;
+    }
+    *out = std::move(scaled);
+  }
   return true;
 }
 
