@@ -1,14 +1,17 @@
-#include "gui/web_chrome.h"
-
-#include <QDir>
-#include <QUrl>
-#include <QWidget>
-
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 
 #include <wrl.h>
 #include <WebView2.h>
 #include <WebView2EnvironmentOptions.h>
+
+#include "gui/web_chrome.h"
+
+#include <QDir>
+#include <QUrl>
+#include <QWidget>
 
 namespace uhdr_repack {
 
@@ -94,9 +97,12 @@ void WebChrome::loadApp(const QString& web_root) {
   if (!impl_->webview) return;
   const QString host = QStringLiteral("uhdr.app");
   const std::wstring folder = web_root.toStdWString();
-  impl_->webview->SetVirtualHostNameToFolderMapping(
-      host.toStdWString().c_str(), folder.c_str(),
-      COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+  Microsoft::WRL::ComPtr<ICoreWebView2_3> webview3;
+  if (SUCCEEDED(impl_->webview.As(&webview3))) {
+    webview3->SetVirtualHostNameToFolderMapping(
+        host.toStdWString().c_str(), folder.c_str(),
+        COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+  }
   impl_->webview->Navigate((L"https://" + host.toStdWString() + L"/index.html").c_str());
 }
 
