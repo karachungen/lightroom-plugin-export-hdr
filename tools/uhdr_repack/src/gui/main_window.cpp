@@ -5,6 +5,7 @@
 #include "gui/web_chrome.h"
 #include "session.h"
 
+#include <QAbstractButton>
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFutureWatcher>
