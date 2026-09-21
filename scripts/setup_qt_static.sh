@@ -22,6 +22,11 @@ if [[ "$(uname -m)" != "arm64" ]]; then
   exit 1
 fi
 
+if [[ -f "$PREFIX/lib/cmake/Qt6/Qt6Config.cmake" ]]; then
+  echo "==> Static Qt already installed at $PREFIX"
+  exit 0
+fi
+
 for command in cmake ninja curl tar; do
   command -v "$command" >/dev/null || {
     echo "Missing required command: $command" >&2

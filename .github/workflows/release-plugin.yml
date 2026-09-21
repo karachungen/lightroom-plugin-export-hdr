@@ -44,9 +44,50 @@ jobs:
         with:
           arch: x64
 
+      - name: Cache static Qt
+        uses: actions/cache@v4
+        id: qt-cache
+        with:
+          path: |
+            ~/.cache/uhdr-qt-static
+            ~/Qt/6.11.0-static
+            ~/AppData/Local/uhdr-qt-static
+          key: qt-static-6.11.0-${{ matrix.id }}-${{ hashFiles('scripts/setup_qt_static.sh', 'scripts/setup_qt_static.ps1') }}
+          restore-keys: |
+            qt-static-6.11.0-${{ matrix.id }}-
+
+      - name: Build static Qt (macOS)
+        if: matrix.id == 'macos-arm64'
+        shell: bash
+        run: |
+          if [[ ! -f "${HOME}/Qt/6.11.0-static/lib/cmake/Qt6/Qt6Config.cmake" ]]; then
+            bash scripts/setup_qt_static.sh
+          else
+            echo "Static Qt already present at ${HOME}/Qt/6.11.0-static"
+          fi
+
+      - name: Build static Qt (Windows)
+        if: matrix.id == 'windows-x64'
+        shell: powershell
+        run: |
+          $prefix = Join-Path $env:USERPROFILE "Qt\6.11.0-static"
+          $marker = Join-Path $prefix "lib\cmake\Qt6\Qt6Config.cmake"
+          if (-not (Test-Path -LiteralPath $marker)) {
+            .\scripts\setup_qt_static.ps1
+          } else {
+            Write-Host "Static Qt already present at $prefix"
+          }
+
       - name: Build, test, and package plugin
         shell: bash
-        run: bash scripts/build_plugin.sh all
+        run: |
+          export QT_STATIC_ROOT="${HOME}/Qt/6.11.0-static"
+          if [[ ! -f "${QT_STATIC_ROOT}/lib/cmake/Qt6/Qt6Config.cmake" ]]; then
+            echo "Static Qt missing at ${QT_STATIC_ROOT}" >&2
+            echo "The Build static Qt step must install Qt before packaging." >&2
+            exit 1
+          fi
+          bash scripts/build_plugin.sh all
 
       - name: macOS shell quoting regression test
         if: matrix.id == 'macos-arm64'

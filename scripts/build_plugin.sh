@@ -278,7 +278,7 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake
+		brew install cmake ninja
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
 		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
