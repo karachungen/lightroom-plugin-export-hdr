@@ -102,70 +102,86 @@ Write-Host "OK: Cyrillic folder encode — UTF-8 paths work."
 $SliceOut = Join-Path $TestDir "out_slice_uhdr.jpg"
 $SdrCopy = [System.IO.Path]::GetTempFileName() + ".jpg"
 Copy-Item -LiteralPath $Base -Destination $SdrCopy -Force
-try {
-	Remove-Item -Force -ErrorAction SilentlyContinue $SliceOut, (Join-Path $TestDir "out_slice_uhdr_*.jpg")
-	Write-Host "==> Slice test (1x1 + 4x5 single-slide Instagram crop, below 1× stays native)"
-	& $Bin --hdr-tiff $Hdr --base $SdrCopy --out $SliceOut --slice-aspect 1x1
-	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-	Assert-InspectOk $SliceOut
-	$inspect1x1 = (& $Bin --inspect $SliceOut | Out-String)
-	$dim1 = [regex]::Match($inspect1x1, '(?m)^dimensions: (\d+)x(\d+)\s*$')
-	if ("$($dim1.Groups[1].Value)x$($dim1.Groups[2].Value)" -ne "1000x1000") {
-		throw "FAIL: 1x1 native crop was $($dim1.Groups[1].Value)x$($dim1.Groups[2].Value), expected 1000x1000"
-	}
-	$slices1x1 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_1x1_*.jpg" -File)
-	if ($slices1x1.Count -ne 0) {
-		throw "FAIL: default 1x1 crop should write only $SliceOut, found numbered slices"
-	}
 
-	Remove-Item -Force -ErrorAction SilentlyContinue $SliceOut, (Join-Path $TestDir "out_slice_uhdr_*.jpg")
-	& $Bin --hdr-tiff $Hdr --base $SdrCopy --out $SliceOut --slice-aspect 4x5
-	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-	Assert-InspectOk $SliceOut
-	$inspect4x5 = (& $Bin --inspect $SliceOut | Out-String)
-	$dimMatch = [regex]::Match($inspect4x5, '(?m)^dimensions: (\d+)x(\d+)\s*$')
-	$localH = [int]$dimMatch.Groups[2].Value
-	$localW = [int]$dimMatch.Groups[1].Value
-	if ("${localW}x${localH}" -ne "800x1000") {
-		throw "FAIL: 4x5 native crop was ${localW}x${localH}, expected 800x1000"
-	}
-	$slices4x5 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_4x5_*.jpg" -File)
-	if ($slices4x5.Count -ne 0) {
-		throw "FAIL: default 4x5 crop should write only $SliceOut, found numbered slices"
-	}
-
-	Write-Host "OK: slice encode — crops below 1× stay native (no silent upscale)."
-
-	$Dsc = Join-Path $RepoRoot "test/ui/fixtures/DSC02993.jpg"
-	$DscHdr = Join-Path $RepoRoot "test/ui/fixtures/DSC02993.tif"
-	if ((Test-Path -LiteralPath $Dsc) -and (Test-Path -LiteralPath $DscHdr)) {
-		$FeedOut = Join-Path $TestDir "out_feed_1080.jpg"
-		Remove-Item -Force -ErrorAction SilentlyContinue $FeedOut
-		Write-Host "==> Optional 4:5 --out-width 1080 on 1152x1440 fixture"
-		& $Bin --hdr-tiff $DscHdr --base $Dsc --out $FeedOut --slice-aspect 4x5 --out-width 1080
-		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-		Assert-InspectOk $FeedOut
-		$inspectFeed = (& $Bin --inspect $FeedOut | Out-String)
-		$dimFeed = [regex]::Match($inspectFeed, '(?m)^dimensions: (\d+)x(\d+)\s*$')
-		if ("$($dimFeed.Groups[1].Value)x$($dimFeed.Groups[2].Value)" -ne "1080x1350") {
-			throw "FAIL: 4x5 --out-width 1080 was $($dimFeed.Groups[1].Value)x$($dimFeed.Groups[2].Value), expected 1080x1350"
-		}
-		Write-Host "OK: 4:5 --out-width 1080 scales 1152x1440 to 1080x1350."
-		$SmartOut = Join-Path $TestDir "out_feed_smart.jpg"
-		Remove-Item -Force -ErrorAction SilentlyContinue $SmartOut
-		Write-Host "==> Optional 4:5 smart pick (no --out-width) on 1152x1440 fixture"
-		& $Bin --hdr-tiff $DscHdr --base $Dsc --out $SmartOut --slice-aspect 4x5
-		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-		Assert-InspectOk $SmartOut
-		$inspectSmart = (& $Bin --inspect $SmartOut | Out-String)
-		$dimSmart = [regex]::Match($inspectSmart, '(?m)^dimensions: (\d+)x(\d+)\s*$')
-		if ("$($dimSmart.Groups[1].Value)x$($dimSmart.Groups[2].Value)" -ne "1152x1440") {
-			throw "FAIL: 4x5 smart pick was $($dimSmart.Groups[1].Value)x$($dimSmart.Groups[2].Value), expected 1152x1440"
-		}
-		Write-Host "OK: 4:5 smart pick keeps 1152x1440 (native, below 2x)."
-	}
-}
-finally {
+Remove-Item -Force -ErrorAction SilentlyContinue $SliceOut, (Join-Path $TestDir "out_slice_uhdr_*.jpg")
+Write-Host "==> Slice test (1x1 + 4x5 single-slide Instagram crop, below 1x stays native)"
+& $Bin --hdr-tiff $Hdr --base $SdrCopy --out $SliceOut --slice-aspect 1x1
+if ($LASTEXITCODE -ne 0) {
 	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	exit $LASTEXITCODE
 }
+Assert-InspectOk $SliceOut
+$inspect1x1 = (& $Bin --inspect $SliceOut | Out-String)
+$dim1 = [regex]::Match($inspect1x1, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+if ("$($dim1.Groups[1].Value)x$($dim1.Groups[2].Value)" -ne "1000x1000") {
+	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	throw "FAIL: 1x1 native crop was $($dim1.Groups[1].Value)x$($dim1.Groups[2].Value), expected 1000x1000"
+}
+$slices1x1 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_1x1_*.jpg" -File)
+if ($slices1x1.Count -ne 0) {
+	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	throw "FAIL: default 1x1 crop should write only $SliceOut, found numbered slices"
+}
+
+Remove-Item -Force -ErrorAction SilentlyContinue $SliceOut, (Join-Path $TestDir "out_slice_uhdr_*.jpg")
+& $Bin --hdr-tiff $Hdr --base $SdrCopy --out $SliceOut --slice-aspect 4x5
+if ($LASTEXITCODE -ne 0) {
+	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	exit $LASTEXITCODE
+}
+Assert-InspectOk $SliceOut
+$inspect4x5 = (& $Bin --inspect $SliceOut | Out-String)
+$dimMatch = [regex]::Match($inspect4x5, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+$localH = [int]$dimMatch.Groups[2].Value
+$localW = [int]$dimMatch.Groups[1].Value
+if ("${localW}x${localH}" -ne "800x1000") {
+	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	throw "FAIL: 4x5 native crop was ${localW}x${localH}, expected 800x1000"
+}
+$slices4x5 = @(Get-ChildItem -LiteralPath $TestDir -Filter "out_slice_uhdr_4x5_*.jpg" -File)
+if ($slices4x5.Count -ne 0) {
+	Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+	throw "FAIL: default 4x5 crop should write only $SliceOut, found numbered slices"
+}
+
+Write-Host "OK: slice encode - crops below 1x stay native (no silent upscale)."
+
+$Dsc = Join-Path $RepoRoot "test/ui/fixtures/DSC02993.jpg"
+$DscHdr = Join-Path $RepoRoot "test/ui/fixtures/DSC02993.tif"
+if ((Test-Path -LiteralPath $Dsc) -and (Test-Path -LiteralPath $DscHdr)) {
+	$FeedOut = Join-Path $TestDir "out_feed_1080.jpg"
+	Remove-Item -Force -ErrorAction SilentlyContinue $FeedOut
+	Write-Host "==> Optional 4:5 --out-width 1080 on 1152x1440 fixture"
+	& $Bin --hdr-tiff $DscHdr --base $Dsc --out $FeedOut --slice-aspect 4x5 --out-width 1080
+	if ($LASTEXITCODE -ne 0) {
+		Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+		exit $LASTEXITCODE
+	}
+	Assert-InspectOk $FeedOut
+	$inspectFeed = (& $Bin --inspect $FeedOut | Out-String)
+	$dimFeed = [regex]::Match($inspectFeed, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+	if ("$($dimFeed.Groups[1].Value)x$($dimFeed.Groups[2].Value)" -ne "1080x1350") {
+		Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+		throw "FAIL: 4x5 --out-width 1080 was $($dimFeed.Groups[1].Value)x$($dimFeed.Groups[2].Value), expected 1080x1350"
+	}
+	Write-Host "OK: 4:5 --out-width 1080 scales 1152x1440 to 1080x1350."
+	$SmartOut = Join-Path $TestDir "out_feed_smart.jpg"
+	Remove-Item -Force -ErrorAction SilentlyContinue $SmartOut
+	Write-Host "==> Optional 4:5 smart pick (no --out-width) on 1152x1440 fixture"
+	& $Bin --hdr-tiff $DscHdr --base $Dsc --out $SmartOut --slice-aspect 4x5
+	if ($LASTEXITCODE -ne 0) {
+		Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+		exit $LASTEXITCODE
+	}
+	Assert-InspectOk $SmartOut
+	$inspectSmart = (& $Bin --inspect $SmartOut | Out-String)
+	$dimSmart = [regex]::Match($inspectSmart, '(?m)^dimensions: (\d+)x(\d+)\s*$')
+	if ("$($dimSmart.Groups[1].Value)x$($dimSmart.Groups[2].Value)" -ne "1152x1440") {
+		Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
+		throw "FAIL: 4x5 smart pick was $($dimSmart.Groups[1].Value)x$($dimSmart.Groups[2].Value), expected 1152x1440"
+	}
+	Write-Host "OK: 4:5 smart pick keeps 1152x1440 (native, below 2x)."
+}
+
+Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
 exit 0
