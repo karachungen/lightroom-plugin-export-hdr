@@ -40,18 +40,20 @@ QString imageToDataUrl(const QImage& image, const char* format = "PNG") {
   return mime + QString::fromLatin1(bytes.toBase64());
 }
 
+QString jpegBytesToDataUrl(const std::vector<uint8_t>& jpeg) {
+  if (jpeg.empty()) {
+    return {};
+  }
+  const QByteArray bytes(reinterpret_cast<const char*>(jpeg.data()), static_cast<int>(jpeg.size()));
+  return QStringLiteral("data:image/jpeg;base64,") + QString::fromLatin1(bytes.toBase64());
+}
+
 QString thumbDataUrl(const QImage& image) {
   if (image.isNull()) {
     return {};
   }
   return imageToDataUrl(image.scaled(192, 144, Qt::KeepAspectRatio, Qt::SmoothTransformation),
                         "JPEG");
-}
-
-QImage previewSized(const QImage& image, int max_edge = 1600) {
-  if (image.isNull()) return {};
-  if (image.width() <= max_edge && image.height() <= max_edge) return image;
-  return image.scaled(max_edge, max_edge, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 }
 
 struct SdrFileProbe {
@@ -281,7 +283,7 @@ void GuiBridge::sendItemReady(int index) {
   json root;
   root["type"] = "itemReady";
   root["id"] = item.id;
-  root["sdrDataUrl"] = imageToDataUrl(previewSized(st.sdr), "JPEG").toStdString();
+  root["sdrDataUrl"] = imageToDataUrl(st.sdr, "JPEG").toStdString();
   root["thumb"] = thumbDataUrl(st.sdr).toStdString();
   root["imageWidth"] = st.sdr.width();
   root["imageHeight"] = st.sdr.height();
@@ -300,9 +302,10 @@ void GuiBridge::sendItemReady(int index) {
   root["outputHeight"] = static_cast<int>(item.output_height);
   if (editor && !editor->gain_map.empty()) {
     const bool encoded = !st.final_dirty && !st.final_hdr.gainmap_jpeg.empty();
-    const QString heat =
-        imageToDataUrl(previewSized(editor->renderHeatmap(opt.monochrome_gainmap), 1024), "JPEG");
-    if (!heat.isEmpty()) root["heatmapDataUrl"] = heat.toStdString();
+    if (encoded) {
+      const QString heat = jpegBytesToDataUrl(st.final_hdr.gainmap_jpeg);
+      if (!heat.isEmpty()) root["heatmapDataUrl"] = heat.toStdString();
+    }
     root["encoded"] = encoded;
     root["gainmapChannels"] = opt.monochrome_gainmap ? "luma" : "rgb";
   }
@@ -384,28 +387,25 @@ void GuiBridge::sendSlices(int index) {
 
 void GuiBridge::sendHeatmap(int index) {
   if (!chrome_ || !document_ || index < 0 || index >= document_->itemCount()) return;
+  const auto& st = document_->state(index);
+  const EncodeOptions opt = effective_encode_options(document_->session(), document_->item(index));
+  const bool encoded = !st.final_dirty && !st.final_hdr.gainmap_jpeg.empty();
+
   json root;
   root["type"] = "heatmap";
   root["id"] = document_->item(index).id;
-  const auto& st = document_->state(index);
   json stats;
   stats["min"] = st.gain_min;
   stats["max"] = st.gain_max;
   stats["w"] = st.gain_width;
   stats["h"] = st.gain_height;
   root["gainStats"] = stats;
-  auto* editor = editorForIndex(index);
-  if (!editor || editor->gain_map.empty()) return;
-  const EncodeOptions opt = effective_encode_options(document_->session(), document_->item(index));
-  editor->setRgbGainMap(st.gain_rgb);
-  editor->setContentBoost(opt.min_content_boost, opt.max_content_boost);
-  const QString data_url =
-      imageToDataUrl(previewSized(editor->renderHeatmap(opt.monochrome_gainmap), 1024), "JPEG");
-  if (data_url.isEmpty()) return;
-  const bool encoded = !st.final_dirty && !st.final_hdr.gainmap_jpeg.empty();
-  root["heatmapDataUrl"] = data_url.toStdString();
   root["encoded"] = encoded;
   root["gainmapChannels"] = opt.monochrome_gainmap ? "luma" : "rgb";
+  if (encoded) {
+    const QString data_url = jpegBytesToDataUrl(st.final_hdr.gainmap_jpeg);
+    if (!data_url.isEmpty()) root["heatmapDataUrl"] = data_url.toStdString();
+  }
   chrome_->postToPage(QString::fromStdString(root.dump()));
 }
 
@@ -460,7 +460,7 @@ bool GuiBridge::hasEncodedHdr() const {
 }
 
 bool GuiBridge::needsEncodedPreview() const {
-  return preview_mode_ == PreviewMode::kFinalHdr;
+  return preview_mode_ == PreviewMode::kFinalHdr || preview_mode_ == PreviewMode::kGainMap;
 }
 
 void GuiBridge::syncGainVisualization() {
@@ -580,11 +580,16 @@ void GuiBridge::ensureHdrThenPreview(int index) {
     return;
   }
   if (hasEncodedHdr()) {
-    activity_log_append(id, "encode", "preview cache hit (hdr)");
+    activity_log_append(id, "encode",
+                      preview_mode_ == PreviewMode::kGainMap ? "preview cache hit (gain)"
+                                                             : "preview cache hit (hdr)");
     const auto& frame = document_->state(index).final_hdr;
-    if (viewport_) {
+    if (viewport_ && preview_mode_ == PreviewMode::kFinalHdr) {
       viewport_->setFinalHdr(frame.rgba_half, frame.width, frame.height, frame.color_gamut);
       viewport_->setPreviewMode(PreviewMode::kFinalHdr);
+    }
+    if (preview_mode_ == PreviewMode::kGainMap) {
+      sendHeatmap(index);
     }
     sendHdrLoading(false, true);
     emitOverlay();
@@ -616,45 +621,7 @@ void GuiBridge::ensureHdrThenPreview(int index) {
 
 void GuiBridge::ensureGainHeatmap(int index) {
   if (preview_mode_ != PreviewMode::kGainMap || index != current_index_ || !document_) return;
-  emitOverlay();
-  emitSliceGuides();
-  const auto& st = document_->state(index);
-  if (!st.loaded) return;
-  auto* editor = editorForIndex(index);
-  const EncodeOptions opt =
-      effective_encode_options(document_->session(), document_->item(index));
-  if (editor && editor->gain_map.empty() && !st.gain.empty()) {
-    editor->setAutoGainMap(st.gain, st.gain_width, st.gain_height);
-  }
-  if (editor) {
-    editor->setRgbGainMap(st.gain_rgb);
-    editor->setContentBoost(opt.min_content_boost, opt.max_content_boost);
-  }
-  const bool have_luma = editor && !editor->gain_map.empty();
-  if (have_luma) {
-    sendHeatmap(index);
-    sendHdrLoading(false, false);
-  }
-  const bool need_rgb = !opt.monochrome_gainmap && st.gain_rgb.empty();
-  if (!have_luma || need_rgb) {
-    if (document_->item(index).hdr_tiff.empty()) {
-      sendHdrLoading(true, false, QStringLiteral("wait_tiff"));
-      const int requested = index;
-      ensureHdrTiffs({index}, [this, requested](bool ok, const QString& error) {
-        if (requested != current_index_ || preview_mode_ != PreviewMode::kGainMap) return;
-        if (!ok) {
-          activity_log_append(document_->item(requested).id, "wait_tiff",
-                              "gain map fail " + error.toStdString());
-          onFinalPreviewFailed(requested, error);
-          return;
-        }
-        ensureGainHeatmap(requested);
-      });
-      return;
-    }
-    sendHdrLoading(true, false, QStringLiteral("gainmap"));
-    document_->requestGainMap(index);
-  }
+  scheduleFinalPreview();
 }
 
 void GuiBridge::handleSyncToOthers() {
@@ -775,10 +742,7 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
     }
   }
 
-  applyLiveSettings(instagram_changed, encode_changed && preview_mode_ == PreviewMode::kGainMap);
-  if (encode_changed && preview_mode_ == PreviewMode::kGainMap && current_index_ >= 0) {
-    ensureGainHeatmap(current_index_);
-  }
+  applyLiveSettings(instagram_changed, false);
   if (instagram_changed) {
     emitOverlay();
     emitSliceGuides();
@@ -1046,10 +1010,10 @@ void GuiBridge::onFinalPreviewReady(int index) {
     viewport_->setPreviewMode(PreviewMode::kFinalHdr);
   }
   if (preview_mode_ == PreviewMode::kGainMap) sendHeatmap(index);
-  sendHdrLoading(false, preview_mode_ == PreviewMode::kFinalHdr);
+  sendHdrLoading(false, true);
   emitOverlay();
   emitSliceGuides();
-  if (chrome_) {
+  if (chrome_ && preview_mode_ == PreviewMode::kFinalHdr) {
     json status;
     status["type"] = "status";
     status["text"] = QStringLiteral("Encoded Ultra HDR").toStdString();

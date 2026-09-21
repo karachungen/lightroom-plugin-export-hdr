@@ -11,6 +11,7 @@ local LrProgressScope = import "LrProgressScope"
 local LrPathUtils = import "LrPathUtils"
 local LrFileUtils = import "LrFileUtils"
 local LrExportSession = import "LrExportSession"
+local LrFunctionContext = import "LrFunctionContext"
 
 local loadPluginModule = assert(loadfile(LrPathUtils.child(_PLUGIN.path, "PluginInit.lua")))()
 local UHDR = loadPluginModule("UHDRSettings")
@@ -527,120 +528,127 @@ local function isJpegPath(p)
 end
 
 local function renderHdrTiff(photo, propertyTable, tempDir, logPath)
-	local hdrSettings = UHDR.mergeHdrTiffSettings(propertyTable, tempDir)
-	if logPath then
-		pcall(function()
-			if photo and photo.getDevelopSettings then
-				local d = photo:getDevelopSettings()
-				if d then
-					Log.append(
-						logPath,
-						"Develop HDREditMode="
-							.. tostring(d.HDREditMode)
-							.. " (HDR editing must be on for HDR TIFF export)\n"
-					)
+	local resultPath
+	local resultErr
+
+	LrFunctionContext.callWithContext("uhdrHdrTiff", function(_fc)
+		local hdrSettings = UHDR.mergeHdrTiffSettings(propertyTable, tempDir)
+		if logPath then
+			Log.append(
+				logPath,
+				string.format(
+					"HDR pass settings: format=%s destType=%s dest=%s colorSpace=%s provider=%s size=%s %sx%s\n",
+					tostring(hdrSettings.LR_format),
+					tostring(hdrSettings.LR_export_destinationType),
+					tostring(hdrSettings.LR_export_destinationPathPrefix),
+					tostring(hdrSettings.LR_export_colorSpace),
+					tostring(hdrSettings.LR_exportServiceProvider),
+					tostring(hdrSettings.LR_size_resizeType),
+					tostring(hdrSettings.LR_size_maxWidth),
+					tostring(hdrSettings.LR_size_maxHeight)
+				)
+			)
+		end
+		local sess = LrExportSession({
+			photosToExport = { photo },
+			exportSettings = hdrSettings,
+		})
+		sess:doExportOnCurrentTask()
+
+		local hdrPath
+		local tried = {}
+		local renderErrors = {}
+		for _, rendition in sess:renditions() do
+			local ok, pth = rendition:waitForRender()
+			if ok and pth and pth ~= "" then
+				tried[#tried + 1] = pth
+				if isTiffPath(pth) then
+					hdrPath = pth
+					break
 				end
+			elseif not ok then
+				local err = tostring(pth)
+				renderErrors[#renderErrors + 1] = err
+				if logPath then
+					Log.append(logPath, "HDR TIFF waitForRender failed: " .. err .. "\n")
+				end
+			elseif logPath then
+				Log.append(
+					logPath,
+					"HDR TIFF waitForRender: ok but empty path (ok=" .. tostring(ok) .. ").\n"
+				)
 			end
-		end)
-		Log.append(
-			logPath,
-			string.format(
-				"HDR pass settings: format=%s destType=%s dest=%s colorSpace=%s provider=%s size=%s %sx%s\n",
-				tostring(hdrSettings.LR_format),
-				tostring(hdrSettings.LR_export_destinationType),
-				tostring(hdrSettings.LR_export_destinationPathPrefix),
-				tostring(hdrSettings.LR_export_colorSpace),
-				tostring(hdrSettings.LR_exportServiceProvider),
-				tostring(hdrSettings.LR_size_resizeType),
-				tostring(hdrSettings.LR_size_maxWidth),
-				tostring(hdrSettings.LR_size_maxHeight)
-			)
-		)
-	end
-	local sess = LrExportSession({
-		photosToExport = { photo },
-		exportSettings = hdrSettings,
-	})
-	sess:doExportOnCurrentTask()
+		end
 
-	local hdrPath
-	local tried = {}
-	local renderErrors = {}
-	for _, rendition in sess:renditions() do
-		local ok, pth = rendition:waitForRender()
-		if ok and pth and pth ~= "" then
-			tried[#tried + 1] = pth
-			if isTiffPath(pth) then
-				hdrPath = pth
-				break
+		if photo then
+			pcall(function()
+				sess:removePhoto(photo)
+			end)
+		end
+
+		if not hdrPath then
+			if logPath and #tried > 0 then
+				Log.append(
+					logPath,
+					"HDR TIFF pass found no .tif rendition; paths returned: "
+						.. table.concat(tried, "; ")
+						.. "\n"
+				)
 			end
-		elseif not ok then
-			local err = tostring(pth)
-			renderErrors[#renderErrors + 1] = err
+			if #tried > 0 then
+				local first = tried[1]
+				if isJpegPath(first) then
+					resultErr =
+						"Internal HDR pass saved JPEG ("
+							.. tostring(LrPathUtils.leafName(first))
+							.. ") instead of TIFF. In Develop, turn HDR ON (Basics panel). Otherwise Lightroom exports SDR JPEG even when the plug-in requests Rec2020 HDR TIFF."
+					return
+				end
+				resultErr = "Internal HDR pass returned no TIFF file (got " .. tostring(first) .. ")."
+				return
+			end
 			if logPath then
-				Log.append(logPath, "HDR TIFF waitForRender failed: " .. err .. "\n")
+				Log.append(logPath, "HDR TIFF session produced no rendition path.\n")
 			end
-		elseif logPath then
-			Log.append(
-				logPath,
-				"HDR TIFF waitForRender: ok but empty path (ok=" .. tostring(ok) .. ").\n"
-			)
-		end
-	end
-
-	if not hdrPath then
-		if logPath and #tried > 0 then
-			Log.append(
-				logPath,
-				"HDR TIFF pass found no .tif rendition; paths returned: "
-					.. table.concat(tried, "; ")
-					.. "\n"
-			)
-		end
-		if #tried > 0 then
-			local first = tried[1]
-			if isJpegPath(first) then
-				return nil,
-					"Internal HDR pass saved JPEG ("
-						.. tostring(LrPathUtils.leafName(first))
-						.. ") instead of TIFF. In Develop, turn HDR ON (Basics panel). Check the log line Develop HDREditMode= — it must indicate HDR editing is active. Otherwise Lightroom exports SDR JPEG even when the plug-in requests Rec2020 HDR TIFF."
+			if #renderErrors > 0 then
+				resultErr = table.concat(renderErrors, " ")
+			else
+				resultErr = ""
 			end
-			return nil, "Internal HDR pass returned no TIFF file (got " .. tostring(first) .. ")."
+			return
 		end
+
 		if logPath then
-			Log.append(logPath, "HDR TIFF session produced no rendition path.\n")
+			Log.append(logPath, "HDR TIFF render: " .. tostring(hdrPath) .. "\n")
+			if #tried > 1 then
+				Log.append(logPath, "HDR TIFF rendition candidates: " .. table.concat(tried, "; ") .. "\n")
+			end
 		end
-		if #renderErrors > 0 then
-			return nil, table.concat(renderErrors, " ")
-		end
-		return nil, ""
-	end
 
-	if logPath then
-		Log.append(logPath, "HDR TIFF render: " .. tostring(hdrPath) .. "\n")
-		if #tried > 1 then
-			Log.append(logPath, "HDR TIFF rendition candidates: " .. table.concat(tried, "; ") .. "\n")
+		if not LrFileUtils.exists(hdrPath) then
+			if logPath then
+				Log.append(logPath, "ERROR: HDR TIFF path missing on disk: " .. tostring(hdrPath) .. "\n")
+			end
+			if #renderErrors > 0 then
+				resultErr = table.concat(renderErrors, " ")
+			else
+				resultErr = "exported path not found: " .. tostring(hdrPath)
+			end
+			return
 		end
-	end
 
-	if not LrFileUtils.exists(hdrPath) then
-		if logPath then
-			Log.append(logPath, "ERROR: HDR TIFF path missing on disk: " .. tostring(hdrPath) .. "\n")
+		if not waitForSettledHdrTiff(hdrPath, logPath) then
+			if logPath then
+				Log.append(logPath, "ERROR: HDR TIFF did not settle with a valid TIFF header (incomplete write?).\n")
+			end
+			resultErr = "TIFF file did not finish writing or has an invalid header."
+			return
 		end
-		if #renderErrors > 0 then
-			return nil, table.concat(renderErrors, " ")
-		end
-		return nil, "exported path not found: " .. tostring(hdrPath)
-	end
 
-	if not waitForSettledHdrTiff(hdrPath, logPath) then
-		if logPath then
-			Log.append(logPath, "ERROR: HDR TIFF did not settle with a valid TIFF header (incomplete write?).\n")
-		end
-		return nil, "TIFF file did not finish writing or has an invalid header."
-	end
+		resultPath = hdrPath
+	end)
 
-	return hdrPath
+	return resultPath, resultErr
 end
 
 local function fulfillOnDemandHdrTiff(item, propertyTable, previewWorkRoot)
@@ -787,6 +795,35 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 	)
 	LrFileUtils.createDirectory(previewWorkRoot)
 
+	local memoryReleased = false
+	local itemsByIdRef = nil
+
+	local function releaseExportMemory()
+		if memoryReleased then
+			return
+		end
+		memoryReleased = true
+		local keep = propertyTable[UHDR.KEY.keepIntermediates]
+		for _, item in ipairs(previewBatch) do
+			item.photo = nil
+			if not keep then
+				safeDeleteTree(item.tempDir)
+			end
+		end
+		if not keep then
+			safeDeleteTree(previewWorkRoot)
+		end
+		if itemsByIdRef then
+			for k in pairs(itemsByIdRef) do
+				itemsByIdRef[k] = nil
+			end
+		end
+	end
+
+	functionContext:addCleanupHandler(function()
+		releaseExportMemory()
+	end)
+
 	for _, rendition in exportContext:renditions({ stopIfCanceled = true }) do
 		done = done + 1
 		local canceled = false
@@ -871,6 +908,17 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		Log.append(logPath, "Queued for Ultra HDR (HDR TIFF on demand)\n")
 	end
 
+	local parentSession = exportContext.exportSession
+	if parentSession then
+		for _, item in ipairs(previewBatch) do
+			if item.photo then
+				pcall(function()
+					parentSession:removePhoto(item.photo)
+				end)
+			end
+		end
+	end
+
 	if #previewBatch > 0 then
 		local resultPath = LrPathUtils.child(previewWorkRoot, "result.json")
 		local previewLog = fallbackLog()
@@ -886,6 +934,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		for _, item in ipairs(previewBatch) do
 			itemsById[item.id] = item
 		end
+		itemsByIdRef = itemsById
 
 		local guiDone = false
 		local pst = 0
@@ -924,14 +973,6 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 			pst = CMD.runShell(previewCmd, previewLog)
 		end
 
-		local function discardPreviewTemps()
-			for _, item in ipairs(previewBatch) do
-				if not propertyTable[UHDR.KEY.keepIntermediates] then
-					safeDeleteTree(item.tempDir)
-				end
-			end
-		end
-
 		local function previewCanceledFromLightroom()
 			local canceled = false
 			pcall(function()
@@ -946,7 +987,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		local approved = PreviewSession.readApproved(resultPath)
 		-- Studio cancel returns 2 (LrTasks.execute: 512 on macOS). Do not surface that as an export error.
 		if previewCanceledFromLightroom() or sx == 2 or (sx == 0 and not approved) then
-			discardPreviewTemps()
+			releaseExportMemory()
 			Log.append(previewLog, "Ultra HDR preview cancelled.\n")
 			pcall(function()
 				progress:done()
@@ -954,7 +995,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 			return
 		end
 		if sx ~= 0 then
-			discardPreviewTemps()
+			releaseExportMemory()
 			error(
 				"Ultra HDR preview failed (exit "
 					.. tostring(sx)
@@ -964,7 +1005,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 			)
 		end
 		if not approved then
-			discardPreviewTemps()
+			releaseExportMemory()
 			Log.append(previewLog, "Ultra HDR preview cancelled.\n")
 			pcall(function()
 				progress:done()
@@ -989,9 +1030,6 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 						.. tostring(encoded)
 						.. ")\n"
 				)
-				if not propertyTable[UHDR.KEY.keepIntermediates] then
-					safeDeleteTree(item.tempDir)
-				end
 			else
 				local folder = destDir or LrPathUtils.parent(item.finalOut) or "."
 				LrFileUtils.createDirectory(folder)
@@ -1026,11 +1064,11 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 					end
 				end
 				assertFinalUltraHdr(binary, destFile, logPath, item.sdrSize)
-				if not propertyTable[UHDR.KEY.keepIntermediates] then
-					safeDeleteTree(item.tempDir)
-				end
 			end
 		end
+		releaseExportMemory()
+	else
+		releaseExportMemory()
 	end
 
 	pcall(function()

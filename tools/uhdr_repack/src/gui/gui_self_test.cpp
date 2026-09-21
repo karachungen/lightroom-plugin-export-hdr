@@ -1109,21 +1109,24 @@ int gui_self_test_main(const std::string& session_path) {
   std::cout << "OK encoded RGB gain-map JPEG " << decoded.gainmap_jpeg.size() << " bytes\n";
   checks++;
 
+  const QImage encoded_map =
+      QImage::fromData(decoded.gainmap_jpeg.data(), static_cast<int>(decoded.gainmap_jpeg.size()),
+                       "JPEG");
+  if (encoded_map.isNull() || encoded_map.width() < 2 || encoded_map.height() < 2) {
+    return fail("encoded gain-map JPEG should decode for Gain preview");
+  }
   std::vector<float> overlay_gain;
   int overlay_w = 0;
   int overlay_h = 0;
   if (!compute_auto_gainmap(encode_item.sdr, encode_item.hdr_tiff, &overlay_gain, &overlay_w,
                             &overlay_h, &err)) {
-    return fail("gain overlay heatmap compute: " + err);
+    return fail("gain preview heatmap compute: " + err);
   }
   GainMapEditor overlay_editor;
   overlay_editor.setAutoGainMap(overlay_gain, overlay_w, overlay_h);
   const QImage heat = overlay_editor.renderHeatmap();
-  const QImage encoded_map =
-      QImage::fromData(decoded.gainmap_jpeg.data(), static_cast<int>(decoded.gainmap_jpeg.size()),
-                       "JPEG");
-  if (heat.isNull() || encoded_map.isNull()) {
-    return fail("gain overlay heatmap or encoded JPEG is empty");
+  if (heat.isNull()) {
+    return fail("synthetic gain heatmap render failed");
   }
   const QImage encoded_scaled =
       encoded_map.scaled(heat.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
@@ -1143,10 +1146,11 @@ int gui_self_test_main(const std::string& session_path) {
       ++samples;
     }
   }
-  if (samples < 1 || differ * 2 < samples) {
-    return fail("luma heatmap looks like the encoded gain-map JPEG");
+  if (samples < 1 || differ * 2 >= samples) {
+    return fail("encoded gain-map JPEG is too similar to synthetic heatmap preview");
   }
-  std::cout << "OK gain overlay stays luma heatmap (not encoded JPEG)\n";
+  std::cout << "OK Gain preview uses encoded Ultra HDR gain-map JPEG " << encoded_map.width()
+            << "x" << encoded_map.height() << "\n";
   checks++;
 
   EncodeRequest mono = req;

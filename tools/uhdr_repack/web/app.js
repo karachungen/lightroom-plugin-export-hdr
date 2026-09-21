@@ -94,7 +94,7 @@
     lastPreviewRect: null,
     galleryCache: { max: -1, preset: "", chosen: -1 },
     overlayCache: { key: "", sdr: null, count: 0 },
-    canvasScale: { x: 1, y: 1, offsetX: 0, offsetY: 0 },
+    canvasScale: { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: 0, dh: 0, cssW: 0, cssH: 0 },
     aspectPicked: {},
     sizeDrag: "",
     loaded: false,
@@ -319,6 +319,9 @@
           state.encodedWidth = 0;
           state.encodedHeight = 0;
           state.encodedBytes = 0;
+          if (state.mode === "gain") {
+            state.heatmapImage = null;
+          }
         } else {
           const encodedW = Number(msg.encodedWidth) || 0;
           const encodedH = Number(msg.encodedHeight) || 0;
@@ -1163,9 +1166,16 @@
     const wrap = document.getElementById("preview-frame") || document.getElementById("canvas-wrap");
     const w = wrap.clientWidth;
     const h = Math.max(240, wrap.clientHeight);
-    canvas.width = w;
-    canvas.height = h;
-    if (!state.sdrImage) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(h * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    if (!state.sdrImage) {
+      state.canvasScale = { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: w, dh: h, cssW: w, cssH: h };
+      return;
+    }
     const scale = Math.min(w / state.sdrImage.width, h / state.sdrImage.height);
     const dw = state.sdrImage.width * scale;
     const dh = state.sdrImage.height * scale;
@@ -1176,22 +1186,25 @@
       offsetY: (h - dh) / 2,
       dw,
       dh,
+      cssW: w,
+      cssH: h,
     };
   }
 
   function drawPreview() {
-    ctx.fillStyle = "#070605";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (!state.sdrImage) return;
     const s = state.canvasScale;
-    if (state.mode === "gain" && state.heatmapImage) {
-      ctx.globalAlpha = 1;
+    const cssW = s.cssW || canvas.width;
+    const cssH = s.cssH || canvas.height;
+    ctx.fillStyle = "#070605";
+    ctx.fillRect(0, 0, cssW, cssH);
+    if (state.mode === "gain") {
+      if (state.heatmapImage) {
+        ctx.drawImage(state.heatmapImage, s.offsetX, s.offsetY, s.dw, s.dh);
+      }
+    } else if (state.sdrImage) {
       ctx.drawImage(state.sdrImage, s.offsetX, s.offsetY, s.dw, s.dh);
-      ctx.globalAlpha = 0.76;
-      ctx.drawImage(state.heatmapImage, s.offsetX, s.offsetY, s.dw, s.dh);
-      ctx.globalAlpha = 1;
     } else {
-      ctx.drawImage(state.sdrImage, s.offsetX, s.offsetY, s.dw, s.dh);
+      return;
     }
     if (state.slices.length && state.settings.sliceAspect !== "none" && state.mode !== "hdr") {
       const ux = Math.min.apply(null, state.slices.map((r) => r.x));
