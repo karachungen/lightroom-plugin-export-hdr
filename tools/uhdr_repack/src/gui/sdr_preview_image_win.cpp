@@ -28,8 +28,20 @@ bool frame_size(IWICBitmapFrameDecode* frame, int* width, int* height, std::stri
   return true;
 }
 
+struct ComApartment {
+  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  ~ComApartment() {
+    if (hr == S_OK || hr == S_FALSE) CoUninitialize();
+  }
+};
+
 bool open_frame(const std::string& path, Microsoft::WRL::ComPtr<IWICImagingFactory>& factory,
                 Microsoft::WRL::ComPtr<IWICBitmapFrameDecode>& frame, std::string* error) {
+  const ComApartment com;
+  if (FAILED(com.hr) && com.hr != RPC_E_CHANGED_MODE) {
+    if (error) *error = "COM initialization failed";
+    return false;
+  }
   factory = wic::create_factory();
   if (!factory) {
     if (error) *error = "WIC factory failed";
