@@ -84,7 +84,9 @@ case "$platform" in
 macos-arm64)
 	(
 		cd "$REPO_ROOT"
-		zip -r "$artifact" ExportHDR.lrplugin \
+		# -y keeps framework symlinks. Without it, Versions/Current is stored as a
+		# real directory and codesign rejects the bundle.
+		zip -r -y "$artifact" ExportHDR.lrplugin \
 			-x "ExportHDR.lrplugin/bin/.gitignore" \
 			-x "ExportHDR.lrplugin/bin/README.txt"
 	)

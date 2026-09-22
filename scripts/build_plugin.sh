@@ -405,12 +405,114 @@ bundle_shared_qt_macos() {
 	rm -rf "$staging"
 }
 
+# macdeployqt rewrites install names after Homebrew's ad-hoc signature. Those
+# stale signatures make dyld kill the process (SIGKILL / exit 137) when Lightroom
+# launches it. Zip archives that follow symlinks also copy Versions/Current and
+# the framework root binary into real files, which codesign rejects as an
+# ambiguous bundle. Restore the symlink layout, then sign Mach-O files, framework
+# bundles, and the executable.
+repair_framework_symlinks() {
+	local fw="$1"
+	local name ver
+	name="$(basename "$fw" .framework)"
+	ver="$fw/Versions/A"
+	[[ -d "$ver" && -f "$ver/$name" ]] || return 0
+
+	if [[ -e "$fw/Versions/Current" && ! -L "$fw/Versions/Current" ]]; then
+		rm -rf "$fw/Versions/Current"
+	fi
+	if [[ ! -e "$fw/Versions/Current" ]]; then
+		ln -s A "$fw/Versions/Current"
+	fi
+
+	if [[ -e "$fw/$name" && ! -L "$fw/$name" ]]; then
+		rm -f "$fw/$name"
+	fi
+	if [[ ! -e "$fw/$name" ]]; then
+		ln -s "Versions/Current/$name" "$fw/$name"
+	fi
+
+	if [[ -e "$ver/Resources" ]]; then
+		if [[ -e "$fw/Resources" && ! -L "$fw/Resources" ]]; then
+			rm -rf "$fw/Resources"
+		fi
+		if [[ ! -e "$fw/Resources" ]]; then
+			ln -s Versions/Current/Resources "$fw/Resources"
+		fi
+	fi
+}
+
+repair_framework_tree() {
+	local dir="$1"
+	[[ -d "$dir" ]] || return 0
+	local fw
+	while IFS= read -r -d '' fw; do
+		repair_framework_symlinks "$fw"
+	done < <(find "$dir" -name "*.framework" -type d -print0)
+}
+
+codesign_macho_tree() {
+	local dir="$1"
+	[[ -d "$dir" ]] || return 0
+	local f
+	while IFS= read -r -d '' f; do
+		if file -b "$f" | grep -q "Mach-O"; then
+			codesign --force --sign - "$f"
+		fi
+	done < <(find "$dir" -type f -print0)
+}
+
+codesign_framework_bundles() {
+	local dir="$1"
+	[[ -d "$dir" ]] || return 0
+	local fw
+	# Deepest bundles first so a nested framework is sealed before its parent.
+	while IFS= read -r fw; do
+		[[ -n "$fw" ]] || continue
+		codesign --force --sign - "$fw"
+	done < <(find "$dir" -name "*.framework" -type d -print | awk '{ print length($0) "\t" $0 }' | sort -nr | cut -f2-)
+}
+
+verify_macos_codesign() {
+	local exe="$1"
+	local plugin_root="$2"
+	local qtcore="$plugin_root/Frameworks/QtCore.framework/Versions/A/QtCore"
+	if ! codesign --verify --strict "$exe"; then
+		echo "codesign verify failed: $exe" >&2
+		exit 1
+	fi
+	if [[ -f "$qtcore" ]] && ! codesign --verify --strict "$qtcore"; then
+		echo "codesign verify failed: $qtcore" >&2
+		exit 1
+	fi
+}
+
 codesign_macos_bundle() {
 	echo "==> Ad-hoc codesign (required after copying into the plug-in bundle)"
-	if uhdr_links_shared_qt_macos "$PLUGIN_BIN/uhdr_repack"; then
-		codesign --force --deep --sign - "$PLUGIN_BIN/uhdr_repack"
+	local exe="$PLUGIN_BIN/uhdr_repack"
+	local plugin_root
+	plugin_root="$(dirname "$PLUGIN_BIN")"
+	local entitlements="$SCRIPT_DIR/macos/uhdr_repack.entitlements"
+
+	if uhdr_links_shared_qt_macos "$exe"; then
+		repair_framework_tree "$plugin_root/Frameworks"
+		codesign_macho_tree "$plugin_root/Frameworks"
+		codesign_macho_tree "$plugin_root/PlugIns"
+		codesign_framework_bundles "$plugin_root/Frameworks"
+		if [[ ! -f "$entitlements" ]]; then
+			echo "Missing entitlements file: $entitlements" >&2
+			exit 1
+		fi
+		codesign --force --sign - --entitlements "$entitlements" "$exe"
+		# Chrome quarantine survives codesign and then dyld refuses the Qt libraries
+		# ("library load disallowed by system policy") even when the signature is valid.
+		if command -v xattr >/dev/null 2>&1; then
+			xattr -dr com.apple.quarantine "$plugin_root" || true
+		fi
+		verify_macos_codesign "$exe" "$plugin_root"
 	else
-		codesign --force --sign - "$PLUGIN_BIN/uhdr_repack"
+		codesign --force --sign - "$exe"
+		codesign --verify --strict "$exe"
 	fi
 }
 

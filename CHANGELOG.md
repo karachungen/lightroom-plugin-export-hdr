@@ -5,6 +5,19 @@ All notable changes to **Ultra HDR Export** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `major` / `minor` / `revision`. GitHub Release titles are `{codename} · vX.Y.Z` (see [`RELEASING.md`](RELEASING.md)). Older releases used a `-rN` build suffix (see historical sections below).
 
+## Unreleased
+
+## v3.0.1 — 🔏 Not your RAM
+
+> Exit 137 was Gatekeeper, not a memory crisis. The Qt libraries still wore a signature from before macdeployqt rewrote them, so macOS killed Ultra HDR before it drew a pixel.
+
+### Fixed
+
+- macOS Ultra HDR no longer dies at launch with exit 137 when bundled Qt libraries have a stale ad-hoc signature. The bundle step re-signs Frameworks, PlugIns, and `uhdr_repack`, and allows that executable to load the ad-hoc Qt libraries.
+- macOS release zips keep Qt framework symlinks, so codesign can seal the bundle after unzip.
+- A browser-downloaded plug-in has its quarantine flag cleared during the macOS bundle step, so dyld can load Qt.
+- The export error for exit 137 mentions an invalid code signature and browser quarantine, as well as memory pressure.
+
 ## v3.0.0 — 🌊🔥 Ocean burn
 
 > 💸 Tokens were spent in industrial quantities. The GPUs hummed, the context windows overflowed, and the only scientifically unverified side effect is that the ocean is now a little warmer — all so this plugin could ship Ultra HDR. The sea did not ask for this.

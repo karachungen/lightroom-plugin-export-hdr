@@ -208,7 +208,7 @@ local function uhdrFailureHint(sx, rawSt, logPath)
 		return ""
 	end
 	if sx == 137 or rawSt == 35072 then
-		return "\n\nThis exit code often means the encoder was stopped by the system (memory pressure is common for large HDR TIFFs). Try reducing Image Sizing, closing other apps, or run the same command from Terminal to see a live error. You can also use Activity Monitor to check memory while encoding."
+		return "\n\nThis exit code means the system stopped the encoder (SIGKILL). On macOS that is often an invalid code signature on the bundled Qt libraries: the editor dies at startup, and Console shows \"Code Signature Invalid\". Rebuild with scripts/build_plugin.sh, or re-sign Frameworks, PlugIns, and bin/uhdr_repack. A copy downloaded in a browser also needs the quarantine flag cleared on the .lrplugin folder. Memory pressure on a large HDR TIFF can also stop the encoder. Try reducing Image Sizing, closing other apps, or run the same command from Terminal. Activity Monitor shows memory while encoding."
 	end
 	return ""
 end
