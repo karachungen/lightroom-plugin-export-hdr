@@ -7,6 +7,14 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.2 — 📦 Just the one
+
+> Gatekeeper was treating every Qt framework as its own suspicious app. The macOS plug-in is now a single uhdr_repack with Qt linked inside.
+
+### Changed
+
+- macOS releases ship one statically linked `bin/uhdr_repack`. The zip no longer includes Qt Frameworks or PlugIns, so Gatekeeper is not asked to open `QtConcurrent.framework`.
+
 ## v3.0.1 — 🔏 Not your RAM
 
 > Exit 137 was Gatekeeper, not a memory crisis. The Qt libraries still wore a signature from before macdeployqt rewrote them, so macOS killed Ultra HDR before it drew a pixel.

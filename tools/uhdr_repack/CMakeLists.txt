@@ -230,6 +230,17 @@ if(UHDR_ENABLE_GUI)
     Qt6::GuiPrivate
     Qt6::Widgets
   )
+  if(UHDR_STATIC_QT)
+    # add_executable does not pull static plugins. Without these, the GUI has no
+    # platform plugin and QImage cannot read SDR JPEGs or write PNG previews.
+    set(_uhdr_static_plugins Qt6::QJpegPlugin Qt6::QPngPlugin)
+    if(APPLE)
+      list(APPEND _uhdr_static_plugins Qt6::QCocoaIntegrationPlugin)
+    elseif(WIN32)
+      list(APPEND _uhdr_static_plugins Qt6::QWindowsIntegrationPlugin)
+    endif()
+    qt_import_plugins(uhdr_repack INCLUDE ${_uhdr_static_plugins})
+  endif()
   if(APPLE)
     find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
     find_library(WEBKIT_FRAMEWORK WebKit REQUIRED)

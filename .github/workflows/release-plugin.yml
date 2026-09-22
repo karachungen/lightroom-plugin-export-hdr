@@ -32,6 +32,21 @@ jobs:
         shell: bash
         run: bash scripts/build_plugin.sh install-deps
 
+      - name: Cache static Qt (macOS)
+        if: matrix.id == 'macos-arm64'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.home }}/Qt/6.11.0-static
+          key: qt-6.11.0-macos-arm64-static-v1-${{ hashFiles('scripts/setup_qt_static.sh') }}
+
+      - name: Build static Qt (macOS)
+        if: matrix.id == 'macos-arm64'
+        shell: bash
+        run: |
+          export QT_STATIC_ROOT="$HOME/Qt/6.11.0-static"
+          bash scripts/setup_qt_static.sh
+          echo "QT_STATIC_ROOT=$QT_STATIC_ROOT" >> "$GITHUB_ENV"
+
       - name: Setup CMake 3.31 (Windows)
         if: matrix.id == 'windows-x64'
         uses: lukka/get-cmake@latest
@@ -106,18 +121,21 @@ jobs:
 
       - name: Build, test, and package plugin
         shell: bash
-        env:
-          UHDR_STATIC_QT: OFF
         run: |
           if [[ "${{ matrix.id }}" == "macos-arm64" ]]; then
-            export CMAKE_PREFIX_PATH="$(brew --prefix qt)"
-          elif [[ -n "${QT_ROOT_DIR:-}" ]]; then
-            if command -v cygpath &>/dev/null; then
-              export CMAKE_PREFIX_PATH="$(cygpath -u "$QT_ROOT_DIR")"
-              export PATH="$(cygpath -u "$QT_ROOT_DIR/bin"):$PATH"
-            else
-              export CMAKE_PREFIX_PATH="$QT_ROOT_DIR"
-              export PATH="$QT_ROOT_DIR/bin:$PATH"
+            export UHDR_STATIC_QT=ON
+            export UHDR_REQUIRE_STATIC_QT=1
+            export QT_STATIC_ROOT="${QT_STATIC_ROOT:-$HOME/Qt/6.11.0-static}"
+          else
+            export UHDR_STATIC_QT=OFF
+            if [[ -n "${QT_ROOT_DIR:-}" ]]; then
+              if command -v cygpath &>/dev/null; then
+                export CMAKE_PREFIX_PATH="$(cygpath -u "$QT_ROOT_DIR")"
+                export PATH="$(cygpath -u "$QT_ROOT_DIR/bin"):$PATH"
+              else
+                export CMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+                export PATH="$QT_ROOT_DIR/bin:$PATH"
+              fi
             fi
           fi
           bash scripts/build_plugin.sh all

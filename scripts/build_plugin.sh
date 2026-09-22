@@ -245,6 +245,12 @@ resolve_qt_for_build() {
 		return 0
 	fi
 
+	if [[ "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
+		echo "UHDR_REQUIRE_STATIC_QT is set but no static Qt kit was found." >&2
+		echo "Run ./scripts/setup_qt_static.sh or set QT_STATIC_ROOT." >&2
+		exit 1
+	fi
+
 	shared_prefix="$(find_qt_shared_prefix || true)"
 	if [[ -n "$shared_prefix" ]]; then
 		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
@@ -597,10 +603,25 @@ bundle_macos() {
 	clean_plugin_bin
 	cp "$build_exe" "$PLUGIN_BIN/uhdr_repack"
 	chmod +x "$PLUGIN_BIN/uhdr_repack"
+	if [[ "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
+		if uhdr_links_shared_qt_macos "$PLUGIN_BIN/uhdr_repack"; then
+			echo "Release build requires a single uhdr_repack with no shared Qt." >&2
+			exit 1
+		fi
+	fi
 	bundle_shared_qt_macos "$PLUGIN_BIN/uhdr_repack"
 
-	# libuhdr and libjpeg-turbo are linked statically; shared Qt (CI) is bundled above.
+	# libuhdr and libjpeg-turbo are linked statically; shared Qt is bundled above.
 	codesign_macos_bundle
+
+	if [[ "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
+		local plugin_root
+		plugin_root="$(dirname "$PLUGIN_BIN")"
+		if [[ -d "$plugin_root/Frameworks" || -d "$plugin_root/PlugIns" ]]; then
+			echo "Static bundle must not contain Frameworks or PlugIns." >&2
+			exit 1
+		fi
+	fi
 
 	echo "==> Bundled encoder: $PLUGIN_BIN/uhdr_repack"
 }
