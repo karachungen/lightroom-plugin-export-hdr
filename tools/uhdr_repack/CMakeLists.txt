@@ -222,7 +222,15 @@ if(UHDR_USE_SYSTEM)
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
 else()
   target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
-  target_link_libraries(uhdr_repack PRIVATE uhdr)
+  # libultrahdr v2 names the static MSVC target uhdr-static. Linking the bare
+  # name "uhdr" is then a filename, so Ninja can link before that library exists.
+  if(TARGET uhdr-static)
+    target_link_libraries(uhdr_repack PRIVATE uhdr-static)
+  elseif(TARGET uhdr)
+    target_link_libraries(uhdr_repack PRIVATE uhdr)
+  else()
+    message(FATAL_ERROR "libultrahdr did not create a uhdr or uhdr-static target")
+  endif()
 endif()
 
 target_link_libraries(uhdr_repack PRIVATE nlohmann_json::nlohmann_json)
