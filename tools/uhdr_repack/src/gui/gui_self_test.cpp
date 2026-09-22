@@ -7,7 +7,7 @@
 #include "gainmap_edit.h"
 #include "gui/gainmap_canvas.h"
 #include "gui/hdr_rhi_viewport.h"
-#include "gui/preview_document.h"
+#include "gui/sdr_preview_image.h"
 #include "gui/hdr_tiff_client.h"
 #include "gui/ultrahdr_preview_service.h"
 #include "half_float.h"
@@ -87,8 +87,9 @@ bool test_session_item_gainmap(const SessionItem& item, int* checks) {
   }
   (*checks)++;
 
-  QImage sdr(QString::fromStdString(item.sdr));
-  if (sdr.isNull()) {
+  QImage sdr;
+  std::string sdr_error;
+  if (!load_sdr_preview_image(item.sdr, &sdr, &sdr_error) || sdr.isNull()) {
     return false;
   }
 

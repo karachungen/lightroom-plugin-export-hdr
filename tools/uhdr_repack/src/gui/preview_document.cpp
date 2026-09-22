@@ -4,6 +4,7 @@
 #include "encode_engine.h"
 #include "gainmap_compute.h"
 #include "gainmap_loader.h"
+#include "gui/sdr_preview_image.h"
 
 #include <QFutureWatcher>
 #include <QtConcurrent/QtConcurrentRun>
@@ -116,12 +117,15 @@ void PreviewDocument::requestItem(int index) {
     result.index = index;
     result.generation = generation;
     result.state.loading = false;
-    result.state.sdr = QImage(QString::fromStdString(item_copy.sdr));
-    if (result.state.sdr.isNull()) {
+    QImage sdr;
+    std::string sdr_error;
+    if (!load_sdr_preview_image(item_copy.sdr, &sdr, &sdr_error) || sdr.isNull()) {
       result.state.error = QStringLiteral("Could not load SDR image: %1")
-                               .arg(QString::fromStdString(item_copy.sdr));
+                               .arg(QString::fromStdString(
+                                   sdr_error.empty() ? item_copy.sdr : sdr_error));
       return result;
     }
+    result.state.sdr = std::move(sdr);
 
     std::string error;
     bool loaded_cache = false;

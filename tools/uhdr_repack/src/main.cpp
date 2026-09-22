@@ -8,6 +8,7 @@
 
 #ifdef UHDR_ENABLE_GUI
 #include "gui_app.h"
+#include "gui/sdr_preview_image.h"
 #endif
 
 #ifdef _WIN32
@@ -59,6 +60,19 @@ static int run(int argc, char** argv) {
 
   if (std::strcmp(argv[1], "--dump-gainmap") == 0) {
     return cli_dump_gainmap_main(argc, argv);
+  }
+
+  if (std::strcmp(argv[1], "--probe-sdr") == 0) {
+#ifndef UHDR_ENABLE_GUI
+    std::cerr << "uhdr_repack was built without GUI support (--probe-sdr unavailable)\n";
+    return 1;
+#else
+    if (argc < 3) {
+      std::cerr << "--probe-sdr requires an image path\n";
+      return 1;
+    }
+    return probe_sdr_main(argv[2]);
+#endif
   }
 
   if (std::strcmp(argv[1], "--self-test") == 0) {

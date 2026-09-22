@@ -238,6 +238,11 @@ resolve_qt_for_build() {
 	fi
 
 	static_root="$(find_qt_static_root || true)"
+	if [[ -z "$static_root" && "$(uname -s)" == "Darwin" ]]; then
+		echo "==> Static Qt kit missing; building ${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
+		"$SCRIPT_DIR/setup_qt_static.sh"
+		static_root="$(find_qt_static_root || true)"
+	fi
 	if [[ -n "$static_root" ]]; then
 		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON")
 		echo "==> Using static Qt at $static_root"
@@ -245,8 +250,8 @@ resolve_qt_for_build() {
 		return 0
 	fi
 
-	if [[ "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
-		echo "UHDR_REQUIRE_STATIC_QT is set but no static Qt kit was found." >&2
+	if [[ "$(uname -s)" == "Darwin" || "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
+		echo "macOS release builds require a static Qt kit and will not fall back to shared Qt." >&2
 		echo "Run ./scripts/setup_qt_static.sh or set QT_STATIC_ROOT." >&2
 		exit 1
 	fi

@@ -7,6 +7,15 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.3 — 🧬 One libjpeg
+
+> The static binary carried two libjpeg ABIs. Qt asked for version 80, libultrahdr answered 62, and the editor segfaulted while opening the SDR JPEG.
+
+### Fixed
+
+- Ultra HDR no longer crashes on open with exit 139 while reading the SDR JPEG. The editor loads that file with ImageIO on macOS and WIC on Windows, and the static build does not link Qt's JPEG plugin.
+- macOS `./scripts/build_plugin.sh` uses the same static Qt 6.11.2 kit as GitHub Actions, and the JPEG load is checked before a release zip is created.
+
 ## v3.0.2 — 📦 Just the one
 
 > Gatekeeper was treating every Qt framework as its own suspicious app. The macOS plug-in is now a single uhdr_repack with Qt linked inside.

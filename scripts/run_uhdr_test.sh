@@ -198,3 +198,24 @@ if [[ -f "$DSC" && -f "$DSC_HDR" ]]; then
 	fi
 	echo "OK: 4:5 smart pick keeps 1152x1440 (native, below 2×)."
 fi
+
+echo "==> SDR JPEG preview load (editor path, not Qt's JPEG plugin)"
+probe_log="$(mktemp)"
+set +e
+"$BIN" --probe-sdr "$BASE" >"$probe_log" 2>&1
+probe_ec=$?
+set -e
+cat "$probe_log"
+if [[ "$probe_ec" -ne 0 ]]; then
+	echo "FAIL: --probe-sdr exited $probe_ec" >&2
+	exit 14
+fi
+if grep -q "Wrong JPEG library version" "$probe_log"; then
+	echo "FAIL: libjpeg ABI clash while loading $BASE" >&2
+	exit 14
+fi
+if ! grep -Eq '^sdr: [0-9]+x[0-9]+$' "$probe_log"; then
+	echo "FAIL: --probe-sdr did not report sdr: WxH for $BASE" >&2
+	exit 14
+fi
+echo "OK: SDR JPEG preview load."

@@ -123,8 +123,7 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ matrix.id }}" == "macos-arm64" ]]; then
-            export UHDR_STATIC_QT=ON
-            export UHDR_REQUIRE_STATIC_QT=1
+            # Static Qt is the script default. The cache step already installed it.
             export QT_STATIC_ROOT="${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
           else
             export UHDR_STATIC_QT=OFF

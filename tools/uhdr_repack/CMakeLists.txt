@@ -188,9 +188,13 @@ if(UHDR_ENABLE_GUI)
     list(APPEND _UHDR_GUI_SOURCES
       src/gui/web_chrome_mac.mm
       src/gui/app_icon_mac.mm
+      src/gui/sdr_preview_image_mac.mm
     )
   elseif(WIN32)
-    list(APPEND _UHDR_GUI_SOURCES src/gui/web_chrome_win.cpp)
+    list(APPEND _UHDR_GUI_SOURCES
+      src/gui/web_chrome_win.cpp
+      src/gui/sdr_preview_image_win.cpp
+    )
   endif()
 
   list(APPEND _UHDR_ALL_SOURCES ${_UHDR_GUI_SOURCES})
@@ -231,9 +235,11 @@ if(UHDR_ENABLE_GUI)
     Qt6::Widgets
   )
   if(UHDR_STATIC_QT)
-    # add_executable does not pull static plugins. Without these, the GUI has no
-    # platform plugin and QImage cannot read SDR JPEGs or write PNG previews.
-    set(_uhdr_static_plugins Qt6::QJpegPlugin Qt6::QPngPlugin)
+    # add_executable does not pull static plugins. The cocoa/windows plugin starts
+    # the GUI. PNG is for data-URL previews. Do not import QJpegPlugin: Qt's
+    # bundled libjpeg is ABI 80 and libultrahdr's libjpeg-turbo is ABI 62, and
+    # one static binary cannot carry both jpeg_* symbols (exit 139).
+    set(_uhdr_static_plugins Qt6::QPngPlugin)
     if(APPLE)
       list(APPEND _uhdr_static_plugins Qt6::QCocoaIntegrationPlugin)
     elseif(WIN32)
@@ -244,7 +250,8 @@ if(UHDR_ENABLE_GUI)
   if(APPLE)
     find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
     find_library(WEBKIT_FRAMEWORK WebKit REQUIRED)
-    target_link_libraries(uhdr_repack PRIVATE ${APPKIT_FRAMEWORK} ${WEBKIT_FRAMEWORK})
+    find_library(IMAGEIO_FRAMEWORK ImageIO REQUIRED)
+    target_link_libraries(uhdr_repack PRIVATE ${APPKIT_FRAMEWORK} ${WEBKIT_FRAMEWORK} ${IMAGEIO_FRAMEWORK})
   endif()
   if(WIN32)
     set(_WEBVIEW2_SDK "$ENV{WEBVIEW2_SDK}")

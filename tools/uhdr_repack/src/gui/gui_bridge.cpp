@@ -2,6 +2,7 @@
 
 #include "activity_log.h"
 #include "gui/hdr_tiff_client.h"
+#include "gui/sdr_preview_image.h"
 #include "gui/web_chrome.h"
 #include "slice_plan.h"
 
@@ -10,7 +11,6 @@
 #include <QBuffer>
 #include <QFileInfo>
 #include <QImage>
-#include <QImageReader>
 #include <QMetaObject>
 #include <QRect>
 #include <QTimer>
@@ -66,10 +66,13 @@ SdrFileProbe probeSdrFile(const std::string& path) {
   SdrFileProbe info;
   const QString qpath = QString::fromStdString(path);
   info.bytes = QFileInfo(qpath).size();
-  QImageReader reader(qpath);
-  const QSize sz = reader.size();
-  info.width = sz.width();
-  info.height = sz.height();
+  int width = 0;
+  int height = 0;
+  std::string error;
+  if (sdr_preview_size(path, &width, &height, &error)) {
+    info.width = width;
+    info.height = height;
+  }
   return info;
 }
 
