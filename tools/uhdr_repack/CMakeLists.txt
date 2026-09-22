@@ -84,6 +84,11 @@ else()
   # Vendor + statically build libjpeg-turbo instead of linking whatever the host has installed
   # (e.g. Homebrew's dylib, which pins an absolute /opt/homebrew or /usr/local path).
   set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr" FORCE)
+  # v2 static MSVC builds switch the CRT to /MT. Shared Qt is /MD, so keep the
+  # parent runtime. libultrahdr treats BUILD_FOR_WINUI as "do not force /MT".
+  if(WIN32 AND NOT UHDR_STATIC_QT)
+    set(BUILD_FOR_WINUI ON CACHE BOOL "Keep libultrahdr on the DLL CRT for shared Qt" FORCE)
+  endif()
   FetchContent_MakeAvailable(libultrahdr)
   # Re-apply if the source tree was already populated without PATCH_COMMAND.
   execute_process(
