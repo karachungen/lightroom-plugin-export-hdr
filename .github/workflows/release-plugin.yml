@@ -64,30 +64,30 @@ jobs:
         if: matrix.id == 'windows-x64'
         uses: actions/cache@v4
         with:
-          path: C:/Qt/6.11.0
-          key: qt-6.11.0-windows-msvc2022-v3-${{ hashFiles('.github/workflows/release-plugin.yml') }}
+          path: C:/Qt/6.11.2
+          key: qt-6.11.2-windows-msvc2022-v3-${{ hashFiles('.github/workflows/release-plugin.yml') }}
           restore-keys: |
-            qt-6.11.0-windows-msvc2022-v3-
+            qt-6.11.2-windows-msvc2022-v3-
 
       - name: Install Qt 6.11 (Windows)
         if: matrix.id == 'windows-x64'
         shell: pwsh
         run: |
           $qtRoot = "C:\Qt"
-          $prefix = Join-Path $qtRoot "6.11.0\msvc2022_64"
+          $prefix = Join-Path $qtRoot "6.11.2\msvc2022_64"
           $marker = Join-Path $prefix "lib\cmake\Qt6\Qt6Config.cmake"
           $shaderTools = Join-Path $prefix "lib\cmake\Qt6ShaderTools\Qt6ShaderToolsConfig.cmake"
           if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath $shaderTools)) {
-            if (Test-Path -LiteralPath (Join-Path $qtRoot "6.11.0")) {
-              Write-Host "Removing incomplete Qt install at $(Join-Path $qtRoot '6.11.0')"
-              Remove-Item -LiteralPath (Join-Path $qtRoot "6.11.0") -Recurse -Force
+            if (Test-Path -LiteralPath (Join-Path $qtRoot "6.11.2")) {
+              Write-Host "Removing incomplete Qt install at $(Join-Path $qtRoot '6.11.2')"
+              Remove-Item -LiteralPath (Join-Path $qtRoot "6.11.2") -Recurse -Force
             }
             New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
             python -m pip install --upgrade pip "git+https://github.com/miurahr/aqtinstall.git"
-            python -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 `
+            python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 `
               --outputdir $qtRoot `
               --external 7z
-            python -m aqt install-qt windows desktop 6.11.0 win64_msvc2022_64 `
+            python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 `
               -m qtshadertools `
               --outputdir $qtRoot `
               --external 7z

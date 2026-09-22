@@ -4,12 +4,16 @@
 
 #include "wic_utils.h"
 
+#include <QByteArray>
 #include <QImage>
 
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
 #include <windows.h>
+#include <oleauto.h>
+#include <propidl.h>
 #include <wincodec.h>
 
 namespace uhdr_repack {
@@ -122,6 +126,136 @@ int probe_sdr_main(const std::string& path) {
     return 1;
   }
   std::cout << "sdr: " << image.width() << "x" << image.height() << "\n";
+  return 0;
+}
+
+bool encode_preview_jpeg(const QImage& image, int quality, std::vector<uint8_t>* out,
+                         std::string* error) {
+  if (!out || image.isNull() || image.width() <= 0 || image.height() <= 0) {
+    if (error) *error = "invalid arguments";
+    return false;
+  }
+  const ComApartment com;
+  if (FAILED(com.hr) && com.hr != RPC_E_CHANGED_MODE) {
+    if (error) *error = "COM initialization failed";
+    return false;
+  }
+  const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+  auto factory = wic::create_factory();
+  if (!factory) {
+    if (error) *error = "WIC factory failed";
+    return false;
+  }
+
+  Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+  const UINT w = static_cast<UINT>(rgba.width());
+  const UINT h = static_cast<UINT>(rgba.height());
+  const UINT stride = static_cast<UINT>(rgba.bytesPerLine());
+  HRESULT hr = factory->CreateBitmapFromMemory(
+      w, h, GUID_WICPixelFormat32bppRGBA, stride, stride * h,
+      const_cast<BYTE*>(rgba.constBits()), &bitmap);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC could not wrap preview pixels";
+    return false;
+  }
+
+  Microsoft::WRL::ComPtr<IStream> stream;
+  hr = CreateStreamOnHGlobal(nullptr, TRUE, &stream);
+  if (FAILED(hr)) {
+    if (error) *error = "Could not create a JPEG stream";
+    return false;
+  }
+  Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+  hr = factory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &encoder);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG encoder failed";
+    return false;
+  }
+  hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG encoder init failed";
+    return false;
+  }
+  Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+  Microsoft::WRL::ComPtr<IPropertyBag2> bag;
+  hr = encoder->CreateNewFrame(&frame, &bag);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG frame failed";
+    return false;
+  }
+  if (bag) {
+    PROPBAG2 option{};
+    option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+    VARIANT value;
+    VariantInit(&value);
+    value.vt = VT_R4;
+    value.fltVal = static_cast<float>(std::clamp(quality, 1, 100)) / 100.f;
+    bag->Write(1, &option, &value);
+    VariantClear(&value);
+  }
+  hr = frame->Initialize(bag.Get());
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG frame init failed";
+    return false;
+  }
+  hr = frame->SetSize(w, h);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG SetSize failed";
+    return false;
+  }
+  WICPixelFormatGUID format = GUID_WICPixelFormat24bppBGR;
+  hr = frame->SetPixelFormat(&format);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG SetPixelFormat failed";
+    return false;
+  }
+  hr = frame->WriteSource(bitmap.Get(), nullptr);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG WriteSource failed";
+    return false;
+  }
+  hr = frame->Commit();
+  if (SUCCEEDED(hr)) hr = encoder->Commit();
+  if (FAILED(hr)) {
+    if (error) *error = "WIC JPEG commit failed";
+    return false;
+  }
+
+  STATSTG stat{};
+  hr = stream->Stat(&stat, STATFLAG_NONAME);
+  if (FAILED(hr) || stat.cbSize.QuadPart <= 0) {
+    if (error) *error = "WIC JPEG stream is empty";
+    return false;
+  }
+  LARGE_INTEGER zero{};
+  stream->Seek(zero, STREAM_SEEK_SET, nullptr);
+  const auto nbytes = static_cast<ULONG>(stat.cbSize.QuadPart);
+  out->resize(nbytes);
+  ULONG read = 0;
+  hr = stream->Read(out->data(), nbytes, &read);
+  if (FAILED(hr) || read == 0) {
+    out->clear();
+    if (error) *error = "WIC JPEG read failed";
+    return false;
+  }
+  out->resize(read);
+  return true;
+}
+
+int encode_preview_jpeg_main(const std::string& path) {
+  QImage image;
+  std::string error;
+  if (!load_sdr_preview_image(path, &image, &error) || image.isNull()) {
+    std::cerr << (error.empty() ? "Could not load SDR image" : error) << "\n";
+    return 1;
+  }
+  std::vector<uint8_t> jpeg;
+  if (!encode_preview_jpeg(image, 80, &jpeg, &error) || jpeg.empty()) {
+    std::cerr << (error.empty() ? "Could not encode preview JPEG" : error) << "\n";
+    return 1;
+  }
+  const QByteArray bytes(reinterpret_cast<const char*>(jpeg.data()), static_cast<int>(jpeg.size()));
+  std::cout << "data:image/jpeg;base64," << bytes.toBase64().constData() << "\n";
   return 0;
 }
 

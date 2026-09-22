@@ -37,7 +37,7 @@ One-time setup from repo root:
   .\scripts\build_plugin.ps1 all
 
 libjpeg-turbo is built automatically via libultrahdr (UHDR_BUILD_DEPS) during configure.
-CMake 4.x rejects vendored libjpeg-turbo 3.0.1's old cmake_minimum_required(); build_plugin.sh
+CMake 4.x rejects vendored libjpeg-turbo 3.1.0's old cmake_minimum_required(); build_plugin.sh
 works around this on both platforms by exporting CMAKE_POLICY_VERSION_MINIMUM=3.5. The
 Windows CMake 3.31.x pin above predates that workaround and has not been re-verified against
 CMake 4.x — treat it as still required until someone confirms otherwise on Windows.

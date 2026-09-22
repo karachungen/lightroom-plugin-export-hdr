@@ -45,6 +45,7 @@ void print_usage() {
       << "  uhdr_repack --edit [--session <json>] [--sdr <path> --hdr-tiff <path> --out <path>]...\n"
       << "  uhdr_repack --self-test [--session <json>]\n"
       << "  uhdr_repack --probe-sdr <path>\n"
+      << "  uhdr_repack --encode-preview-jpeg <path>\n"
       << "  uhdr_repack --dump-gainmap --sdr <path> --hdr-tiff <path> --out <path.gainmap>\n\n"
       << "Encode options:\n"
       << "  --base-quality <0-100>       (default 95)\n"

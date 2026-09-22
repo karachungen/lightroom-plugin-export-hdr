@@ -62,7 +62,7 @@ if(UHDR_USE_SYSTEM)
   set(_uhdr_vendor_lib "${UHDR_LIBRARY}")
 else()
   include(FetchContent)
-  set(_LIBUHDR_TAG "v1.4.0")
+  set(_LIBUHDR_TAG "v2.0.2")
   FetchContent_Declare(
     libultrahdr
     GIT_REPOSITORY https://github.com/google/libultrahdr.git
@@ -79,6 +79,8 @@ else()
   set(UHDR_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
   set(UHDR_BUILD_FUZZERS OFF CACHE BOOL "" FORCE)
   set(UHDR_MAX_DIMENSION 65500 CACHE STRING "Maximum input width and height supported by libultrahdr" FORCE)
+  # The plug-in writes JPEG gain maps. HEIF/AVIF is a separate libheif build this binary does not ship.
+  set(UHDR_ENABLE_HEIF OFF CACHE BOOL "Build libultrahdr without HEIF/AVIF" FORCE)
   # Vendor + statically build libjpeg-turbo instead of linking whatever the host has installed
   # (e.g. Homebrew's dylib, which pins an absolute /opt/homebrew or /usr/local path).
   set(UHDR_BUILD_DEPS ON CACHE BOOL "Build libjpeg-turbo via libultrahdr" FORCE)
@@ -96,7 +98,7 @@ include(FetchContent)
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG v3.11.3
+  GIT_TAG v3.12.0
   GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)

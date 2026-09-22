@@ -219,3 +219,48 @@ if ! grep -Eq '^sdr: [0-9]+x[0-9]+$' "$probe_log"; then
 	exit 14
 fi
 echo "OK: SDR JPEG preview load."
+
+echo "==> SDR JPEG preview encode (film-strip data URL)"
+enc_log="$(mktemp)"
+jpeg_roundtrip="$(mktemp)"
+set +e
+"$BIN" --encode-preview-jpeg "$BASE" >"$enc_log" 2>&1
+enc_ec=$?
+set -e
+if [[ "$enc_ec" -ne 0 ]]; then
+	echo "FAIL: --encode-preview-jpeg exited $enc_ec" >&2
+	head -c 400 "$enc_log" >&2
+	echo >&2
+	exit 15
+fi
+if grep -q "Wrong JPEG library version" "$enc_log"; then
+	echo "FAIL: libjpeg ABI clash while encoding $BASE" >&2
+	exit 15
+fi
+if ! grep -Eq '^data:image/jpeg;base64,[A-Za-z0-9+/]+=*$' "$enc_log"; then
+	echo "FAIL: preview JPEG data URL missing or empty" >&2
+	head -c 200 "$enc_log" >&2
+	echo >&2
+	exit 15
+fi
+python3 - "$enc_log" "$jpeg_roundtrip" <<'PY'
+import base64, sys
+line = open(sys.argv[1], "r", encoding="utf-8").read().strip()
+prefix = "data:image/jpeg;base64,"
+raw = base64.b64decode(line[len(prefix):], validate=True)
+if len(raw) < 32 or raw[:2] != b"\xff\xd8":
+    raise SystemExit("decoded payload is not a JPEG")
+open(sys.argv[2], "wb").write(raw)
+print(f"preview jpeg bytes: {len(raw)}")
+PY
+"$BIN" --probe-sdr "$jpeg_roundtrip" >"$probe_log" 2>&1
+cat "$probe_log"
+if grep -q "Wrong JPEG library version" "$probe_log"; then
+	echo "FAIL: libjpeg ABI clash while reloading the preview JPEG" >&2
+	exit 15
+fi
+if ! grep -Eq '^sdr: [0-9]+x[0-9]+$' "$probe_log"; then
+	echo "FAIL: encoded preview JPEG did not reload" >&2
+	exit 15
+fi
+echo "OK: SDR JPEG preview encode."

@@ -75,6 +75,19 @@ static int run(int argc, char** argv) {
 #endif
   }
 
+  if (std::strcmp(argv[1], "--encode-preview-jpeg") == 0) {
+#ifndef UHDR_ENABLE_GUI
+    std::cerr << "uhdr_repack was built without GUI support (--encode-preview-jpeg unavailable)\n";
+    return 1;
+#else
+    if (argc < 3) {
+      std::cerr << "--encode-preview-jpeg requires an image path\n";
+      return 1;
+    }
+    return encode_preview_jpeg_main(argv[2]);
+#endif
+  }
+
   if (std::strcmp(argv[1], "--self-test") == 0) {
 #ifndef UHDR_ENABLE_GUI
     std::cerr << "uhdr_repack was built without GUI support (--self-test unavailable)\n";

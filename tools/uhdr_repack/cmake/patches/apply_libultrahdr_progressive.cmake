@@ -1,4 +1,4 @@
-# Idempotent: insert jpeg_simple_progression after jpeg_set_quality in libultrahdr v1.4.0.
+# Idempotent: insert jpeg_simple_progression after jpeg_set_quality in libultrahdr.
 if(NOT JPEG_ENCODER_CPP)
   message(FATAL_ERROR "JPEG_ENCODER_CPP is required")
 endif()

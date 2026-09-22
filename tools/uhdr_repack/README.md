@@ -1,6 +1,6 @@
 # uhdr_repack
 
-CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** **`v1.4.0`**, **`UHDR_WRITE_XMP=ON`**.
+CLI: **Lightroom HDR TIFF** + **SDR base** → one **Ultra HDR JPEG** (gain map + primary XMP) using [google/libultrahdr](https://github.com/google/libultrahdr), vendored via CMake **FetchContent** **`v2.0.2`**, **`UHDR_WRITE_XMP=ON`**.
 
 **Platforms:**
 - **macOS 26 (Tahoe), ARM64** — HDR/SDR ingest via Core Image (`.mm` loaders).
@@ -47,7 +47,7 @@ flowchart TB
 
 ## Build
 
-From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`** on both platforms (static link). Use **CMake 3.15–3.31.x** on Windows (CMake 4.x fails on vendored libjpeg-turbo 3.0.1 until upstream updates; CI pins **3.31.6**). First configure downloads libultrahdr into **`build/_deps/`**.
+From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`** on both platforms (static link). Use **CMake 3.15–3.31.x** on Windows (CMake 4.x fails on the vendored libjpeg-turbo 3.1.0 `cmake_minimum_required` until upstream updates; CI pins **3.31.6**). First configure downloads libultrahdr into **`build/_deps/`**.
 
 **Canonical configure/build** (shared by local builds and GitHub Actions) — use [CMakePresets.json](CMakePresets.json):
 

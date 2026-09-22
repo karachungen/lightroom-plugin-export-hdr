@@ -31,13 +31,23 @@ QString imageToDataUrl(const QImage& image, const char* format = "PNG") {
   if (image.isNull()) {
     return {};
   }
+  if (QLatin1String(format) == QLatin1String("JPEG")) {
+    std::vector<uint8_t> jpeg;
+    std::string error;
+    if (!encode_preview_jpeg(image, 80, &jpeg, &error) || jpeg.empty()) {
+      return {};
+    }
+    const QByteArray bytes(reinterpret_cast<const char*>(jpeg.data()),
+                           static_cast<int>(jpeg.size()));
+    return QStringLiteral("data:image/jpeg;base64,") + QString::fromLatin1(bytes.toBase64());
+  }
   QByteArray bytes;
   QBuffer buffer(&bytes);
   buffer.open(QIODevice::WriteOnly);
-  image.save(&buffer, format, 80);
-  const QString mime = QStringLiteral("data:image/%1;base64,")
-                           .arg(QLatin1String(format) == QLatin1String("JPEG") ? "jpeg" : "png");
-  return mime + QString::fromLatin1(bytes.toBase64());
+  if (!image.save(&buffer, format) || bytes.isEmpty()) {
+    return {};
+  }
+  return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
 }
 
 QString jpegBytesToDataUrl(const std::vector<uint8_t>& jpeg) {

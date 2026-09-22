@@ -3,9 +3,12 @@
 
 #include "gui/sdr_preview_image.h"
 
+#include <QByteArray>
 #include <QImage>
 
+#include <algorithm>
 #include <iostream>
+#include <vector>
 
 namespace uhdr_repack {
 namespace {
@@ -117,6 +120,80 @@ int probe_sdr_main(const std::string& path) {
     return 1;
   }
   std::cout << "sdr: " << image.width() << "x" << image.height() << "\n";
+  return 0;
+}
+
+bool encode_preview_jpeg(const QImage& image, int quality, std::vector<uint8_t>* out,
+                         std::string* error) {
+  if (!out || image.isNull() || image.width() <= 0 || image.height() <= 0) {
+    if (error) *error = "invalid arguments";
+    return false;
+  }
+  const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+  CGDataProviderRef provider = CGDataProviderCreateWithData(
+      nullptr, rgba.constBits(), static_cast<size_t>(rgba.sizeInBytes()), nullptr);
+  if (provider == nullptr) {
+    if (error) *error = "Could not wrap preview pixels";
+    return false;
+  }
+  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGImageRef cg = CGImageCreate(
+      static_cast<size_t>(rgba.width()), static_cast<size_t>(rgba.height()), 8, 32,
+      static_cast<size_t>(rgba.bytesPerLine()), space,
+      kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, provider, nullptr, false,
+      kCGRenderingIntentDefault);
+  CGColorSpaceRelease(space);
+  CGDataProviderRelease(provider);
+  if (cg == nullptr) {
+    if (error) *error = "Could not create a preview bitmap";
+    return false;
+  }
+
+  CFMutableDataRef data = CFDataCreateMutable(kCFAllocatorDefault, 0);
+  CGImageDestinationRef dest =
+      CGImageDestinationCreateWithData(data, CFSTR("public.jpeg"), 1, nullptr);
+  const float q = static_cast<float>(std::clamp(quality, 1, 100)) / 100.f;
+  CFNumberRef qnum = CFNumberCreate(kCFAllocatorDefault, kCFNumberFloatType, &q);
+  const void* keys[] = {kCGImageDestinationLossyCompressionQuality};
+  const void* vals[] = {qnum};
+  CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, keys, vals, 1,
+                                             &kCFTypeDictionaryKeyCallBacks,
+                                             &kCFTypeDictionaryValueCallBacks);
+  bool ok = false;
+  if (dest != nullptr) {
+    CGImageDestinationAddImage(dest, cg, props);
+    ok = CGImageDestinationFinalize(dest);
+    CFRelease(dest);
+  }
+  CFRelease(props);
+  CFRelease(qnum);
+  CGImageRelease(cg);
+  if (!ok || data == nullptr || CFDataGetLength(data) <= 0) {
+    if (data) CFRelease(data);
+    if (error) *error = "ImageIO JPEG encode failed";
+    return false;
+  }
+  const auto* bytes = CFDataGetBytePtr(data);
+  const CFIndex n = CFDataGetLength(data);
+  out->assign(bytes, bytes + n);
+  CFRelease(data);
+  return true;
+}
+
+int encode_preview_jpeg_main(const std::string& path) {
+  QImage image;
+  std::string error;
+  if (!load_sdr_preview_image(path, &image, &error) || image.isNull()) {
+    std::cerr << (error.empty() ? "Could not load SDR image" : error) << "\n";
+    return 1;
+  }
+  std::vector<uint8_t> jpeg;
+  if (!encode_preview_jpeg(image, 80, &jpeg, &error) || jpeg.empty()) {
+    std::cerr << (error.empty() ? "Could not encode preview JPEG" : error) << "\n";
+    return 1;
+  }
+  const QByteArray bytes(reinterpret_cast<const char*>(jpeg.data()), static_cast<int>(jpeg.size()));
+  std::cout << "data:image/jpeg;base64," << bytes.toBase64().constData() << "\n";
   return 0;
 }
 

@@ -7,6 +7,19 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.4 — 🎞 Not a question
+
+> The film strip showed a blue question mark because the thumbnail JPEG had no bytes. Qt's JPEG writer left with the plugin that crashed the editor, so ImageIO and WIC write those thumbs now.
+
+### Fixed
+
+- Film-strip tiles and the stage SDR preview encode JPEG through ImageIO on macOS and WIC on Windows. An empty Qt JPEG save no longer becomes a blue question mark.
+
+### Changed
+
+- Vendored libultrahdr is v2.0.2, which builds libjpeg-turbo 3.1.0. nlohmann/json is v3.12.0.
+- The Windows release kit is Qt 6.11.2, the same open-source patch as the macOS static kit. Qt 6.11.3 is not published yet.
+
 ## v3.0.3 — 🧬 One libjpeg
 
 > The static binary carried two libjpeg ABIs. Qt asked for version 80, libultrahdr answered 62, and the editor segfaulted while opening the SDR JPEG.
