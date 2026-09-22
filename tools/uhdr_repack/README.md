@@ -110,7 +110,7 @@ shared builds and are only suitable for local development:
 
 ```bash
 ./scripts/setup_qt_static.sh
-export QT_STATIC_ROOT=$HOME/Qt/6.11.0-static
+export QT_STATIC_ROOT=$HOME/Qt/6.11.2-static
 ./scripts/build_plugin.sh build
 ```
 

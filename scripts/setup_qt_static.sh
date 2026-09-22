@@ -3,7 +3,7 @@
 # and cannot produce the single-file plugin binary required by this project.
 set -euo pipefail
 
-QT_VERSION="${QT_VERSION:-6.11.0}"
+QT_VERSION="${QT_VERSION:-6.11.2}"
 PREFIX="${QT_STATIC_ROOT:-$HOME/Qt/$QT_VERSION-static}"
 CACHE_DIR="${QT_SOURCE_CACHE:-$HOME/.cache/uhdr-qt-static}"
 ARCHIVE="$CACHE_DIR/qt-everywhere-src-$QT_VERSION.tar.xz"

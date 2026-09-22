@@ -152,7 +152,7 @@ find_qt_static_root() {
 	if [[ -n "${QT_STATIC_ROOT:-}" ]]; then
 		candidates+=("$QT_STATIC_ROOT")
 	fi
-	candidates+=("$HOME/Qt/${QT_VERSION:-6.11.0}-static")
+	candidates+=("$HOME/Qt/${QT_VERSION:-6.11.2}-static")
 
 	local candidate
 	for candidate in "${candidates[@]}"; do

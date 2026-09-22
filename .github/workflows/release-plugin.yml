@@ -36,14 +36,14 @@ jobs:
         if: matrix.id == 'macos-arm64'
         uses: actions/cache@v4
         with:
-          path: ${{ runner.home }}/Qt/6.11.0-static
-          key: qt-6.11.0-macos-arm64-static-v1-${{ hashFiles('scripts/setup_qt_static.sh') }}
+          path: ${{ runner.home }}/Qt/6.11.2-static
+          key: qt-6.11.2-macos-arm64-static-v1-${{ hashFiles('scripts/setup_qt_static.sh') }}
 
       - name: Build static Qt (macOS)
         if: matrix.id == 'macos-arm64'
         shell: bash
         run: |
-          export QT_STATIC_ROOT="$HOME/Qt/6.11.0-static"
+          export QT_STATIC_ROOT="$HOME/Qt/6.11.2-static"
           bash scripts/setup_qt_static.sh
           echo "QT_STATIC_ROOT=$QT_STATIC_ROOT" >> "$GITHUB_ENV"
 
@@ -125,7 +125,7 @@ jobs:
           if [[ "${{ matrix.id }}" == "macos-arm64" ]]; then
             export UHDR_STATIC_QT=ON
             export UHDR_REQUIRE_STATIC_QT=1
-            export QT_STATIC_ROOT="${QT_STATIC_ROOT:-$HOME/Qt/6.11.0-static}"
+            export QT_STATIC_ROOT="${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
           else
             export UHDR_STATIC_QT=OFF
             if [[ -n "${QT_ROOT_DIR:-}" ]]; then
