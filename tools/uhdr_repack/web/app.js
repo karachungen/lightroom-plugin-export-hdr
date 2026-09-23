@@ -77,6 +77,9 @@
     sdrImage: null,
     imageWidth: 0,
     imageHeight: 0,
+    previewWidth: 0,
+    previewHeight: 0,
+    previewReduced: false,
     encodedWidth: 0,
     encodedHeight: 0,
     encodedBytes: 0,
@@ -87,14 +90,19 @@
     slices: [],
     sliceError: "",
     maxSliceCount: 0,
-    cropMeta: { axis: "x", slack: 0 },
+    cropMeta: { axis: "x", slack: 0, lead: 0, trail: 0 },
     drag: null,
     dragRaf: 0,
     settingsTimer: 0,
     lastPreviewRect: null,
     galleryCache: { max: -1, preset: "", chosen: -1 },
     overlayCache: { key: "", sdr: null, count: 0 },
-    canvasScale: { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: 0, dh: 0, cssW: 0, cssH: 0 },
+    canvasScale: { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: 0, dh: 0, cssW: 0, cssH: 0, fit: 1 },
+    viewZoom: 1,
+    viewPanX: 0,
+    viewPanY: 0,
+    viewPan: null,
+    viewPublishKey: "",
     aspectPicked: {},
     sizeDrag: "",
     loaded: false,
@@ -102,6 +110,7 @@
     loadLabel: "",
     loadStarted: 0,
     loadTicker: 0,
+    encoding: false,
   };
 
   const PHASE_LABEL = {
@@ -112,8 +121,13 @@
     decode: "Preview decode",
   };
 
+  const ZOOM_MIN = 0.25;
+  const ZOOM_MAX = 16;
+  const ZOOM_STEP = 1.25;
+
   const canvas = document.getElementById("preview-canvas");
   const ctx = canvas.getContext("2d");
+  const previewFrame = document.getElementById("preview-frame");
   const filmstrip = document.getElementById("filmstrip");
   const sliceOverlay = document.getElementById("slice-overlay");
   const sliceThumbs = document.getElementById("slice-thumbs");
@@ -223,6 +237,47 @@
     post({ type: "setDestDir", path: el.value.trim() });
   }
 
+  function previewIsReduced(previewW, previewH, imageW, imageH, flagged) {
+    const pw = Number(previewW) || 0;
+    const ph = Number(previewH) || 0;
+    const iw = Number(imageW) || 0;
+    const ih = Number(imageH) || 0;
+    const smaller = pw > 0 && ph > 0 && iw > 0 && ih > 0 && (pw < iw || ph < ih);
+    return smaller || flagged === true;
+  }
+
+  function previewMemoryText(previewW, previewH, imageW, imageH) {
+    const pw = Number(previewW) || 0;
+    const ph = Number(previewH) || 0;
+    const iw = Number(imageW) || 0;
+    const ih = Number(imageH) || 0;
+    if (pw > 0 && ph > 0 && iw > 0 && ih > 0 && (pw < iw || ph < ih)) {
+      return `Preview ${pw}×${ph}, reduced for memory. Export uses ${iw}×${ih}.`;
+    }
+    return "Preview reduced for memory. Export uses the original size.";
+  }
+
+  function syncPreviewMemoryNote() {
+    const note = document.getElementById("preview-memory-note");
+    if (!note) return;
+    const show = state.loaded && previewIsReduced(
+      state.previewWidth,
+      state.previewHeight,
+      state.imageWidth,
+      state.imageHeight,
+      state.previewReduced
+    );
+    note.hidden = !show;
+    if (show) {
+      note.textContent = previewMemoryText(
+        state.previewWidth,
+        state.previewHeight,
+        state.imageWidth,
+        state.imageHeight
+      );
+    }
+  }
+
   function handleNative(msg) {
     switch (msg.type) {
       case "session":
@@ -235,12 +290,39 @@
         break;
       case "itemLoading":
         if (msg.id !== state.currentId) return;
+        state.previewReduced = false;
+        state.previewWidth = 0;
+        state.previewHeight = 0;
+        syncPreviewMemoryNote();
         setSdrLoadOverlay(true, msg);
         break;
       case "itemReady":
         updateItemThumb(msg.id, msg.thumb || msg.sdrDataUrl);
+        const readyItem = state.items.find((x) => x.id === msg.id);
+        const readyImageW = msg.imageWidth !== undefined ? Number(msg.imageWidth) || 0 : 0;
+        const readyImageH = msg.imageHeight !== undefined ? Number(msg.imageHeight) || 0 : 0;
+        const readyPreviewW = msg.previewWidth !== undefined ? Number(msg.previewWidth) || 0 : 0;
+        const readyPreviewH = msg.previewHeight !== undefined ? Number(msg.previewHeight) || 0 : 0;
+        const readyReduced = previewIsReduced(
+          readyPreviewW,
+          readyPreviewH,
+          readyImageW,
+          readyImageH,
+          msg.previewReduced === true
+        );
+        if (readyItem) {
+          readyItem.previewReduced = readyReduced;
+          readyItem.previewWidth = readyPreviewW;
+          readyItem.previewHeight = readyPreviewH;
+          if (msg.imageWidth !== undefined) readyItem.imageWidth = readyImageW;
+          if (msg.imageHeight !== undefined) readyItem.imageHeight = readyImageH;
+        }
+        renderFilmstrip();
         if (msg.id !== state.currentId) return;
         state.loaded = true;
+        state.previewReduced = readyReduced;
+        state.previewWidth = readyPreviewW;
+        state.previewHeight = readyPreviewH;
         document.body.classList.remove("is-loading");
         setSdrLoadOverlay(false);
         if (msg.sliceAspect !== undefined) state.settings.sliceAspect = msg.sliceAspect;
@@ -251,11 +333,7 @@
         if (msg.outputHeight !== undefined) state.settings.outputHeight = Number(msg.outputHeight) || 0;
         if (msg.imageWidth !== undefined) state.imageWidth = Number(msg.imageWidth) || 0;
         if (msg.imageHeight !== undefined) state.imageHeight = Number(msg.imageHeight) || 0;
-        const readyItem = state.items.find((x) => x.id === msg.id);
-        if (readyItem) {
-          if (msg.imageWidth !== undefined) readyItem.imageWidth = Number(msg.imageWidth) || 0;
-          if (msg.imageHeight !== undefined) readyItem.imageHeight = Number(msg.imageHeight) || 0;
-        }
+        syncPreviewMemoryNote();
         const autoAspect = maybeAutoSelectAspect(!!msg.hasSliceOverride);
         syncIgPresets();
         loadImages(msg);
@@ -265,6 +343,10 @@
         break;
       case "itemFailed":
         if (msg.id && msg.id !== state.currentId) return;
+        state.previewReduced = false;
+        state.previewWidth = 0;
+        state.previewHeight = 0;
+        syncPreviewMemoryNote();
         document.body.classList.remove("is-loading");
         setSdrLoadOverlay(false);
         document.getElementById("status-text").textContent = msg.text || "Could not load image";
@@ -273,17 +355,26 @@
         if (msg.id !== state.currentId) return;
         applyGainmapMessage(msg);
         break;
+      case "previewView":
+        applyExternalPreviewView(Number(msg.zoom), Number(msg.panX), Number(msg.panY));
+        break;
       case "slices":
         if (msg.id !== state.currentId) return;
         if (state.drag) break;
-        state.slices = msg.rects || [];
-        state.sliceError = msg.error || "";
         if (msg.cropOffset !== undefined) state.settings.cropOffset = Number(msg.cropOffset);
         if (msg.sliceCount !== undefined) state.settings.sliceCount = Number(msg.sliceCount);
         if (msg.maxSliceCount !== undefined) state.maxSliceCount = Number(msg.maxSliceCount);
         if (msg.previewSlice !== undefined) state.settings.previewSlice = Number(msg.previewSlice);
         if (msg.outputWidth !== undefined) state.settings.outputWidth = Number(msg.outputWidth) || 0;
         if (msg.outputHeight !== undefined) state.settings.outputHeight = Number(msg.outputHeight) || 0;
+        if (state.sdrImage && IG_RATIO[state.settings.sliceAspect]) {
+          const planned = computeLocalSlices();
+          state.slices = planned.rects;
+          state.sliceError = planned.error || msg.error || "";
+        } else {
+          state.slices = msg.rects || [];
+          state.sliceError = msg.error || "";
+        }
         drawPreview();
         renderSliceOverlay();
         syncSizeSliders();
@@ -292,7 +383,9 @@
         renderGalleryPicker();
         break;
       case "status":
-        if (state.loadStarted) {
+        if (state.encoding) {
+          showEncodeStatus(msg.text || "");
+        } else if (state.loadStarted) {
           state.loadLabel = msg.text || state.loadLabel;
           refreshLoadStatus();
         } else {
@@ -300,7 +393,7 @@
         }
         break;
       case "busy":
-        document.getElementById("apply-btn").disabled = !!msg.busy;
+        setEncodingLock(!!msg.busy, msg.text || "");
         break;
       case "destDir":
         setDestField(msg.path || "");
@@ -418,15 +511,32 @@
         note.textContent = "HDR TIFF reduced to 2880px short edge for performance";
         li.appendChild(note);
       }
+      if (item.previewReduced) {
+        const previewNote = document.createElement("div");
+        previewNote.className = "size-warn";
+        previewNote.textContent = previewMemoryText(
+          item.previewWidth,
+          item.previewHeight,
+          item.imageWidth,
+          item.imageHeight
+        );
+        li.appendChild(previewNote);
+      }
       li.addEventListener("click", () => selectItem(item.id, true));
       filmstrip.appendChild(li);
     });
     filmstrip.scrollTop = scrollTop;
+    if (state.encoding) applyControlLock();
   }
 
   function selectItem(id, notify) {
     state.currentId = id;
     state.loaded = false;
+    state.previewReduced = false;
+    state.previewWidth = 0;
+    state.previewHeight = 0;
+    resetPreviewZoom();
+    syncPreviewMemoryNote();
     document.body.classList.add("is-loading");
     renderFilmstrip();
     const item = state.items.find((x) => x.id === id);
@@ -998,15 +1108,48 @@
     state.galleryCache = { max, preset, chosen };
   }
 
+  function tilesForCount(packH, count, w, h, rw, rh, tileW, tileH) {
+    if (count < 1 || rw === 0 || rh === 0) return null;
+    if (packH) {
+      if (count * tileW <= w) return { tileW, tileH };
+      let nextW = evenFloor(Math.floor(w / count));
+      let nextH = evenFloor(Math.floor((nextW * rh) / rw));
+      if (nextH > h) {
+        nextH = evenFloor(h);
+        nextW = evenFloor(Math.floor((nextH * rw) / rh));
+      }
+      if (nextW < 2 || nextH < 2 || nextH > h || count * nextW > w) return null;
+      return { tileW: nextW, tileH: nextH };
+    }
+    if (count * tileH <= h) return { tileW, tileH };
+    let nextH = evenFloor(Math.floor(h / count));
+    let nextW = evenFloor(Math.floor((nextH * rw) / rh));
+    if (nextW > w) {
+      nextW = evenFloor(w);
+      nextH = evenFloor(Math.floor((nextW * rh) / rw));
+    }
+    if (nextW < 2 || nextH < 2 || nextW > w || count * nextH > h) return null;
+    return { tileW: nextW, tileH: nextH };
+  }
+
+  function planPixelSize() {
+    const w = evenFloor(Number(state.imageWidth) || 0);
+    const h = evenFloor(Number(state.imageHeight) || 0);
+    if (w >= 2 && h >= 2) return { w, h };
+    if (!state.sdrImage) return { w: 0, h: 0 };
+    return { w: evenFloor(state.sdrImage.width), h: evenFloor(state.sdrImage.height) };
+  }
+
   function computeLocalSlices() {
     const spec = IG_RATIO[state.settings.sliceAspect];
     if (!state.sdrImage || !spec) {
-      state.cropMeta = { axis: "x", slack: 0 };
+      state.cropMeta = { axis: "x", slack: 0, lead: 0, trail: 0 };
       state.maxSliceCount = 0;
       return { rects: [], error: "" };
     }
-    const w = evenFloor(state.sdrImage.width);
-    const h = evenFloor(state.sdrImage.height);
+    const plannedSize = planPixelSize();
+    const w = plannedSize.w;
+    const h = plannedSize.h;
     const rw = spec[0];
     const rh = spec[1];
     const packH = w * rh >= h * rw;
@@ -1026,9 +1169,19 @@
       axis = "y";
     }
     if (maxCount > IG_GALLERY_MAX) maxCount = IG_GALLERY_MAX;
+    const span = packH ? w : h;
+    const tileSpan = packH ? tileW : tileH;
+    if (tileSpan >= 2 && maxCount >= 1) {
+      let cover = Math.round(span / tileSpan);
+      if (cover < maxCount) cover = maxCount;
+      if (cover > IG_GALLERY_MAX) cover = IG_GALLERY_MAX;
+      if (cover > maxCount && tilesForCount(packH, cover, w, h, rw, rh, tileW, tileH)) {
+        maxCount = cover;
+      }
+    }
     state.maxSliceCount = maxCount;
-    if (tileW < 2 || tileH < 2 || maxCount < 1) {
-      state.cropMeta = { axis, slack: 0 };
+    if (tileW < 2 || tileH < 2 || maxCount < 1 || w < 2 || h < 2) {
+      state.cropMeta = { axis, slack: 0, lead: 0, trail: 0 };
       const label = state.settings.sliceAspect;
       return { rects: [], error: `Image too small for ${label} crop` };
     }
@@ -1038,8 +1191,12 @@
     if (count < 1) count = 1;
     if (count > maxCount) count = maxCount;
     state.settings.sliceCount = count;
+    const fitted = tilesForCount(packH, count, w, h, rw, rh, tileW, tileH);
+    if (fitted) {
+      tileW = fitted.tileW;
+      tileH = fitted.tileH;
+    }
     const slack = axis === "x" ? w - count * tileW : h - count * tileH;
-    state.cropMeta = { axis, slack };
     const offset = Math.min(1, Math.max(0, Number(state.settings.cropOffset) || 0));
     let start = evenFloor(Math.round(slack * offset));
     if (axis === "x") {
@@ -1047,18 +1204,21 @@
     } else if (start + count * tileH > h) {
       start = evenFloor(h - count * tileH);
     }
+    const trail = Math.max(0, slack - start);
+    state.cropMeta = { axis, slack, lead: start, trail };
+    const cross = axis === "x" ? evenFloor(Math.floor((h - tileH) / 2)) : evenFloor(Math.floor((w - tileW) / 2));
     const rects = [];
     for (let i = 0; i < count; i += 1) {
       if (axis === "x") {
         rects.push({
           x: (start + i * tileW) / w,
-          y: 0,
+          y: cross / h,
           w: tileW / w,
           h: tileH / h,
         });
       } else {
         rects.push({
-          x: 0,
+          x: cross / w,
           y: (start + i * tileH) / h,
           w: tileW / w,
           h: tileH / h,
@@ -1162,8 +1322,147 @@
     applyGainmapMessage(msg);
   }
 
+  function clampZoom(zoom) {
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+  }
+
+  function resetPreviewZoom() {
+    state.viewZoom = 1;
+    state.viewPanX = 0;
+    state.viewPanY = 0;
+    state.viewPublishKey = "";
+    syncZoomUi();
+    publishPreviewView();
+  }
+
+  function syncZoomUi() {
+    const zoomOut = document.getElementById("zoom-out");
+    const zoomIn = document.getElementById("zoom-in");
+    const zoomFit = document.getElementById("zoom-fit");
+    const hasImage = !!state.sdrImage;
+    const zoom = state.viewZoom;
+    if (zoomOut) zoomOut.disabled = !hasImage || zoom <= ZOOM_MIN + 0.001;
+    if (zoomIn) zoomIn.disabled = !hasImage || zoom >= ZOOM_MAX - 0.001;
+    if (zoomFit) {
+      zoomFit.disabled = !hasImage;
+      zoomFit.textContent = `${Math.round(zoom * 100)}%`;
+      zoomFit.title = zoom > ZOOM_MIN + 0.001 ? "Fit to frame" : "Fitted to frame";
+    }
+    if (previewFrame && !state.viewPan) {
+      const s = state.canvasScale;
+      const canPan = hasImage && (s.dw > s.cssW + 1 || s.dh > s.cssH + 1);
+      previewFrame.classList.toggle("is-pannable", canPan);
+    }
+  }
+
+  function fittedPixelSize() {
+    const fit = state.canvasScale.fit || 0;
+    if (!state.sdrImage || fit <= 0) return { w: 0, h: 0 };
+    return { w: state.sdrImage.width * fit, h: state.sdrImage.height * fit };
+  }
+
+  function previewViewKey() {
+    const fit = fittedPixelSize();
+    const panX = fit.w > 0 ? state.viewPanX / fit.w : 0;
+    const panY = fit.h > 0 ? state.viewPanY / fit.h : 0;
+    return `${state.viewZoom.toFixed(4)}:${panX.toFixed(4)}:${panY.toFixed(4)}`;
+  }
+
+  function publishPreviewView() {
+    const key = previewViewKey();
+    if (key === state.viewPublishKey) return;
+    state.viewPublishKey = key;
+    const fit = fittedPixelSize();
+    post({
+      type: "setPreviewView",
+      zoom: state.viewZoom,
+      panX: fit.w > 0 ? state.viewPanX / fit.w : 0,
+      panY: fit.h > 0 ? state.viewPanY / fit.h : 0,
+    });
+  }
+
+  function applyExternalPreviewView(zoom, panX, panY) {
+    const fit = fittedPixelSize();
+    state.viewZoom = clampZoom(Number.isFinite(zoom) ? zoom : 1);
+    state.viewPanX = (Number.isFinite(panX) ? panX : 0) * fit.w;
+    state.viewPanY = (Number.isFinite(panY) ? panY : 0) * fit.h;
+    state.viewPublishKey = previewViewKey();
+    resizeCanvas();
+    drawPreview();
+  }
+
+  function placePreview(cssW, cssH, panX, panY) {
+    const img = state.sdrImage;
+    const fit = Math.min(cssW / img.width, cssH / img.height);
+    const scale = fit * state.viewZoom;
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    let offsetX = (cssW - dw) / 2 + panX;
+    let offsetY = (cssH - dh) / 2 + panY;
+    const margin = 48;
+    if (dw <= cssW) {
+      offsetX = (cssW - dw) / 2;
+    } else {
+      offsetX = Math.min(cssW - margin, Math.max(margin - dw, offsetX));
+    }
+    if (dh <= cssH) {
+      offsetY = (cssH - dh) / 2;
+    } else {
+      offsetY = Math.min(cssH - margin, Math.max(margin - dh, offsetY));
+    }
+    state.viewPanX = offsetX - (cssW - dw) / 2;
+    state.viewPanY = offsetY - (cssH - dh) / 2;
+    state.canvasScale = {
+      x: scale,
+      y: scale,
+      offsetX,
+      offsetY,
+      dw,
+      dh,
+      cssW,
+      cssH,
+      fit,
+    };
+    publishPreviewView();
+  }
+
+  function setPreviewZoom(next, anchor) {
+    if (!state.sdrImage) return;
+    const prev = state.canvasScale;
+    const zoom = clampZoom(next);
+    let panX = state.viewPanX;
+    let panY = state.viewPanY;
+    if (anchor && prev.dw > 0 && prev.dh > 0 && prev.fit > 0) {
+      const ix = (anchor.x - prev.offsetX) / prev.dw;
+      const iy = (anchor.y - prev.offsetY) / prev.dh;
+      const dw = state.sdrImage.width * prev.fit * zoom;
+      const dh = state.sdrImage.height * prev.fit * zoom;
+      panX = anchor.x - ix * dw - (prev.cssW - dw) / 2;
+      panY = anchor.y - iy * dh - (prev.cssH - dh) / 2;
+    } else if (zoom <= ZOOM_MIN + 0.001) {
+      panX = 0;
+      panY = 0;
+    }
+    state.viewZoom = zoom;
+    state.viewPanX = panX;
+    state.viewPanY = panY;
+    resizeCanvas();
+    drawPreview();
+    syncZoomUi();
+  }
+
+  function frameAnchor(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function frameCenterAnchor() {
+    const s = state.canvasScale;
+    return { x: (s.cssW || canvas.clientWidth) / 2, y: (s.cssH || canvas.clientHeight) / 2 };
+  }
+
   function resizeCanvas() {
-    const wrap = document.getElementById("preview-frame") || document.getElementById("canvas-wrap");
+    const wrap = previewFrame || document.getElementById("canvas-wrap");
     const w = wrap.clientWidth;
     const h = Math.max(240, wrap.clientHeight);
     const dpr = window.devicePixelRatio || 1;
@@ -1173,22 +1472,12 @@
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     if (!state.sdrImage) {
-      state.canvasScale = { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: w, dh: h, cssW: w, cssH: h };
+      state.canvasScale = { x: 1, y: 1, offsetX: 0, offsetY: 0, dw: w, dh: h, cssW: w, cssH: h, fit: 1 };
+      syncZoomUi();
       return;
     }
-    const scale = Math.min(w / state.sdrImage.width, h / state.sdrImage.height);
-    const dw = state.sdrImage.width * scale;
-    const dh = state.sdrImage.height * scale;
-    state.canvasScale = {
-      x: scale,
-      y: scale,
-      offsetX: (w - dw) / 2,
-      offsetY: (h - dh) / 2,
-      dw,
-      dh,
-      cssW: w,
-      cssH: h,
-    };
+    placePreview(w, h, state.viewPanX, state.viewPanY);
+    syncZoomUi();
   }
 
   function drawPreview() {
@@ -1308,6 +1597,71 @@
     }
   }
 
+  function hideSliceMargins() {
+    const leadEl = document.getElementById("slice-margin-lead");
+    const trailEl = document.getElementById("slice-margin-trail");
+    if (leadEl) leadEl.hidden = true;
+    if (trailEl) trailEl.hidden = true;
+  }
+
+  function pinMarginLabel(el, origin, gutter, edge, along) {
+    const text = along === "y" ? el.offsetHeight : el.offsetWidth;
+    if (gutter >= text + 8) return origin + (gutter - text) / 2;
+    if (edge === "start") return origin + 4;
+    return origin + gutter - text - 4;
+  }
+
+  function updateSliceMargins() {
+    const leadEl = document.getElementById("slice-margin-lead");
+    const trailEl = document.getElementById("slice-margin-trail");
+    const s = state.canvasScale;
+    const show =
+      leadEl &&
+      trailEl &&
+      s &&
+      state.sdrImage &&
+      state.slices.length &&
+      state.settings.sliceAspect !== "none";
+    if (!show) {
+      hideSliceMargins();
+      return;
+    }
+    const axis = state.cropMeta.axis === "y" ? "y" : "x";
+    const lead = Number(state.cropMeta.lead) || 0;
+    const trail = Number(state.cropMeta.trail) || 0;
+    leadEl.hidden = false;
+    trailEl.hidden = false;
+    leadEl.textContent = String(lead);
+    trailEl.textContent = String(trail);
+    leadEl.title = axis === "x" ? "Left margin, master pixels" : "Top margin, master pixels";
+    trailEl.title = axis === "x" ? "Right margin, master pixels" : "Bottom margin, master pixels";
+    const first = state.slices[0];
+    const last = state.slices[state.slices.length - 1];
+    if (axis === "x") {
+      const gutterL = first.x * s.dw;
+      const trailStart = (last.x + last.w) * s.dw;
+      const gutterR = Math.max(0, s.dw - trailStart);
+      const y = s.offsetY + s.dh / 2;
+      leadEl.style.left = `${pinMarginLabel(leadEl, s.offsetX, gutterL, "start", "x")}px`;
+      leadEl.style.top = `${y}px`;
+      trailEl.style.left = `${pinMarginLabel(trailEl, s.offsetX + trailStart, gutterR, "end", "x")}px`;
+      trailEl.style.top = `${y}px`;
+      leadEl.style.transform = "translateY(-50%)";
+      trailEl.style.transform = "translateY(-50%)";
+    } else {
+      const gutterT = first.y * s.dh;
+      const trailStart = (last.y + last.h) * s.dh;
+      const gutterB = Math.max(0, s.dh - trailStart);
+      const x = s.offsetX + s.dw / 2;
+      leadEl.style.top = `${pinMarginLabel(leadEl, s.offsetY, gutterT, "start", "y")}px`;
+      leadEl.style.left = `${x}px`;
+      trailEl.style.top = `${pinMarginLabel(trailEl, s.offsetY + trailStart, gutterB, "end", "y")}px`;
+      trailEl.style.left = `${x}px`;
+      leadEl.style.transform = "translateX(-50%)";
+      trailEl.style.transform = "translateX(-50%)";
+    }
+  }
+
   function renderSliceOverlay(opts) {
     const thumbs = !opts || opts.thumbs !== false;
     const reportRect = !opts || opts.reportRect !== false;
@@ -1320,12 +1674,14 @@
       if (sliceOverlay.childElementCount) sliceOverlay.innerHTML = "";
       if (sliceThumbs.childElementCount) sliceThumbs.innerHTML = "";
       sliceOverlay.classList.remove("is-active", "is-dragging");
+      hideSliceMargins();
       state.overlayCache = { key: "", sdr: null, count: 0 };
       if (reportRect) reportPreviewRect();
       return;
     }
     const selected = Math.max(1, Math.min(state.settings.previewSlice || 1, state.slices.length));
     layoutSliceRects(htmlGuides, selected);
+    updateSliceMargins();
     if (thumbs) paintSliceThumbs(sliceKey(state.slices), selected);
     if (reportRect) reportPreviewRect();
   }
@@ -1348,7 +1704,54 @@
     });
   }
 
+  function showEncodeStatus(text) {
+    const status = document.getElementById("status-text");
+    if (status && text) status.textContent = text;
+    const loader = document.getElementById("hdr-loader");
+    if (!loader) return;
+    loader.hidden = false;
+    const copy = loader.querySelector("p");
+    if (copy && text) copy.textContent = text;
+  }
+
+  function applyControlLock() {
+    document.querySelectorAll("#app button, #app input").forEach((el) => {
+      if (el.id === "cancel-btn") {
+        el.disabled = false;
+        return;
+      }
+      if (state.encoding) {
+        if (!el.dataset.encodeLocked) {
+          el.dataset.encodeLocked = "1";
+          el.dataset.encodeWasDisabled = el.disabled ? "1" : "0";
+        }
+        el.disabled = true;
+      } else if (el.dataset.encodeLocked) {
+        el.disabled = el.dataset.encodeWasDisabled === "1";
+        delete el.dataset.encodeLocked;
+        delete el.dataset.encodeWasDisabled;
+      }
+    });
+  }
+
+  function setEncodingLock(busy, text) {
+    state.encoding = busy;
+    document.body.classList.toggle("is-encoding", busy);
+    applyControlLock();
+    if (busy) {
+      showEncodeStatus(text || "Encoding…");
+      return;
+    }
+    const loader = document.getElementById("hdr-loader");
+    if (loader && !document.body.classList.contains("is-hdr-loading")) {
+      loader.hidden = true;
+    }
+    const status = document.getElementById("status-text");
+    if (status && text) status.textContent = text;
+  }
+
   function refreshLoadStatus() {
+    if (state.encoding) return;
     const el = document.getElementById("status-text");
     if (!el || !state.loadStarted) return;
     const sec = (Date.now() - state.loadStarted) / 1000;
@@ -1402,6 +1805,7 @@
   }
 
   function setHdrLoading(loading, phase) {
+    if (state.encoding && !loading) return;
     const loader = document.getElementById("hdr-loader");
     document.body.classList.toggle("is-hdr-loading", loading);
     if (loader) loader.hidden = !loading;
@@ -1575,14 +1979,16 @@
 
   function slackDisplayPx() {
     const s = state.canvasScale;
-    if (!s || !state.sdrImage || state.cropMeta.slack < 2) return 0;
+    const size = planPixelSize();
+    if (!s || !state.sdrImage || state.cropMeta.slack < 2 || size.w < 2 || size.h < 2) return 0;
     if (state.cropMeta.axis === "x") {
-      return (state.cropMeta.slack / state.sdrImage.width) * s.dw;
+      return (state.cropMeta.slack / size.w) * s.dw;
     }
-    return (state.cropMeta.slack / state.sdrImage.height) * s.dh;
+    return (state.cropMeta.slack / size.h) * s.dh;
   }
 
   sliceOverlay.addEventListener("pointerdown", (ev) => {
+    if (state.encoding) return;
     if (!sliceOverlay.classList.contains("is-active")) return;
     const slackPx = slackDisplayPx();
     if (slackPx < 2) return;
@@ -1626,8 +2032,112 @@
   sliceOverlay.addEventListener("pointerup", endDrag);
   sliceOverlay.addEventListener("pointercancel", endDrag);
 
+  let spaceDown = false;
+
+  function shouldPanPreview(ev) {
+    if (!state.sdrImage || !previewFrame) return false;
+    if (ev.button !== 0 && ev.button !== 1) return false;
+    if (ev.target.closest && ev.target.closest("#zoom-controls")) return false;
+    if (ev.button === 1 || spaceDown || ev.altKey) return true;
+    const crop = sliceOverlay.classList.contains("is-active");
+    const s = state.canvasScale;
+    const canPan = s.dw > s.cssW + 1 || s.dh > s.cssH + 1;
+    return canPan && !crop;
+  }
+
+  if (previewFrame) {
+    previewFrame.addEventListener("pointerdown", (ev) => {
+      if (state.encoding || !shouldPanPreview(ev)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      state.viewPan = {
+        pointerId: ev.pointerId,
+        x: ev.clientX,
+        y: ev.clientY,
+        panX: state.viewPanX,
+        panY: state.viewPanY,
+      };
+      previewFrame.classList.add("is-panning");
+      previewFrame.setPointerCapture(ev.pointerId);
+    }, true);
+    previewFrame.addEventListener("pointermove", (ev) => {
+      const pan = state.viewPan;
+      if (!pan || pan.pointerId !== ev.pointerId) return;
+      state.viewPanX = pan.panX + (ev.clientX - pan.x);
+      state.viewPanY = pan.panY + (ev.clientY - pan.y);
+      resizeCanvas();
+      drawPreview();
+    });
+    function endPreviewPan(ev) {
+      if (!state.viewPan) return;
+      if (ev && state.viewPan.pointerId !== ev.pointerId) return;
+      state.viewPan = null;
+      previewFrame.classList.remove("is-panning");
+      syncZoomUi();
+    }
+    previewFrame.addEventListener("pointerup", endPreviewPan);
+    previewFrame.addEventListener("pointercancel", endPreviewPan);
+    previewFrame.addEventListener("wheel", (ev) => {
+      if (state.encoding || !state.sdrImage) return;
+      ev.preventDefault();
+      const dy = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
+      if (!dy) return;
+      const factor = Math.pow(ZOOM_STEP, -dy / 100);
+      setPreviewZoom(state.viewZoom * factor, frameAnchor(ev.clientX, ev.clientY));
+    }, { passive: false });
+    previewFrame.addEventListener("dblclick", (ev) => {
+      if (state.encoding) return;
+      if (ev.target.closest && ev.target.closest("#zoom-controls")) return;
+      if (!state.sdrImage) return;
+      if (state.viewZoom > ZOOM_MIN + 0.05) setPreviewZoom(1);
+      else setPreviewZoom(2, frameAnchor(ev.clientX, ev.clientY));
+    });
+  }
+
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn = document.getElementById("zoom-out");
+  const zoomFitBtn = document.getElementById("zoom-fit");
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      setPreviewZoom(state.viewZoom * ZOOM_STEP, frameCenterAnchor());
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      setPreviewZoom(state.viewZoom / ZOOM_STEP, frameCenterAnchor());
+    });
+  }
+  if (zoomFitBtn) {
+    zoomFitBtn.addEventListener("click", () => setPreviewZoom(1));
+  }
+  syncZoomUi();
+
   window.addEventListener("keydown", (ev) => {
+    if (state.encoding) return;
     if (ev.target && (ev.target.tagName === "INPUT" || ev.target.tagName === "TEXTAREA")) return;
+    if (ev.key === " " || ev.code === "Space") {
+      spaceDown = true;
+      if (previewFrame) previewFrame.classList.add("is-space-pan");
+      ev.preventDefault();
+      return;
+    }
+    if (!ev.metaKey && !ev.ctrlKey && !ev.altKey) {
+      if (ev.key === "+" || ev.key === "=") {
+        setPreviewZoom(state.viewZoom * ZOOM_STEP, frameCenterAnchor());
+        ev.preventDefault();
+        return;
+      }
+      if (ev.key === "-" || ev.key === "_") {
+        setPreviewZoom(state.viewZoom / ZOOM_STEP, frameCenterAnchor());
+        ev.preventDefault();
+        return;
+      }
+      if (ev.key === "0") {
+        setPreviewZoom(1);
+        ev.preventDefault();
+        return;
+      }
+    }
     const idx = state.items.findIndex((item) => item.id === state.currentId);
     if (ev.key === "ArrowDown" || ev.key === "ArrowRight") {
       if (state.settings.sliceAspect !== "none" && state.cropMeta.slack > 0 &&
@@ -1656,6 +2166,16 @@
     } else if (ev.key === "1") setMode("sdr");
     else if (ev.key === "2") setMode("gain");
     else if (ev.key === "3" || ev.key === "4") setMode("hdr");
+  });
+
+  window.addEventListener("keyup", (ev) => {
+    if (ev.key !== " " && ev.code !== "Space") return;
+    spaceDown = false;
+    if (previewFrame) previewFrame.classList.remove("is-space-pan");
+  });
+  window.addEventListener("blur", () => {
+    spaceDown = false;
+    if (previewFrame) previewFrame.classList.remove("is-space-pan");
   });
 
   window.addEventListener("resize", () => {

@@ -57,6 +57,31 @@ CGImageSourceRef open_source(const std::string& path, std::string* error) {
   return source;
 }
 
+bool cgimage_to_qimage(CGImageRef image, const std::string& path, QImage* out, std::string* error) {
+  const int w = static_cast<int>(CGImageGetWidth(image));
+  const int h = static_cast<int>(CGImageGetHeight(image));
+  if (w <= 0 || h <= 0) {
+    if (error) *error = "ImageIO decoded an empty image: " + path;
+    return false;
+  }
+
+  QImage rgba(w, h, QImage::Format_RGBA8888);
+  rgba.fill(0);
+  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  CGContextRef ctx = CGBitmapContextCreate(
+      rgba.bits(), static_cast<size_t>(w), static_cast<size_t>(h), 8, rgba.bytesPerLine(), space,
+      kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+  CGColorSpaceRelease(space);
+  if (ctx == nullptr) {
+    if (error) *error = "Could not create a bitmap for: " + path;
+    return false;
+  }
+  CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image);
+  CGContextRelease(ctx);
+  *out = std::move(rgba);
+  return true;
+}
+
 }  // namespace
 
 bool sdr_preview_size(const std::string& path, int* width, int* height, std::string* error) {
@@ -71,45 +96,51 @@ bool sdr_preview_size(const std::string& path, int* width, int* height, std::str
   return ok;
 }
 
-bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* error) {
+bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* error, int max_edge) {
   if (!out) {
     if (error) *error = "invalid arguments";
     return false;
   }
   CGImageSourceRef source = open_source(path, error);
   if (source == nullptr) return false;
-  CGImageRef image = CGImageSourceCreateImageAtIndex(source, 0, nullptr);
+
+  int src_w = 0;
+  int src_h = 0;
+  if (!source_size(source, &src_w, &src_h, error)) {
+    CFRelease(source);
+    return false;
+  }
+  int dst_w = src_w;
+  int dst_h = src_h;
+  const bool shrink = max_edge >= 2 &&
+                      fit_preview_long_edge(src_w, src_h, max_edge, &dst_w, &dst_h) &&
+                      (dst_w < src_w || dst_h < src_h);
+
+  CGImageRef image = nullptr;
+  if (shrink) {
+    const int max_px = std::max(dst_w, dst_h);
+    CFNumberRef max_num = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &max_px);
+    const void* keys[] = {kCGImageSourceThumbnailMaxPixelSize,
+                          kCGImageSourceCreateThumbnailFromImageAlways,
+                          kCGImageSourceCreateThumbnailWithTransform};
+    const void* vals[] = {max_num, kCFBooleanTrue, kCFBooleanTrue};
+    CFDictionaryRef opts = CFDictionaryCreate(kCFAllocatorDefault, keys, vals, 3,
+                                              &kCFTypeDictionaryKeyCallBacks,
+                                              &kCFTypeDictionaryValueCallBacks);
+    image = CGImageSourceCreateThumbnailAtIndex(source, 0, opts);
+    CFRelease(opts);
+    CFRelease(max_num);
+  } else {
+    image = CGImageSourceCreateImageAtIndex(source, 0, nullptr);
+  }
   CFRelease(source);
   if (image == nullptr) {
     if (error) *error = "ImageIO could not decode: " + path;
     return false;
   }
-
-  const int w = static_cast<int>(CGImageGetWidth(image));
-  const int h = static_cast<int>(CGImageGetHeight(image));
-  if (w <= 0 || h <= 0) {
-    CGImageRelease(image);
-    if (error) *error = "ImageIO decoded an empty image: " + path;
-    return false;
-  }
-
-  QImage rgba(w, h, QImage::Format_RGBA8888);
-  rgba.fill(0);
-  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-  CGContextRef ctx = CGBitmapContextCreate(
-      rgba.bits(), static_cast<size_t>(w), static_cast<size_t>(h), 8, rgba.bytesPerLine(), space,
-      kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-  CGColorSpaceRelease(space);
-  if (ctx == nullptr) {
-    CGImageRelease(image);
-    if (error) *error = "Could not create a bitmap for: " + path;
-    return false;
-  }
-  CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image);
-  CGContextRelease(ctx);
+  const bool ok = cgimage_to_qimage(image, path, out, error);
   CGImageRelease(image);
-  *out = std::move(rgba);
-  return true;
+  return ok;
 }
 
 int probe_sdr_main(const std::string& path) {

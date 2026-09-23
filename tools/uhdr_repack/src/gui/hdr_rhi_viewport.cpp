@@ -473,6 +473,8 @@ class HdrRhiViewport::Impl {
   float headroom = 1.0f;
   float sdr_white_scale = 1.0f;
   float zoom = 1.0f;
+  float fit_w = 1.0f;
+  float fit_h = 1.0f;
   QPointF pan;
   QPoint last_pointer;
   bool panning = false;
@@ -567,6 +569,23 @@ void HdrRhiViewport::setZoom(float zoom) {
   requestUpdate();
 }
 
+void HdrRhiViewport::zoomBy(float factor) {
+  d_->zoom = std::clamp(d_->zoom * std::max(factor, 0.01f), 0.25f, 16.0f);
+  requestUpdate();
+  emit viewChanged(d_->zoom, static_cast<float>(d_->pan.x()), static_cast<float>(-d_->pan.y()));
+}
+
+void HdrRhiViewport::setView(float zoom, float pan_x, float pan_y) {
+  d_->zoom = std::clamp(zoom, 0.25f, 16.0f);
+  d_->pan = QPointF(pan_x, -pan_y);
+  requestUpdate();
+}
+
+void HdrRhiViewport::setFitSize(int width, int height) {
+  d_->fit_w = static_cast<float>(std::max(1, width));
+  d_->fit_h = static_cast<float>(std::max(1, height));
+}
+
 void HdrRhiViewport::fitToView() {
   d_->zoom = 1.0f;
   d_->pan = {};
@@ -637,7 +656,7 @@ bool HdrRhiViewport::event(QEvent* event) {
 
 void HdrRhiViewport::wheelEvent(QWheelEvent* event) {
   const float factor = event->angleDelta().y() > 0 ? 1.15f : 1.0f / 1.15f;
-  setZoom(d_->zoom * factor);
+  zoomBy(factor);
   event->accept();
 }
 
@@ -654,9 +673,10 @@ void HdrRhiViewport::mouseMoveEvent(QMouseEvent* event) {
   if (!d_->panning || width() <= 0 || height() <= 0) return;
   const QPoint delta = event->pos() - d_->last_pointer;
   d_->last_pointer = event->pos();
-  d_->pan += QPointF(static_cast<float>(delta.x()) / width(),
-                     static_cast<float>(delta.y()) / height());
+  d_->pan += QPointF(static_cast<float>(delta.x()) / std::max(d_->fit_w, 1.0f),
+                     static_cast<float>(delta.y()) / std::max(d_->fit_h, 1.0f));
   requestUpdate();
+  emit viewChanged(d_->zoom, static_cast<float>(d_->pan.x()), static_cast<float>(-d_->pan.y()));
   event->accept();
 }
 

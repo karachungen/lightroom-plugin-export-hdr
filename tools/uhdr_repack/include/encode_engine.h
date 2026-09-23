@@ -3,6 +3,7 @@
 #include "slice_plan.h"
 #include "uhdr_encode.h"
 
+#include <functional>
 #include <string>
 
 namespace uhdr_repack {
@@ -26,6 +27,8 @@ struct EncodeRequest {
   /** 0 = native crop, clamped to min(crop, 2×). Otherwise even pixels, aspect-locked, between 1× and min(crop, 2×). */
   unsigned output_width = 0;
   unsigned output_height = 0;
+  /** Called on the encode worker as each stage starts. Empty when unused. */
+  std::function<void(const std::string&)> on_progress;
 };
 
 /** Load HDR+SDR and encode one Ultra HDR JPEG (optional slices). */

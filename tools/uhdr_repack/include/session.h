@@ -2,6 +2,7 @@
 
 #include "encode_engine.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -76,7 +77,8 @@ bool parse_edit_cli_args(int argc, char** argv, PreviewSession* session, std::st
 std::string resolve_repo_relative(const std::string& path, const std::string& base_dir);
 
 int encode_session_item(const PreviewSession& session, const SessionItem& item, ItemEncodeResult* ir,
-                        std::string* error);
+                        std::string* error,
+                        const std::function<void(const std::string&)>& on_progress = {});
 
 /** Delete the on-disk HDR TIFF and clear item.hdr_tiff (no-op if empty/missing). */
 void discard_hdr_tiff_file(SessionItem* item);

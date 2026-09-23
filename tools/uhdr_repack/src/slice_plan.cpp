@@ -60,6 +60,9 @@ struct TileGeometry {
   std::string error;
 };
 
+bool tiles_for_count(TileGeometry* g, unsigned count, unsigned master_w, unsigned master_h,
+                     unsigned rw, unsigned rh);
+
 TileGeometry plan_tiles(unsigned master_w, unsigned master_h, SliceAspect aspect) {
   TileGeometry g;
   if (aspect == SliceAspect::kNone) {
@@ -119,8 +122,55 @@ TileGeometry plan_tiles(unsigned master_w, unsigned master_h, SliceAspect aspect
   if (g.max_count > kInstagramGalleryMax) {
     g.max_count = kInstagramGalleryMax;
   }
+  // A panorama that is only a few pixels short of another frame (21594 vs 10×2160)
+  // still offers that frame. The tile shrinks just enough to keep the aspect and
+  // land on the far edge. Counts that already fit keep the full-height tile.
+  const unsigned span = g.pack_horizontal ? master_w : master_h;
+  const unsigned tile = g.pack_horizontal ? g.tile_w : g.tile_h;
+  if (tile >= 2 && g.max_count >= 1) {
+    unsigned cover = static_cast<unsigned>(std::lround(static_cast<double>(span) / static_cast<double>(tile)));
+    if (cover < g.max_count) cover = g.max_count;
+    if (cover > kInstagramGalleryMax) cover = kInstagramGalleryMax;
+    if (cover > g.max_count) {
+      TileGeometry trial = g;
+      if (tiles_for_count(&trial, cover, master_w, master_h, rw, rh)) {
+        g.max_count = cover;
+      }
+    }
+  }
   g.ok = true;
   return g;
+}
+
+bool tiles_for_count(TileGeometry* g, unsigned count, unsigned master_w, unsigned master_h,
+                     unsigned rw, unsigned rh) {
+  if (!g || count < 1 || rw == 0 || rh == 0) return false;
+  if (g->pack_horizontal) {
+    if (count * g->tile_w <= master_w) return true;
+    unsigned tile_w = even_floor(master_w / count);
+    unsigned tile_h =
+        even_floor(static_cast<unsigned>((static_cast<unsigned long long>(tile_w) * rh) / rw));
+    if (tile_h > master_h) {
+      tile_h = even_floor(master_h);
+      tile_w = even_floor(static_cast<unsigned>((static_cast<unsigned long long>(tile_h) * rw) / rh));
+    }
+    if (tile_w < 2 || tile_h < 2 || tile_h > master_h || count * tile_w > master_w) return false;
+    g->tile_w = tile_w;
+    g->tile_h = tile_h;
+    return true;
+  }
+  if (count * g->tile_h <= master_h) return true;
+  unsigned tile_h = even_floor(master_h / count);
+  unsigned tile_w =
+      even_floor(static_cast<unsigned>((static_cast<unsigned long long>(tile_h) * rw) / rh));
+  if (tile_w > master_w) {
+    tile_w = even_floor(master_w);
+    tile_h = even_floor(static_cast<unsigned>((static_cast<unsigned long long>(tile_w) * rh) / rw));
+  }
+  if (tile_w < 2 || tile_h < 2 || tile_w > master_w || count * tile_h > master_h) return false;
+  g->tile_w = tile_w;
+  g->tile_h = tile_h;
+  return true;
 }
 
 }  // namespace
@@ -434,7 +484,7 @@ bool compute_slices(unsigned master_w, unsigned master_h, SliceAspect aspect,
     return true;
   }
 
-  const TileGeometry g = plan_tiles(master_w, master_h, aspect);
+  TileGeometry g = plan_tiles(master_w, master_h, aspect);
   if (!g.ok) {
     if (error) {
       *error = g.error;
@@ -450,20 +500,38 @@ bool compute_slices(unsigned master_w, unsigned master_h, SliceAspect aspect,
     count = g.max_count;
   }
 
+  const unsigned master_even_w = even_floor(master_w);
+  const unsigned master_even_h = even_floor(master_h);
+  unsigned rw = 0;
+  unsigned rh = 0;
+  if (!aspect_ratio(aspect, &rw, &rh) ||
+      !tiles_for_count(&g, count, master_even_w, master_even_h, rw, rh)) {
+    if (error) {
+      *error = "Computed tile size is too small for slicing";
+    }
+    return false;
+  }
+
   unsigned slack = 0;
   unsigned start_x = 0;
   unsigned start_y = 0;
   if (g.pack_horizontal) {
-    slack = master_w - count * g.tile_w;
+    slack = master_even_w - count * g.tile_w;
     start_x = even_offset(slack, crop_offset);
-    if (start_x + count * g.tile_w > master_w) {
-      start_x = even_floor(master_w - count * g.tile_w);
+    if (start_x + count * g.tile_w > master_even_w) {
+      start_x = even_floor(master_even_w - count * g.tile_w);
+    }
+    if (g.tile_h < master_even_h) {
+      start_y = even_floor((master_even_h - g.tile_h) / 2);
     }
   } else {
-    slack = master_h - count * g.tile_h;
+    slack = master_even_h - count * g.tile_h;
     start_y = even_offset(slack, crop_offset);
-    if (start_y + count * g.tile_h > master_h) {
-      start_y = even_floor(master_h - count * g.tile_h);
+    if (start_y + count * g.tile_h > master_even_h) {
+      start_y = even_floor(master_even_h - count * g.tile_h);
+    }
+    if (g.tile_w < master_even_w) {
+      start_x = even_floor((master_even_w - g.tile_w) / 2);
     }
   }
 

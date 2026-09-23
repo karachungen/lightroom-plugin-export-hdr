@@ -43,6 +43,7 @@ class MainWindow : public QMainWindow {
   void prepareItemGainMaps();
   void failEncode(const QString& title, const QString& error);
   void finishEncodeSuccess();
+  void showEncodeProgress(bool busy, const QString& message);
 
   std::unique_ptr<PreviewDocument> document_;
   HdrRhiViewport* viewport_ = nullptr;

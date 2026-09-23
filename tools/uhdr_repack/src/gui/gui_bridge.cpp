@@ -92,6 +92,16 @@ SliceAspect parseSliceAspectString(const std::string& s) {
   return aspect;
 }
 
+void masterPixelSize(const PreviewItemState& st, int* width, int* height) {
+  if (st.source_width >= 2 && st.source_height >= 2) {
+    *width = st.source_width;
+    *height = st.source_height;
+    return;
+  }
+  *width = st.sdr.width();
+  *height = st.sdr.height();
+}
+
 json itemQueueMetaJson(PreviewDocument* document, int index) {
   json j;
   if (!document || index < 0 || index >= document->itemCount()) return j;
@@ -102,9 +112,14 @@ json itemQueueMetaJson(PreviewDocument* document, int index) {
   j["sliceAspect"] = slice_aspect_label(aspect);
   unsigned master_w = 0;
   unsigned master_h = 0;
-  if (st.loaded && st.sdr.width() >= 2 && st.sdr.height() >= 2) {
-    master_w = static_cast<unsigned>(st.sdr.width());
-    master_h = static_cast<unsigned>(st.sdr.height());
+  if (st.loaded) {
+    int w = 0;
+    int h = 0;
+    masterPixelSize(st, &w, &h);
+    if (w >= 2 && h >= 2) {
+      master_w = static_cast<unsigned>(w);
+      master_h = static_cast<unsigned>(h);
+    }
   } else {
     const SdrFileProbe probe = probeSdrFile(item.sdr);
     master_w = probe.width > 0 ? static_cast<unsigned>(probe.width) : 0;
@@ -182,6 +197,9 @@ GuiBridge::GuiBridge(PreviewDocument* document, HdrRhiViewport* viewport, WebChr
   final_preview_timer_->setSingleShot(true);
   final_preview_timer_->setInterval(400);
   connect(final_preview_timer_, &QTimer::timeout, this, [this]() { scheduleFinalPreview(); });
+  if (viewport_) {
+    connect(viewport_, &HdrRhiViewport::viewChanged, this, &GuiBridge::onPreviewViewChanged);
+  }
 }
 
 GuiBridge::~GuiBridge() { activity_log_set_hook({}); }
@@ -296,10 +314,16 @@ void GuiBridge::sendItemReady(int index) {
   json root;
   root["type"] = "itemReady";
   root["id"] = item.id;
+  int master_w = 0;
+  int master_h = 0;
+  masterPixelSize(st, &master_w, &master_h);
   root["sdrDataUrl"] = imageToDataUrl(st.sdr, "JPEG").toStdString();
   root["thumb"] = thumbDataUrl(st.sdr).toStdString();
-  root["imageWidth"] = st.sdr.width();
-  root["imageHeight"] = st.sdr.height();
+  root["imageWidth"] = master_w;
+  root["imageHeight"] = master_h;
+  root["previewWidth"] = st.sdr.width();
+  root["previewHeight"] = st.sdr.height();
+  root["previewReduced"] = st.preview_reduced;
   json stats;
   stats["min"] = st.gain_min;
   stats["max"] = st.gain_max;
@@ -330,6 +354,9 @@ void GuiBridge::sendSlices(int index) {
   if (!chrome_ || !document_ || index < 0 || index >= document_->itemCount()) return;
   const auto& st = document_->state(index);
   const auto& item = document_->item(index);
+  int master_w = 0;
+  int master_h = 0;
+  masterPixelSize(st, &master_w, &master_h);
   const SliceAspect aspect = effective_slice_aspect(document_->session(), item);
   const float offset = effective_crop_offset(item);
   const unsigned slice_count = effective_slice_count(item);
@@ -343,9 +370,9 @@ void GuiBridge::sendSlices(int index) {
     root["maxSliceCount"] = 0;
     unsigned ow = 0;
     unsigned oh = 0;
-    if (st.loaded && st.sdr.width() >= 2 && st.sdr.height() >= 2 &&
-        clamp_encode_output_size(aspect, static_cast<unsigned>(st.sdr.width()),
-                                 static_cast<unsigned>(st.sdr.height()), item.output_width,
+    if (st.loaded && master_w >= 2 && master_h >= 2 &&
+        clamp_encode_output_size(aspect, static_cast<unsigned>(master_w),
+                                 static_cast<unsigned>(master_h), item.output_width,
                                  item.output_height, &ow, &oh)) {
       root["outputWidth"] = ow;
       root["outputHeight"] = oh;
@@ -358,10 +385,9 @@ void GuiBridge::sendSlices(int index) {
   std::vector<CropRect> slices;
   std::string err;
   const unsigned max_count =
-      max_slice_count(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
-                      aspect);
-  compute_slices(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
-                 aspect, &slices, &err, offset, slice_count);
+      max_slice_count(static_cast<unsigned>(master_w), static_cast<unsigned>(master_h), aspect);
+  compute_slices(static_cast<unsigned>(master_w), static_cast<unsigned>(master_h), aspect, &slices,
+                 &err, offset, slice_count);
 
   json root;
   root["type"] = "slices";
@@ -374,8 +400,8 @@ void GuiBridge::sendSlices(int index) {
   root["previewSlice"] = static_cast<int>(item.preview_slice_index < 1 ? 1 : item.preview_slice_index);
   unsigned ow = 0;
   unsigned oh = 0;
-  unsigned crop_w = st.sdr.width() > 0 ? static_cast<unsigned>(st.sdr.width()) : 0;
-  unsigned crop_h = st.sdr.height() > 0 ? static_cast<unsigned>(st.sdr.height()) : 0;
+  unsigned crop_w = master_w > 0 ? static_cast<unsigned>(master_w) : 0;
+  unsigned crop_h = master_h > 0 ? static_cast<unsigned>(master_h) : 0;
   if (!slices.empty()) {
     crop_w = slices[0].w;
     crop_h = slices[0].h;
@@ -388,10 +414,10 @@ void GuiBridge::sendSlices(int index) {
   }
   for (const auto& crop : slices) {
     json r;
-    r["x"] = static_cast<float>(crop.x) / std::max(1, st.sdr.width());
-    r["y"] = static_cast<float>(crop.y) / std::max(1, st.sdr.height());
-    r["w"] = static_cast<float>(crop.w) / std::max(1, st.sdr.width());
-    r["h"] = static_cast<float>(crop.h) / std::max(1, st.sdr.height());
+    r["x"] = static_cast<float>(crop.x) / std::max(1, master_w);
+    r["y"] = static_cast<float>(crop.y) / std::max(1, master_h);
+    r["w"] = static_cast<float>(crop.w) / std::max(1, master_w);
+    r["h"] = static_cast<float>(crop.h) / std::max(1, master_h);
     root["rects"].push_back(std::move(r));
   }
   chrome_->postToPage(QString::fromStdString(root.dump()));
@@ -493,10 +519,12 @@ PreviewMode GuiBridge::parsePreviewMode(const std::string& mode) const {
 }
 
 void GuiBridge::setBusy(bool busy, const QString& message) {
+  encoding_ = busy;
   if (!chrome_) return;
   json root;
   root["type"] = "busy";
   root["busy"] = busy;
+  if (!message.isEmpty()) root["text"] = message.toStdString();
   if (!message.isEmpty()) {
     json status;
     status["type"] = "status";
@@ -791,7 +819,48 @@ QRect GuiBridge::letterboxedImageRect(QRect* local) const {
 }
 
 QRect GuiBridge::selectedHdrHole() const {
-  return letterboxedImageRect();
+  const QRect fitted = letterboxedImageRect();
+  if (!fitted.isValid()) return {};
+  if (previewViewIsFitted() || preview_rect_.width() < 8 || preview_rect_.height() < 8) return fitted;
+  return preview_rect_;
+}
+
+bool GuiBridge::previewViewIsFitted() const {
+  return std::abs(preview_zoom_ - 1.f) < 0.001f && std::abs(preview_pan_x_) < 0.0005f &&
+         std::abs(preview_pan_y_) < 0.0005f;
+}
+
+void GuiBridge::pushPreviewViewToViewport() {
+  if (!viewport_) return;
+  QRect local;
+  letterboxedImageRect(&local);
+  viewport_->setFitSize(std::max(1, local.width()), std::max(1, local.height()));
+  if (previewViewIsFitted()) {
+    viewport_->setView(1.f, 0.f, 0.f);
+  } else {
+    viewport_->setView(preview_zoom_, preview_pan_x_, preview_pan_y_);
+  }
+}
+
+void GuiBridge::onPreviewViewChanged(float zoom, float pan_x, float pan_y) {
+  zoom = std::clamp(zoom, 0.25f, 16.f);
+  if (std::abs(zoom - preview_zoom_) < 0.0005f && std::abs(pan_x - preview_pan_x_) < 0.0005f &&
+      std::abs(pan_y - preview_pan_y_) < 0.0005f) {
+    return;
+  }
+  preview_zoom_ = zoom;
+  preview_pan_x_ = pan_x;
+  preview_pan_y_ = pan_y;
+  pushPreviewViewToViewport();
+  emitOverlay();
+  emitSliceGuides();
+  if (!chrome_) return;
+  json msg;
+  msg["type"] = "previewView";
+  msg["zoom"] = zoom;
+  msg["panX"] = pan_x;
+  msg["panY"] = pan_y;
+  chrome_->postToPage(QString::fromStdString(msg.dump()));
 }
 
 void GuiBridge::sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack_px) const {
@@ -802,52 +871,77 @@ void GuiBridge::sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack
   if (!letterboxedImageRect(&image_local).isValid() || !document_ || current_index_ < 0) return;
   const auto& item = document_->item(current_index_);
   const auto& st = document_->state(current_index_);
+  int master_w = 0;
+  int master_h = 0;
+  masterPixelSize(st, &master_w, &master_h);
   const SliceAspect aspect = effective_slice_aspect(document_->session(), item);
-  if (aspect == SliceAspect::kNone || st.sdr.isNull()) return;
+  if (aspect == SliceAspect::kNone || st.sdr.isNull() || master_w < 2 || master_h < 2) return;
   std::vector<CropRect> slices;
   std::string err;
-  compute_slices(static_cast<unsigned>(st.sdr.width()), static_cast<unsigned>(st.sdr.height()),
-                 aspect, &slices, &err, effective_crop_offset(item), effective_slice_count(item));
+  compute_slices(static_cast<unsigned>(master_w), static_cast<unsigned>(master_h), aspect, &slices,
+                 &err, effective_crop_offset(item), effective_slice_count(item));
   if (slices.empty()) return;
   if (local) {
     for (const auto& crop : slices) {
-      local->push_back(mapCropToLocal(crop, st.sdr.width(), st.sdr.height(), image_local));
+      local->push_back(mapCropToLocal(crop, master_w, master_h, image_local));
     }
   }
-  const bool horizontal = slices[0].h + 1 >= static_cast<unsigned>(st.sdr.height());
+  const bool horizontal = slices[0].h + 1 >= static_cast<unsigned>(master_h);
   if (axis_x) *axis_x = horizontal;
   const unsigned count = static_cast<unsigned>(slices.size());
   int slack = 0;
   if (horizontal) {
-    slack = st.sdr.width() - static_cast<int>(count * slices[0].w);
+    slack = master_w - static_cast<int>(count * slices[0].w);
   } else {
-    slack = st.sdr.height() - static_cast<int>(count * slices[0].h);
+    slack = master_h - static_cast<int>(count * slices[0].h);
   }
   if (slack < 0) slack = 0;
   if (slack_px) {
     if (horizontal) {
       *slack_px = static_cast<int>(
-          std::lround(static_cast<double>(slack) / st.sdr.width() * image_local.width()));
+          std::lround(static_cast<double>(slack) / master_w * image_local.width()));
     } else {
       *slack_px = static_cast<int>(
-          std::lround(static_cast<double>(slack) / st.sdr.height() * image_local.height()));
+          std::lround(static_cast<double>(slack) / master_h * image_local.height()));
+    }
+  }
+  if (!previewViewIsFitted() && local && image_local.isValid()) {
+    const double z = preview_zoom_;
+    const double pan_x = static_cast<double>(preview_pan_x_) * image_local.width();
+    const double pan_y = static_cast<double>(preview_pan_y_) * image_local.height();
+    for (QRect& rect : *local) {
+      const double left = image_local.x() - image_local.width() * (z - 1.0) / 2.0 + pan_x +
+                          (rect.x() - image_local.x()) * z;
+      const double top = image_local.y() - image_local.height() * (z - 1.0) / 2.0 + pan_y +
+                         (rect.y() - image_local.y()) * z;
+      rect = QRect(static_cast<int>(std::lround(left)), static_cast<int>(std::lround(top)),
+                   std::max(1, static_cast<int>(std::lround(rect.width() * z))),
+                   std::max(1, static_cast<int>(std::lround(rect.height() * z))));
+    }
+    if (slack_px && *slack_px > 0) {
+      *slack_px = std::max(0, static_cast<int>(std::lround(*slack_px * z)));
     }
   }
 }
 
 void GuiBridge::onCropDragStarted() {
+  if (encoding_) return;
   crop_dragging_ = true;
   emitOverlay();
 }
 
 void GuiBridge::onCropOffsetChanged(float offset) {
-  if (!document_ || current_index_ < 0) return;
+  if (encoding_ || !document_ || current_index_ < 0) return;
   document_->setLiveCropOffset(current_index_, offset);
   sendSlices(current_index_);
   emitOverlay();
 }
 
 void GuiBridge::onCropDragFinished(float offset) {
+  if (encoding_) {
+    crop_dragging_ = false;
+    return;
+  }
   if (document_ && current_index_ >= 0) {
     document_->setLiveCropOffset(current_index_, offset);
   }
@@ -864,6 +958,9 @@ void GuiBridge::handleMessage(const QString& json_text) {
     return;
   }
   const std::string type = msg.value("type", "");
+  if (encoding_ && type != "cancel" && type != "ready" && type != "previewRect") {
+    return;
+  }
   if (type == "ready") {
     sendSession();
     const auto& opt = document_->session().default_encode_options;
@@ -914,6 +1011,22 @@ void GuiBridge::handleMessage(const QString& json_text) {
   }
   if (type == "syncToOthers") {
     handleSyncToOthers();
+    return;
+  }
+  if (type == "setPreviewView") {
+    const float zoom = std::clamp(static_cast<float>(msg.value("zoom", 1.0)), 0.25f, 16.f);
+    const float pan_x = static_cast<float>(msg.value("panX", 0.0));
+    const float pan_y = static_cast<float>(msg.value("panY", 0.0));
+    if (std::abs(zoom - preview_zoom_) < 0.0005f && std::abs(pan_x - preview_pan_x_) < 0.0005f &&
+        std::abs(pan_y - preview_pan_y_) < 0.0005f) {
+      return;
+    }
+    preview_zoom_ = zoom;
+    preview_pan_x_ = pan_x;
+    preview_pan_y_ = pan_y;
+    pushPreviewViewToViewport();
+    emitOverlay();
+    emitSliceGuides();
     return;
   }
   if (type == "setMode") {
@@ -1011,12 +1124,12 @@ void GuiBridge::onItemFailed(int index, const QString& message) {
     root["id"] = document_ ? document_->item(index).id : "";
     root["text"] = message.toStdString();
     if (chrome_) chrome_->postToPage(QString::fromStdString(root.dump()));
-    setBusy(false, message);
+    if (!encoding_) setBusy(false, message);
   }
 }
 
 void GuiBridge::onFinalPreviewReady(int index) {
-  if (index != current_index_) return;
+  if (encoding_ || index != current_index_) return;
   const auto& frame = document_->state(index).final_hdr;
   if (viewport_ && preview_mode_ == PreviewMode::kFinalHdr) {
     viewport_->setFinalHdr(frame.rgba_half, frame.width, frame.height, frame.color_gamut);
@@ -1035,11 +1148,19 @@ void GuiBridge::onFinalPreviewReady(int index) {
 }
 
 void GuiBridge::onFinalPreviewFailed(int index, const QString& message) {
-  if (index != current_index_) return;
+  if (encoding_ || index != current_index_) return;
   sendHdrLoading(false, false);
   emitOverlay();
   emitSliceGuides();
   setBusy(false, message.isEmpty() ? tr("Encoded preview failed") : message);
+}
+
+void GuiBridge::onFinalPreviewProgress(int index, const QString& detail) {
+  if (encoding_ || index != current_index_ || !chrome_ || detail.isEmpty()) return;
+  json status;
+  status["type"] = "status";
+  status["text"] = detail.toStdString();
+  chrome_->postToPage(QString::fromStdString(status.dump()));
 }
 
 void GuiBridge::onViewportStatusChanged(const HdrViewportStatus& status) {

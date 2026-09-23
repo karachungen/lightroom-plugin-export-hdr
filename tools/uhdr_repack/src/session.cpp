@@ -420,7 +420,8 @@ bool apply_session_dest_dir(PreviewSession* session, std::string* error) {
 }
 
 int encode_session_item(const PreviewSession& session, const SessionItem& item, ItemEncodeResult* ir,
-                        std::string* error) {
+                        std::string* error,
+                        const std::function<void(const std::string&)>& on_progress) {
   if (!ir) {
     if (error) *error = "null encode result";
     return 1;
@@ -451,6 +452,7 @@ int encode_session_item(const PreviewSession& session, const SessionItem& item, 
   req.preview_slice_index = 0;
   req.output_width = item.output_width;
   req.output_height = item.output_height;
+  req.on_progress = on_progress;
 
   std::string enc_err;
   ir->exit_code = encode_from_paths(req, &enc_err);

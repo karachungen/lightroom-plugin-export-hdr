@@ -10,7 +10,7 @@ Large JPEG/TIFF pairs are **not in git**. Put them in `test/ui/fixtures/` yourse
 UHDR_FIXTURES_SRC=/path/to/export/test ./scripts/copy_ui_fixtures.sh
 ```
 
-If `UHDR_FIXTURES_SRC` is unset and the files already exist under `test/ui/fixtures/`, the copy script leaves them in place.
+If `UHDR_FIXTURES_SRC` is unset and the files already exist under `test/ui/fixtures/`, the copy script leaves them in place. `./scripts/build_plugin.sh install --skip-fixtures` continues the bundle when those pairs are absent; preview tests that open them still need the files.
 
 ## Demo
 

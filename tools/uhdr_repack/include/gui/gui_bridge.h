@@ -33,6 +33,7 @@ class GuiBridge : public QObject {
   void sendSlices(int index);
   void sendDisplayStatus(const HdrViewportStatus& status);
   void setBusy(bool busy, const QString& message = {});
+  bool isEncoding() const { return encoding_; }
   void sendDestDir();
   void setDestDir(const QString& path);
   void ensureHdrTiffs(const std::vector<int>& indices, HdrTiffClient::Finished finished);
@@ -49,7 +50,9 @@ class GuiBridge : public QObject {
   void onItemFailed(int index, const QString& message);
   void onFinalPreviewReady(int index);
   void onFinalPreviewFailed(int index, const QString& message);
+  void onFinalPreviewProgress(int index, const QString& detail);
   void onViewportStatusChanged(const HdrViewportStatus& status);
+  void onPreviewViewChanged(float zoom, float pan_x, float pan_y);
   void onCropDragStarted();
   void onCropOffsetChanged(float offset);
   void onCropDragFinished(float offset);
@@ -86,6 +89,8 @@ class GuiBridge : public QObject {
   QRect letterboxedImageRect(QRect* local = nullptr) const;
   QRect selectedHdrHole() const;
   void sliceGuideLayout(QVector<QRect>* local, bool* axis_x, int* slack_px) const;
+  void pushPreviewViewToViewport();
+  bool previewViewIsFitted() const;
 
   PreviewDocument* document_ = nullptr;
   HdrRhiViewport* viewport_ = nullptr;
@@ -95,9 +100,13 @@ class GuiBridge : public QObject {
   int current_index_ = 0;
   PreviewMode preview_mode_ = PreviewMode::kFinalHdr;
   bool approved_ = false;
+  bool encoding_ = false;
   bool crop_dragging_ = false;
   SliceAspect slice_aspect_ = SliceAspect::kNone;
   QRect preview_rect_;
+  float preview_zoom_ = 1.f;
+  float preview_pan_x_ = 0.f;
+  float preview_pan_y_ = 0.f;
 
   std::vector<GainMapEditor> editors_;
 };

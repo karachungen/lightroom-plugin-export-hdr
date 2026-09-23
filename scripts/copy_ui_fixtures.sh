@@ -25,6 +25,10 @@ dest_has_required() {
   return 0
 }
 
+fixtures_skipped() {
+  [[ "${UHDR_SKIP_FIXTURES:-}" == "1" || "${UHDR_SKIP_FIXTURES:-}" == "ON" ]]
+}
+
 if [[ -z "${UHDR_FIXTURES_SRC:-}" ]]; then
   if dest_has_required; then
     echo "==> UHDR_FIXTURES_SRC unset; using existing files in $DEST"
@@ -34,9 +38,13 @@ if [[ -z "${UHDR_FIXTURES_SRC:-}" ]]; then
     echo "WARN: UI fixtures missing in CI; optional preview tests will be skipped." >&2
     exit 0
   fi
-  echo "copy_ui_fixtures: no source folder and missing files in $DEST." >&2
-  echo "Set UHDR_FIXTURES_SRC to a folder containing UI preview JPEG/TIFF pairs." >&2
-  exit 1
+  if fixtures_skipped; then
+    echo "WARN: UI fixtures missing in $DEST; continuing (--skip-fixtures)." >&2
+    exit 0
+  fi
+  echo "WARN: UI fixtures missing in $DEST; local build continues without them." >&2
+  echo "Preview tests need DSC02993 and DJI_0001 JPEG/TIFF pairs there, or set UHDR_FIXTURES_SRC." >&2
+  exit 0
 fi
 
 SRC="$UHDR_FIXTURES_SRC"
@@ -51,6 +59,10 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
   if dest_has_required; then
     echo "==> UI fixtures source missing; using existing files in $DEST"
+    exit 0
+  fi
+  if fixtures_skipped; then
+    echo "WARN: UI fixtures missing under $SRC; continuing (--skip-fixtures)." >&2
     exit 0
   fi
   echo "copy_ui_fixtures: missing source files under $SRC:" >&2

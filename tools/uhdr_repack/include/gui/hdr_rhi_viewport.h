@@ -48,6 +48,9 @@ class HdrRhiViewport final : public QWindow {
   void setTargetDisplayPeak(float nits);
   void setGainVisualizationRange(float min_gain, float max_gain);
   void setZoom(float zoom);
+  void zoomBy(float factor);
+  void setView(float zoom, float pan_x, float pan_y);
+  void setFitSize(int width, int height);
   void fitToView();
   void showActualPixels();
 
@@ -61,6 +64,8 @@ class HdrRhiViewport final : public QWindow {
 
  signals:
   void statusChanged(const uhdr_repack::HdrViewportStatus& status);
+  /** Pan is in fitted-image fractions: positive pan moves the image down and right. */
+  void viewChanged(float zoom, float pan_x, float pan_y);
 
  protected:
   void exposeEvent(QExposeEvent* event) override;

@@ -1035,7 +1035,10 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 				LrFileUtils.createDirectory(folder)
 				local destFile = LrPathUtils.child(folder, LrPathUtils.leafName(item.finalOut) or "export.jpg")
 				local srcFile = (status and status.out) or item.out
-				if not pathEqual(srcFile, destFile) then
+				local gallery = status and status.slices and #status.slices > 0
+				if gallery then
+					Log.append(logPath, "Gallery slices are the export\n")
+				elseif not pathEqual(srcFile, destFile) then
 					local promoteOk, promoteErr = promoteEncodedFile(srcFile, destFile, logPath, item.sdrSize)
 					if not promoteOk then
 						error(
@@ -1051,6 +1054,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 					Log.append(logPath, "Encoded in place: " .. tostring(destFile) .. "\n")
 				end
 
+				local firstSlice = nil
 				if status and status.slices then
 					for _, stagedSlice in ipairs(status.slices) do
 						local destSlice = LrPathUtils.child(folder, LrPathUtils.leafName(stagedSlice) or "")
@@ -1060,10 +1064,23 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 							elseif promoteSliceFile(stagedSlice, destSlice, logPath) then
 								Log.append(logPath, "Promoted slice to: " .. tostring(destSlice) .. "\n")
 							end
+							if not firstSlice and LrFileUtils.exists(destSlice) then
+								firstSlice = destSlice
+							end
 						end
 					end
 				end
-				assertFinalUltraHdr(binary, destFile, logPath, item.sdrSize)
+				if firstSlice then
+					if LrFileUtils.exists(destFile) and not pathEqual(destFile, firstSlice) then
+						pcall(function()
+							LrFileUtils.delete(destFile)
+						end)
+						Log.append(logPath, "Removed unsuffixed export: " .. tostring(destFile) .. "\n")
+					end
+					assertFinalUltraHdr(binary, firstSlice, logPath, item.sdrSize)
+				else
+					assertFinalUltraHdr(binary, destFile, logPath, item.sdrSize)
+				end
 			end
 		end
 		releaseExportMemory()

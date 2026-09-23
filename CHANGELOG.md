@@ -7,6 +7,16 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.5 — 🧠 Leave it on disk
+
+> A large panorama was decoded in full just to draw the editor. The preview is smaller now. The export still reads the original file.
+
+### Fixed
+
+- SDR preview decode stops at a 4096 long edge, and the HDR preview encode stops at 2048. Wide files no longer have to sit in memory at full size while you adjust the export.
+- The editor says when the preview was reduced, and that export still uses the original size.
+- Gallery slicing follows the full frame. A panorama only a few pixels short of another tile still exports that tile, and a multi-slice export no longer leaves the unsuffixed JPEG.
+
 ## v3.0.4 — 🎞 Not a question
 
 > The film strip showed a blue question mark because the thumbnail JPEG had no bytes. Qt's JPEG writer left with the plugin that crashed the editor, so ImageIO and WIC write those thumbs now.

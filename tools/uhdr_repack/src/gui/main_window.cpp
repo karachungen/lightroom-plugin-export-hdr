@@ -12,6 +12,7 @@
 #include <QFutureWatcher>
 #include <QIcon>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
@@ -20,6 +21,7 @@
 #include <QShowEvent>
 #include <QUrl>
 #include <QVector>
+#include <QWheelEvent>
 #include <QWidget>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -45,6 +47,7 @@ class SliceGuideOverlay : public QWidget {
   std::function<void()> onDragStarted;
   std::function<void(float)> onOffsetChanged;
   std::function<void(float)> onDragFinished;
+  std::function<void(int)> onWheel;
 
   void setGuides(const QVector<QRect>& rects, bool interactive, bool axis_x, int slack_px,
                  float crop_offset) {
@@ -107,6 +110,11 @@ class SliceGuideOverlay : public QWidget {
     releaseMouse();
     setCursor(interactive_ && slack_px_ >= 2 ? Qt::OpenHandCursor : Qt::ArrowCursor);
     if (onDragFinished) onDragFinished(crop_offset_);
+    event->accept();
+  }
+
+  void wheelEvent(QWheelEvent* event) override {
+    if (onWheel) onWheel(event->angleDelta().y());
     event->accept();
   }
 
@@ -176,6 +184,8 @@ MainWindow::MainWindow(PreviewSession session, QWidget* parent)
           &GuiBridge::onFinalPreviewReady);
   connect(document_.get(), &PreviewDocument::finalPreviewFailed, bridge_,
           &GuiBridge::onFinalPreviewFailed);
+  connect(document_.get(), &PreviewDocument::finalPreviewProgress, bridge_,
+          &GuiBridge::onFinalPreviewProgress);
   connect(viewport_, &HdrRhiViewport::statusChanged, bridge_,
           &GuiBridge::onViewportStatusChanged);
   connect(bridge_, &GuiBridge::applyRequested, this, &MainWindow::onApplyAll);
@@ -191,6 +201,10 @@ MainWindow::MainWindow(PreviewSession session, QWidget* parent)
   };
   ui_->slice_overlay->onDragFinished = [this](float offset) {
     if (bridge_) bridge_->onCropDragFinished(offset);
+  };
+  ui_->slice_overlay->onWheel = [this](int delta_y) {
+    if (bridge_ && bridge_->isEncoding()) return;
+    if (viewport_ && delta_y != 0) viewport_->zoomBy(delta_y > 0 ? 1.15f : 1.0f / 1.15f);
   };
 }
 
@@ -309,6 +323,27 @@ void MainWindow::prepareItemGainMaps() {
   }
 }
 
+void MainWindow::showEncodeProgress(bool busy, const QString& message) {
+  if (ui_->slice_overlay) {
+    ui_->slice_overlay->setAttribute(Qt::WA_TransparentForMouseEvents, busy);
+  }
+  if (bridge_) bridge_->setBusy(busy, message);
+}
+
+namespace {
+
+QString photoStatusName(const SessionItem& item) {
+  if (!item.label.empty()) return QString::fromStdString(item.label);
+  const std::string& source = !item.sdr.empty() ? item.sdr : item.id;
+  const auto slash = source.find_last_of("/\\");
+  std::string leaf = slash == std::string::npos ? source : source.substr(slash + 1);
+  const auto dot = leaf.find_last_of('.');
+  if (dot != std::string::npos && dot > 0) leaf.resize(dot);
+  return QString::fromStdString(leaf);
+}
+
+}  // namespace
+
 void MainWindow::encodeNextQueuedItem() {
   if (encode_aborted_) {
     return;
@@ -321,8 +356,11 @@ void MainWindow::encodeNextQueuedItem() {
   const int index = encode_queue_[encode_cursor_];
   const int ordinal = static_cast<int>(encode_cursor_) + 1;
   const int total = static_cast<int>(encode_queue_.size());
-  bridge_->setBusy(true, tr("HDR TIFF %1/%2…").arg(ordinal).arg(total));
-  bridge_->ensureHdrTiffs({index}, [this, index, ordinal, total](bool ok, const QString& error) {
+  const SessionItem queued = document_->item(index);
+  const QString prefix =
+      tr("Photo %1 of %2 · %3").arg(ordinal).arg(total).arg(photoStatusName(queued));
+  showEncodeProgress(true, prefix + tr(" · Waiting for Lightroom HDR TIFF"));
+  bridge_->ensureHdrTiffs({index}, [this, index, prefix](bool ok, const QString& error) {
     if (encode_aborted_) {
       return;
     }
@@ -332,14 +370,27 @@ void MainWindow::encodeNextQueuedItem() {
       return;
     }
 
-    bridge_->setBusy(true, tr("Encoding %1/%2…").arg(ordinal).arg(total));
     SessionItem item = document_->item(index);
     PreviewSession session_copy = document_->session();
-    auto future = QtConcurrent::run([session_copy = std::move(session_copy),
-                                     item = std::move(item)]() mutable {
+    const bool full_frame = effective_slice_aspect(session_copy, item) == SliceAspect::kNone;
+    const QString frame = full_frame ? tr(" · Full frame") : QString();
+    showEncodeProgress(true, prefix + frame + tr(" · Preparing encode"));
+    auto future = QtConcurrent::run([this, session_copy = std::move(session_copy),
+                                     item = std::move(item), prefix, frame]() mutable {
+      auto on_progress = [this, prefix, frame](const std::string& detail) {
+        const QString line =
+            prefix + frame + QStringLiteral(" · ") + QString::fromStdString(detail);
+        QMetaObject::invokeMethod(
+            this,
+            [this, line] {
+              if (encode_aborted_) return;
+              showEncodeProgress(true, line);
+            },
+            Qt::QueuedConnection);
+      };
       ItemEncodeResult ir;
       std::string error;
-      const int code = encode_session_item(session_copy, item, &ir, &error);
+      const int code = encode_session_item(session_copy, item, &ir, &error, on_progress);
       return std::pair<int, ItemEncodeResult>{code, std::move(ir)};
     });
 
@@ -369,7 +420,7 @@ void MainWindow::encodeNextQueuedItem() {
 
 void MainWindow::failEncode(const QString& title, const QString& error) {
   encode_aborted_ = true;
-  bridge_->setBusy(false, title);
+  showEncodeProgress(false, title);
   QMessageBox::critical(this, title, error);
 }
 

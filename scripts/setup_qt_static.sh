@@ -47,6 +47,12 @@ fi
 echo "==> Configuring static Qt $QT_VERSION at $PREFIX"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
+# Command Line Tools have the macOS SDK via xcrun, but not xcodebuild. Qt 6.11
+# treats a missing Xcode version as fatal. Skip that check on local machines.
+xcode_check_args=()
+if [[ -z "${GITHUB_ACTIONS:-}" ]]; then
+  xcode_check_args=(-DQT_NO_XCODE_MIN_VERSION_CHECK=ON)
+fi
 (
   cd "$BUILD_DIR"
   "$SOURCE_DIR/configure" \
@@ -64,7 +70,8 @@ mkdir -p "$BUILD_DIR"
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
     -DQT_BUILD_TOOLS_BY_DEFAULT=ON \
     -DQT_BUILD_TESTS=OFF \
-    -DQT_BUILD_EXAMPLES=OFF
+    -DQT_BUILD_EXAMPLES=OFF \
+    ${xcode_check_args[@]+"${xcode_check_args[@]}"}
 )
 
 echo "==> Building and installing static Qt (this can take a while)"

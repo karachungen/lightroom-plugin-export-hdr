@@ -733,6 +733,26 @@ bool test_slice_plan_overlay(int* checks) {
   }
   (*checks)++;
 
+  if (max_slice_count(21594, 2880, SliceAspect::k3x4) != 10) {
+    std::cerr << "21594x2880 3:4 should cover 10 frames, got "
+              << max_slice_count(21594, 2880, SliceAspect::k3x4) << "\n";
+    return false;
+  }
+  if (!compute_slices(21594, 2880, SliceAspect::k3x4, &slices, &err, 0.0f, 0) ||
+      slices.size() != 10) {
+    std::cerr << "21594x2880 3:4 max pack expected 10, got " << slices.size() << " " << err << "\n";
+    return false;
+  }
+  if (slices.front().x != 0 || slices.front().w * 10 > 21594 ||
+      slices.back().x + slices.back().w > 21594 ||
+      21594 - (slices.back().x + slices.back().w) > 32) {
+    std::cerr << "21594x2880 3:4 should start at 0 and reach the right edge, last ends "
+              << (slices.back().x + slices.back().w) << " tile " << slices.front().w << "x"
+              << slices.front().h << "\n";
+    return false;
+  }
+  (*checks)++;
+
   if (max_slice_count(50000, 2000, SliceAspect::k1x1) != kInstagramGalleryMax) {
     std::cerr << "gallery cap expected " << kInstagramGalleryMax << ", got "
               << max_slice_count(50000, 2000, SliceAspect::k1x1) << "\n";
@@ -878,6 +898,40 @@ bool test_slice_plan_overlay(int* checks) {
   return true;
 }
 
+bool test_fit_preview_long_edge(int* checks) {
+  int w = 0;
+  int h = 0;
+  if (!fit_preview_long_edge(30814, 7850, kSdrPreviewMaxEdge, &w, &h) || w != 4096 || h != 1043) {
+    std::cerr << "30814x7850 should fit to 4096x1043, got " << w << "x" << h << "\n";
+    return false;
+  }
+  const double src_aspect = 30814.0 / 7850.0;
+  const double dst_aspect = static_cast<double>(w) / static_cast<double>(h);
+  if (std::abs(src_aspect - dst_aspect) > 0.01) {
+    std::cerr << "fitted panorama aspect drifted\n";
+    return false;
+  }
+  if (!fit_preview_long_edge(1920, 1080, kSdrPreviewMaxEdge, &w, &h) || w != 1920 || h != 1080) {
+    std::cerr << "1920x1080 should stay native, got " << w << "x" << h << "\n";
+    return false;
+  }
+  if (!fit_preview_long_edge(4096, 1000, kSdrPreviewMaxEdge, &w, &h) || w != 4096 || h != 1000) {
+    std::cerr << "4096 long edge should stay native, got " << w << "x" << h << "\n";
+    return false;
+  }
+  if (!fit_preview_long_edge(100, 5000, kSdrPreviewMaxEdge, &w, &h) || w != 82 || h != 4096) {
+    std::cerr << "100x5000 should fit height to 4096, got " << w << "x" << h << "\n";
+    return false;
+  }
+  if (!fit_preview_long_edge(800, 600, 0, &w, &h) || w != 800 || h != 600) {
+    std::cerr << "max_edge 0 should keep the source, got " << w << "x" << h << "\n";
+    return false;
+  }
+  (*checks)++;
+  std::cout << "OK fit preview long edge\n";
+  return true;
+}
+
 bool test_activity_log(int* checks) {
   const fs::path root = fs::temp_directory_path() / "uhdr_activity_log_test";
   std::error_code ec;
@@ -942,6 +996,9 @@ int gui_self_test_main(const std::string& session_path) {
   }
   if (!test_instagram_preview_cache_invalidation(&checks)) {
     return fail("instagram preview cache invalidation");
+  }
+  if (!test_fit_preview_long_edge(&checks)) {
+    return fail("fit preview long edge");
   }
   if (!test_activity_log(&checks)) {
     return fail("activity log");

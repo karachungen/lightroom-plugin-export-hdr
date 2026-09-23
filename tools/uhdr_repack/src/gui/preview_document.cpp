@@ -7,6 +7,8 @@
 #include "gui/sdr_preview_image.h"
 
 #include <QFutureWatcher>
+#include <QMetaObject>
+#include <QString>
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
@@ -119,12 +121,27 @@ void PreviewDocument::requestItem(int index) {
     result.state.loading = false;
     QImage sdr;
     std::string sdr_error;
-    if (!load_sdr_preview_image(item_copy.sdr, &sdr, &sdr_error) || sdr.isNull()) {
+    if (!load_sdr_preview_image(item_copy.sdr, &sdr, &sdr_error, kSdrPreviewMaxEdge) ||
+        sdr.isNull()) {
       result.state.error = QStringLiteral("Could not load SDR image: %1")
                                .arg(QString::fromStdString(
                                    sdr_error.empty() ? item_copy.sdr : sdr_error));
       return result;
     }
+    int src_w = 0;
+    int src_h = 0;
+    std::string size_error;
+    if (!sdr_preview_size(item_copy.sdr, &src_w, &src_h, &size_error) || src_w < 1 || src_h < 1) {
+      src_w = sdr.width();
+      src_h = sdr.height();
+      result.state.preview_reduced = false;
+    } else {
+      const int file_long = std::max(src_w, src_h);
+      const int preview_long = std::max(sdr.width(), sdr.height());
+      result.state.preview_reduced = preview_long > 0 && preview_long < file_long;
+    }
+    result.state.source_width = src_w;
+    result.state.source_height = src_h;
     result.state.sdr = std::move(sdr);
 
     std::string error;
@@ -316,7 +333,7 @@ void PreviewDocument::requestFinalPreview(int index) {
                           std::to_string(options.base_quality) + "/" +
                           std::to_string(options.gainmap_quality));
 
-  auto future = QtConcurrent::run([index, generation, item_copy, options, preview_path,
+  auto future = QtConcurrent::run([this, index, generation, item_copy, options, preview_path,
                                    bake_gainmap]() {
     FinalResult result;
     result.index = index;
@@ -331,6 +348,17 @@ void PreviewDocument::requestFinalPreview(int index) {
     request.preview_slice_index = 0;
     request.preview_max_edge = kPreviewEncodeMaxEdge;
     if (bake_gainmap) request.gainmap_in = item_copy.gainmap_in;
+    request.on_progress = [this, index, generation](const std::string& detail) {
+      const QString text = QString::fromStdString(detail);
+      QMetaObject::invokeMethod(
+          this,
+          [this, index, generation, text] {
+            if (index < 0 || index >= itemCount()) return;
+            if (generation != d_->final_generations[static_cast<size_t>(index)]) return;
+            emit finalPreviewProgress(index, text);
+          },
+          Qt::QueuedConnection);
+    };
     std::string error;
     fs::create_directories(fs::u8path(preview_path).parent_path());
     const auto t_enc = std::chrono::steady_clock::now();
@@ -347,6 +375,7 @@ void PreviewDocument::requestFinalPreview(int index) {
             .count());
     activity_log_append(item_copy.id, "encode", "preview jpeg", result.encode_ms);
     const auto t_dec = std::chrono::steady_clock::now();
+    if (request.on_progress) request.on_progress("Decoding preview");
     if (!decode_ultrahdr_preview(preview_path,
                                  std::max(1.0f, options.target_display_peak_nits / 203.0f),
                                  &result.frame, &error)) {

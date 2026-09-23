@@ -63,9 +63,40 @@ bool encode_target_size(const EncodeRequest& req, unsigned src_w, unsigned src_h
   return w != src_w || h != src_h;
 }
 
+void report_step(const EncodeRequest& req, const std::string& prefix, const std::string& detail) {
+  if (!req.on_progress) return;
+  if (prefix.empty()) req.on_progress(detail);
+  else req.on_progress(prefix + detail);
+}
+
+bool preview_encode(const EncodeRequest& req) { return req.preview_max_edge >= 2; }
+
+std::string path_leaf(const std::string& path) {
+  const auto slash = path.find_last_of("/\\");
+  return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+std::string jpeg_step(const EncodeRequest& req, const std::string& out_path) {
+  if (preview_encode(req)) return "Encoding preview JPEG";
+  return "Encoding Ultra HDR JPEG → " + path_leaf(out_path);
+}
+
+std::string resize_step(const EncodeRequest& req, unsigned w, unsigned h) {
+  if (preview_encode(req)) return "Resizing preview";
+  return "Resizing to " + std::to_string(w) + "×" + std::to_string(h);
+}
+
+std::string slice_step_prefix(const EncodeRequest& req, unsigned index, unsigned total,
+                              const CropRect& crop) {
+  std::ostringstream os;
+  os << "Slice " << index << " of " << total << " · " << slice_aspect_label(req.slice_aspect)
+     << " · " << crop.w << "×" << crop.h << " · ";
+  return os.str();
+}
+
 bool encode_crop(const EncodeRequest& req, unsigned master_w, unsigned master_h,
                  const CropRect& crop, const EncodeOptions& opt, const std::string& out_path,
-                 std::string* err) {
+                 const std::string& step_prefix, std::string* err) {
   unsigned out_w = 0;
   unsigned out_h = 0;
   encode_target_size(req, crop.w, crop.h, &out_w, &out_h);
@@ -75,37 +106,47 @@ bool encode_crop(const EncodeRequest& req, unsigned master_w, unsigned master_h,
 
   RawImageHolder hdr_slice;
   RawImageHolder sdr_slice;
+  report_step(req, step_prefix, "Loading HDR TIFF");
   if (!load_hdr_tiff_raw(req.hdr_tiff, &hdr_slice, err, master_w, master_h, &crop,
                          scale_in_load ? out_w : 0, scale_in_load ? out_h : 0)) {
     return false;
   }
+  report_step(req, step_prefix, "Loading SDR JPEG");
   if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr_slice, err, &crop)) {
     return false;
   }
-  if (!req.gainmap_in.empty() &&
-      !apply_gainmap_to_hdr(&hdr_slice, req.base_path, req.gainmap_in, err, master_w, master_h,
-                            &crop)) {
-    return false;
+  if (!req.gainmap_in.empty()) {
+    report_step(req, step_prefix, "Applying gain map");
+    if (!apply_gainmap_to_hdr(&hdr_slice, req.base_path, req.gainmap_in, err, master_w, master_h,
+                              &crop)) {
+      return false;
+    }
   }
 
   RawImageHolder hdr_out;
   RawImageHolder sdr_out;
   const RawImageHolder* hdr_enc = &hdr_slice;
   const RawImageHolder* sdr_enc = &sdr_slice;
-  if (out_w >= 2 && out_h >= 2) {
-    if (hdr_slice.ref().w != out_w || hdr_slice.ref().h != out_h) {
-      if (!resize_hdr_lanczos(hdr_slice, out_w, out_h, &hdr_out, err)) {
-        return false;
-      }
-      hdr_enc = &hdr_out;
-    }
-    if (sdr_slice.ref().w != out_w || sdr_slice.ref().h != out_h) {
-      if (!resize_sdr_lanczos_sharpen(sdr_slice, out_w, out_h, &sdr_out, err)) {
-        return false;
-      }
-      sdr_enc = &sdr_out;
-    }
+  const bool scale_hdr = out_w >= 2 && out_h >= 2 &&
+                        (hdr_slice.ref().w != out_w || hdr_slice.ref().h != out_h);
+  const bool scale_sdr = out_w >= 2 && out_h >= 2 &&
+                         (sdr_slice.ref().w != out_w || sdr_slice.ref().h != out_h);
+  if (scale_hdr || scale_sdr) {
+    report_step(req, step_prefix, resize_step(req, out_w, out_h));
   }
+  if (scale_hdr) {
+    if (!resize_hdr_lanczos(hdr_slice, out_w, out_h, &hdr_out, err)) {
+      return false;
+    }
+    hdr_enc = &hdr_out;
+  }
+  if (scale_sdr) {
+    if (!resize_sdr_lanczos_sharpen(sdr_slice, out_w, out_h, &sdr_out, err)) {
+      return false;
+    }
+    sdr_enc = &sdr_out;
+  }
+  report_step(req, step_prefix, jpeg_step(req, out_path));
   return encode_pair(*hdr_enc, *sdr_enc, opt, out_path, err);
 }
 
@@ -138,18 +179,21 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
                                    ? dst_w
                                    : 0;
     const unsigned hdr_dst_h = hdr_dst_w ? dst_h : 0;
+    report_step(req, "", "Loading HDR TIFF");
     if (!load_hdr_tiff_raw(req.hdr_tiff, &hdr, &err, 0, 0, nullptr, hdr_dst_w, hdr_dst_h)) {
       if (error_out) *error_out = "HDR TIFF: " + err;
       std::cerr << "HDR TIFF: " << err << "\n";
       return 3;
     }
     if (!req.gainmap_in.empty()) {
+      report_step(req, "", "Applying gain map");
       if (!apply_gainmap_to_hdr(&hdr, req.base_path, req.gainmap_in, &err, master_w, master_h)) {
         if (error_out) *error_out = err;
         std::cerr << "gainmap: " << err << "\n";
         return 10;
       }
     }
+    report_step(req, "", "Loading SDR JPEG");
     if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr, &err)) {
       if (error_out) *error_out = "SDR base: " + err;
       std::cerr << "SDR base: " << err << "\n";
@@ -159,6 +203,9 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     RawImageHolder sdr_out;
     const RawImageHolder* hdr_enc = &hdr;
     const RawImageHolder* sdr_enc = &sdr;
+    if (hdr.ref().w != dst_w || hdr.ref().h != dst_h || sdr.ref().w != dst_w || sdr.ref().h != dst_h) {
+      report_step(req, "", resize_step(req, dst_w, dst_h));
+    }
     if (hdr.ref().w != dst_w || hdr.ref().h != dst_h) {
       if (!resize_hdr_lanczos(hdr, dst_w, dst_h, &hdr_out, &err)) {
         if (error_out) *error_out = err;
@@ -177,6 +224,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     if (!req.gainmap_in.empty()) opt.gainmap_in = req.gainmap_in;
     if (!req.watermark_config.empty()) opt.watermark_config = req.watermark_config;
     if (!req.metadata_patch.empty()) opt.metadata_patch = req.metadata_patch;
+    report_step(req, "", jpeg_step(req, req.out_path));
     if (!encode_pair(*hdr_enc, *sdr_enc, opt, req.out_path, &err)) {
       if (error_out) *error_out = err;
       return 5;
@@ -185,6 +233,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
   }
 
   if (req.slice_aspect == SliceAspect::kNone) {
+    report_step(req, "", "Loading HDR TIFF");
     if (!load_hdr_tiff_raw(req.hdr_tiff, &hdr, &err)) {
       if (error_out) *error_out = "HDR TIFF: " + err;
       std::cerr << "HDR TIFF: " << err << "\n";
@@ -194,6 +243,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     master_w = hdr.ref().w;
     master_h = hdr.ref().h;
 
+    report_step(req, "", "Loading SDR JPEG");
     if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr, &err)) {
       if (error_out) *error_out = "SDR base: " + err;
       std::cerr << "SDR base: " << err << "\n";
@@ -201,6 +251,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     }
 
     if (!req.gainmap_in.empty()) {
+      report_step(req, "", "Applying gain map");
       if (!apply_gainmap_to_hdr(&hdr, req.base_path, req.gainmap_in, &err, master_w, master_h)) {
         if (error_out) *error_out = err;
         std::cerr << "gainmap: " << err << "\n";
@@ -226,6 +277,10 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     const RawImageHolder* hdr_enc = &hdr;
     const RawImageHolder* sdr_enc = &sdr;
     if (encode_target_size(req, hdr.ref().w, hdr.ref().h, &out_w, &out_h)) {
+      if (hdr.ref().w != out_w || hdr.ref().h != out_h || sdr.ref().w != out_w ||
+          sdr.ref().h != out_h) {
+        report_step(req, "", resize_step(req, out_w, out_h));
+      }
       if (hdr.ref().w != out_w || hdr.ref().h != out_h) {
         if (!resize_hdr_lanczos(hdr, out_w, out_h, &hdr_out, &err)) {
           if (error_out) *error_out = err;
@@ -242,6 +297,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
       }
     }
 
+    report_step(req, "", jpeg_step(req, req.out_path));
     if (!encode_pair(*hdr_enc, *sdr_enc, opt, req.out_path, &err)) {
       if (error_out) *error_out = err;
       return 5;
@@ -287,7 +343,9 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
       idx = static_cast<unsigned>(slices.size());
     }
     const CropRect& crop = slices[idx - 1];
-    if (!encode_crop(req, master_w, master_h, crop, opt, req.out_path, &err)) {
+    const std::string prefix =
+        slice_step_prefix(req, idx, static_cast<unsigned>(slices.size()), crop);
+    if (!encode_crop(req, master_w, master_h, crop, opt, req.out_path, prefix, &err)) {
       if (error_out) *error_out = "preview slice: " + err;
       return 9;
     }
@@ -295,7 +353,8 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
   }
 
   if (slices.size() == 1) {
-    if (!encode_crop(req, master_w, master_h, slices[0], opt, req.out_path, &err)) {
+    const std::string prefix = slice_step_prefix(req, 1, 1, slices[0]);
+    if (!encode_crop(req, master_w, master_h, slices[0], opt, req.out_path, prefix, &err)) {
       if (error_out) *error_out = err;
       return 9;
     }
@@ -306,9 +365,11 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
   std::string first_path;
   for (const auto& crop : slices) {
     const std::string slice_out = make_slice_output_path(req.out_path, req.slice_aspect, idx);
+    const std::string prefix =
+        slice_step_prefix(req, idx, static_cast<unsigned>(slices.size()), crop);
     std::cerr << "Slice " << idx << ": crop " << crop.x << "," << crop.y << " " << crop.w << "x"
               << crop.h << " -> " << slice_out << "\n";
-    if (!encode_crop(req, master_w, master_h, crop, opt, slice_out, &err)) {
+    if (!encode_crop(req, master_w, master_h, crop, opt, slice_out, prefix, &err)) {
       if (error_out) *error_out = "slice " + std::to_string(idx) + ": " + err;
       return 9;
     }
@@ -319,17 +380,18 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
   }
 
   if (!first_path.empty() && first_path != req.out_path) {
+    report_step(req, "", "Removing the original export; gallery slices are the output");
     std::error_code ec;
-    fs::remove(fs::u8path(req.out_path), ec);
-    fs::copy_file(fs::u8path(first_path), fs::u8path(req.out_path),
-                  fs::copy_options::overwrite_existing, ec);
+    const bool removed = fs::remove(fs::u8path(req.out_path), ec);
     if (ec) {
-      err = "Could not copy first slice to " + req.out_path + ": " + ec.message();
+      err = "Could not remove original export " + req.out_path + ": " + ec.message();
       if (error_out) *error_out = err;
       std::cerr << err << "\n";
       return 9;
     }
-    std::cout << "Wrote " << req.out_path << " (first slice)\n";
+    if (removed) {
+      std::cout << "Removed " << req.out_path << " (gallery slices are the export)\n";
+    }
   }
   return 0;
 }

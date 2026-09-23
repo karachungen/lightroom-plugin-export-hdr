@@ -24,15 +24,25 @@
     </aside>
 
     <main id="stage">
-      <div id="mode-buttons" class="mode-seg" role="tablist">
-        <button type="button" data-mode="hdr" class="mode-btn active" role="tab">HDR</button>
-        <button type="button" data-mode="sdr" class="mode-btn" role="tab">SDR</button>
-        <button type="button" data-mode="gain" class="mode-btn" role="tab">Gain</button>
+      <div id="stage-toolbar">
+        <div id="mode-buttons" class="mode-seg" role="tablist">
+          <button type="button" data-mode="hdr" class="mode-btn active" role="tab">HDR</button>
+          <button type="button" data-mode="sdr" class="mode-btn" role="tab">SDR</button>
+          <button type="button" data-mode="gain" class="mode-btn" role="tab">Gain</button>
+        </div>
+        <div id="zoom-controls" role="group" aria-label="Preview zoom">
+          <button type="button" id="zoom-out" title="Zoom out (−)">−</button>
+          <button type="button" id="zoom-fit" title="Fit to frame (0). Scroll to zoom, drag to pan.">100%</button>
+          <button type="button" id="zoom-in" title="Zoom in (+)">+</button>
+        </div>
       </div>
+      <p id="preview-memory-note" hidden>Preview reduced for memory. Export uses the original size.</p>
       <div id="canvas-wrap">
         <div id="preview-frame">
           <canvas id="preview-canvas"></canvas>
           <div id="slice-overlay"></div>
+          <div id="slice-margin-lead" class="slice-margin" hidden></div>
+          <div id="slice-margin-trail" class="slice-margin" hidden></div>
           <div id="hdr-loader" hidden>
             <div class="hdr-spinner" aria-hidden="true"></div>
             <p>Encoding Ultra HDR…</p>

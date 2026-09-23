@@ -80,26 +80,16 @@ bool sdr_preview_size(const std::string& path, int* width, int* height, std::str
   return frame_size(frame.Get(), width, height, error);
 }
 
-bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* error) {
-  if (!out) {
-    if (error) *error = "invalid arguments";
-    return false;
-  }
-  Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
-  Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
-  if (!open_frame(path, factory, frame, error)) return false;
-  int w = 0;
-  int h = 0;
-  if (!frame_size(frame.Get(), &w, &h, error)) return false;
-
+bool copy_wic_source(IWICImagingFactory* factory, IWICBitmapSource* source, int w, int h,
+                     const std::string& path, QImage* out, std::string* error) {
   Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
   HRESULT hr = factory->CreateFormatConverter(&converter);
   if (FAILED(hr)) {
     if (error) *error = "WIC CreateFormatConverter failed";
     return false;
   }
-  hr = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
-                             nullptr, 0.f, WICBitmapPaletteTypeCustom);
+  hr = converter->Initialize(source, GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr,
+                             0.f, WICBitmapPaletteTypeCustom);
   if (FAILED(hr)) {
     if (error) *error = "WIC format conversion failed: " + path;
     return false;
@@ -116,6 +106,89 @@ bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* e
   }
   *out = std::move(rgba);
   return true;
+}
+
+bool scale_wic_source(IWICImagingFactory* factory, IWICBitmapSource* source, int dst_w, int dst_h,
+                      const std::string& path, QImage* out, std::string* error) {
+  Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+  HRESULT hr = factory->CreateBitmapScaler(&scaler);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC CreateBitmapScaler failed";
+    return false;
+  }
+  hr = scaler->Initialize(source, static_cast<UINT>(dst_w), static_cast<UINT>(dst_h),
+                          WICBitmapInterpolationModeFant);
+  if (FAILED(hr)) {
+    if (error) *error = "WIC scaler Initialize failed: " + path;
+    return false;
+  }
+  return copy_wic_source(factory, scaler.Get(), dst_w, dst_h, path, out, error);
+}
+
+bool jpeg_native_scale(IWICImagingFactory* factory, IWICBitmapFrameDecode* frame, int src_w,
+                       int src_h, int max_edge, const std::string& path, QImage* out,
+                       std::string* error) {
+  Microsoft::WRL::ComPtr<IWICBitmapSourceTransform> transform;
+  if (FAILED(frame->QueryInterface(IID_PPV_ARGS(&transform)))) return false;
+
+  UINT rw = static_cast<UINT>(std::max(1, src_w));
+  UINT rh = static_cast<UINT>(std::max(1, src_h));
+  int fit_w = src_w;
+  int fit_h = src_h;
+  if (!fit_preview_long_edge(src_w, src_h, max_edge, &fit_w, &fit_h)) return false;
+  rw = static_cast<UINT>(fit_w);
+  rh = static_cast<UINT>(fit_h);
+  if (FAILED(transform->GetClosestSize(&rw, &rh)) || rw < 1 || rh < 1) return false;
+  if (rw >= static_cast<UINT>(src_w) && rh >= static_cast<UINT>(src_h)) return false;
+
+  QImage native(static_cast<int>(rw), static_cast<int>(rh), QImage::Format_RGBA8888);
+  native.fill(0);
+  const UINT stride = static_cast<UINT>(native.bytesPerLine());
+  const UINT bytes = stride * rh;
+  const GUID format = GUID_WICPixelFormat32bppRGBA;
+  const HRESULT hr = transform->CopyPixels(nullptr, rw, rh, &format, WICBitmapTransformRotate0,
+                                           stride, bytes, native.bits());
+  if (FAILED(hr)) return false;
+
+  const int long_edge = std::max(static_cast<int>(rw), static_cast<int>(rh));
+  if (long_edge <= max_edge) {
+    *out = std::move(native);
+    return true;
+  }
+
+  Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+  const HRESULT created = factory->CreateBitmapFromMemory(
+      rw, rh, GUID_WICPixelFormat32bppRGBA, stride, bytes, native.bits(), &bitmap);
+  if (FAILED(created)) {
+    if (error) *error = "WIC CreateBitmapFromMemory failed: " + path;
+    return false;
+  }
+  return scale_wic_source(factory, bitmap.Get(), fit_w, fit_h, path, out, error);
+}
+
+bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* error, int max_edge) {
+  if (!out) {
+    if (error) *error = "invalid arguments";
+    return false;
+  }
+  Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+  Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+  if (!open_frame(path, factory, frame, error)) return false;
+  int w = 0;
+  int h = 0;
+  if (!frame_size(frame.Get(), &w, &h, error)) return false;
+
+  int dst_w = w;
+  int dst_h = h;
+  const bool shrink = max_edge >= 2 && fit_preview_long_edge(w, h, max_edge, &dst_w, &dst_h) &&
+                      (dst_w < w || dst_h < h);
+  if (!shrink) {
+    return copy_wic_source(factory.Get(), frame.Get(), w, h, path, out, error);
+  }
+  if (jpeg_native_scale(factory.Get(), frame.Get(), w, h, max_edge, path, out, error)) {
+    return true;
+  }
+  return scale_wic_source(factory.Get(), frame.Get(), dst_w, dst_h, path, out, error);
 }
 
 int probe_sdr_main(const std::string& path) {

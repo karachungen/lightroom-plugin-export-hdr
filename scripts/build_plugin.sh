@@ -3,7 +3,7 @@
 # Uses CMake presets in tools/uhdr_repack/CMakePresets.json — same path for local and CI.
 #
 # Usage:
-#   ./scripts/build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean]
+#   ./scripts/build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean] [--skip-fixtures]
 set -euo pipefail
 
 # Pin CMake 3.31.x on Windows (CMake 4.x breaks vendored libjpeg-turbo).
@@ -16,12 +16,13 @@ BUILD_DIR="$UHDR_SRC/build"
 PLUGIN_BIN="$REPO_ROOT/ExportHDR.lrplugin/bin"
 
 CLEAN=0
+SKIP_FIXTURES=0
 PRESET=""
 COMMAND=""
 
 usage() {
 	cat <<'EOF'
-Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean]
+Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean] [--skip-fixtures]
 
   install-deps  Install platform build dependencies (macOS: brew; Windows local: setup_windows_build.ps1)
   install       build → bundle → test (default; updates ExportHDR.lrplugin in place, no zip)
@@ -34,6 +35,7 @@ Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--p
 Options:
   --preset NAME   Override auto-detected preset (macos-arm64-release | windows-x64-release)
   --clean         Remove tools/uhdr_repack/build before configure
+  --skip-fixtures Continue bundle when UI preview JPEG/TIFF pairs are missing
 EOF
 }
 
@@ -49,6 +51,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--clean)
 		CLEAN=1
+		shift
+		;;
+	--skip-fixtures)
+		SKIP_FIXTURES=1
 		shift
 		;;
 	-h | --help)
@@ -244,7 +250,7 @@ resolve_qt_for_build() {
 		static_root="$(find_qt_static_root || true)"
 	fi
 	if [[ -n "$static_root" ]]; then
-		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON")
+		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON" "-DCMAKE_PREFIX_PATH=$static_root")
 		echo "==> Using static Qt at $static_root"
 		QT_RESOLVED=1
 		return 0
@@ -655,7 +661,11 @@ bundle_windows() {
 }
 
 cmd_bundle() {
-	"$SCRIPT_DIR/copy_ui_fixtures.sh"
+	if [[ "$SKIP_FIXTURES" -eq 1 ]]; then
+		UHDR_SKIP_FIXTURES=1 "$SCRIPT_DIR/copy_ui_fixtures.sh"
+	else
+		"$SCRIPT_DIR/copy_ui_fixtures.sh"
+	fi
 	case "$PRESET" in
 	macos-arm64-release) bundle_macos ;;
 	windows-x64-release) bundle_windows ;;

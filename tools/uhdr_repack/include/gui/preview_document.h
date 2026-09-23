@@ -15,6 +15,11 @@ namespace uhdr_repack {
 
 struct PreviewItemState {
   QImage sdr;
+  /** Pixel size of the SDR file. Crop and export use this, not the preview bitmap. */
+  int source_width = 0;
+  int source_height = 0;
+  /** True when the on-screen bitmap is smaller than the file for memory. */
+  bool preview_reduced = false;
   std::vector<float> gain;
   std::vector<float> gain_rgb;
   int gain_width = 0;
@@ -74,6 +79,7 @@ class PreviewDocument final : public QObject {
   void itemFailed(int index, const QString& message);
   void finalPreviewReady(int index);
   void finalPreviewFailed(int index, const QString& message);
+  void finalPreviewProgress(int index, const QString& detail);
   void itemChanged(int index);
 
  private:
