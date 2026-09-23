@@ -73,6 +73,7 @@ class GuiBridge : public QObject {
   void emitSliceGuides();
   void applyLiveSettings(bool send_slices, bool send_heatmap);
   void sendHeatmap(int index);
+  void sendHdrEmulation();
   void sendHdrLoading(bool loading, bool ready = false, const QString& phase = {});
   void sendItemLoading(int index);
   void syncGainToViewport(int index);
@@ -107,6 +108,7 @@ class GuiBridge : public QObject {
   float preview_zoom_ = 1.f;
   float preview_pan_x_ = 0.f;
   float preview_pan_y_ = 0.f;
+  bool viewport_hdr_active_ = false;
 
   std::vector<GainMapEditor> editors_;
 };

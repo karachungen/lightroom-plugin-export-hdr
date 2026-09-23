@@ -119,6 +119,7 @@ set(_UHDR_CORE_SOURCES
   src/slice_plan.cpp
   src/resize_lanczos.cpp
   src/uhdr_encode.cpp
+  src/jpeg_container.cpp
   src/jpeg_xmp_rights.cpp
   src/gainmap_metadata.cpp
   src/gainmap_loader.cpp
@@ -212,6 +213,7 @@ if(UHDR_ENABLE_GUI)
       src/gui/web_chrome_mac.mm
       src/gui/app_icon_mac.mm
       src/gui/sdr_preview_image_mac.mm
+      src/gui/display_hdr_mac.mm
     )
   elseif(WIN32)
     list(APPEND _UHDR_GUI_SOURCES
@@ -243,6 +245,12 @@ if(UHDR_USE_SYSTEM)
   target_link_libraries(uhdr_repack PRIVATE "${_uhdr_vendor_lib}")
 else()
   target_include_directories(uhdr_repack PRIVATE "${libultrahdr_SOURCE_DIR}")
+  if(WIN32)
+    target_include_directories(uhdr_repack PRIVATE
+      "${libultrahdr_SOURCE_DIR}/third_party/turbojpeg/src"
+      "${libultrahdr_BINARY_DIR}/turbojpeg/src/turbojpeg-build"
+    )
+  endif()
   # libultrahdr v2 names the static MSVC target uhdr-static. Linking the bare
   # name "uhdr" is then a filename, so Ninja can link before that library exists.
   if(TARGET uhdr-static)
@@ -251,6 +259,10 @@ else()
     target_link_libraries(uhdr_repack PRIVATE uhdr)
   else()
     message(FATAL_ERROR "libultrahdr did not create a uhdr or uhdr-static target")
+  endif()
+  if(WIN32)
+    target_link_libraries(uhdr_repack PRIVATE
+      "${libultrahdr_BINARY_DIR}/turbojpeg/src/turbojpeg-build/jpeg-static.lib")
   endif()
 endif()
 

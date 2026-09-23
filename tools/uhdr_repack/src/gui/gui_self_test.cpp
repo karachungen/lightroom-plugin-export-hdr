@@ -13,10 +13,14 @@
 #include "gui/ultrahdr_preview_service.h"
 #include "half_float.h"
 #include "hdr_bridge.h"
+#include "jpeg_container.h"
 #include "session.h"
 #include "slice_plan.h"
 #include "tiff_input.h"
 #include "verify.h"
+#ifdef _WIN32
+#include "wic_utils.h"
+#endif
 
 #include <QApplication>
 #include <QEventLoop>
@@ -962,6 +966,88 @@ bool test_activity_log(int* checks) {
   return true;
 }
 
+bool test_sdr_p3_ingest(int* checks) {
+  const LinearRgb p3{0.82f, 0.14f, 0.06f};
+  const LinearRgb rec = display_p3_to_rec2020(p3);
+  const LinearRgb back = rec2020_to_display_p3(rec);
+  if (std::abs(back.r - p3.r) > 5e-3f || std::abs(back.g - p3.g) > 5e-3f ||
+      std::abs(back.b - p3.b) > 5e-3f) {
+    std::cerr << "Display P3 Rec.2020 roundtrip drifted\n";
+    return false;
+  }
+  std::cout << "OK Display P3 <-> Rec.2020 roundtrip\n";
+  (*checks)++;
+
+  uint8_t srgb_red[4] = {255, 0, 0, 255};
+  srgb_rgba8888_to_display_p3(srgb_red, 1);
+  if (srgb_red[0] == 255 && srgb_red[1] == 0 && srgb_red[2] == 0) {
+    std::cerr << "sRGB red should remap when tagged as Display P3\n";
+    return false;
+  }
+  if (srgb_red[0] < 220) {
+    std::cerr << "sRGB red mapped to P3 is unexpectedly dark\n";
+    return false;
+  }
+  std::cout << "OK sRGB 8-bit to Display P3 remap " << static_cast<int>(srgb_red[0]) << ","
+            << static_cast<int>(srgb_red[1]) << "," << static_cast<int>(srgb_red[2]) << "\n";
+  (*checks)++;
+
+#ifdef _WIN32
+  const fs::path png = fs::temp_directory_path() / "uhdr_sdr_p3_ingest.jpg";
+  std::vector<uint8_t> red_px(8 * 8 * 4, 255);
+  for (size_t i = 0; i < red_px.size(); i += 4) {
+    red_px[i] = 255;
+    red_px[i + 1] = 0;
+    red_px[i + 2] = 0;
+  }
+  std::vector<uint8_t> jpeg;
+  std::string encode_err;
+  if (!wic::encode_jpeg_from_rgba8(red_px.data(), 8, 8, 100, &jpeg, &encode_err) || jpeg.empty()) {
+    std::cerr << "could not write ingest fixture JPEG: " << encode_err << "\n";
+    return false;
+  }
+  {
+    std::ofstream out(png, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(jpeg.data()),
+              static_cast<std::streamsize>(jpeg.size()));
+    if (!out) {
+      std::cerr << "could not save ingest fixture JPEG\n";
+      return false;
+    }
+  }
+  std::vector<uint8_t> managed;
+  std::string err;
+  if (!wic::decode_scale_crop_to_rgba8(png.u8string(), 8, 8, 8, 8, 0, 0, managed, &err,
+                                       wic::Rgba8Space::DisplayP3) ||
+      managed.size() < 4) {
+    std::cerr << "WIC Display P3 decode: " << err << "\n";
+    fs::remove(png);
+    return false;
+  }
+  const int dr = std::abs(static_cast<int>(managed[0]) - static_cast<int>(srgb_red[0]));
+  const int dg = std::abs(static_cast<int>(managed[1]) - static_cast<int>(srgb_red[1]));
+  const int db = std::abs(static_cast<int>(managed[2]) - static_cast<int>(srgb_red[2]));
+  fs::remove(png);
+    if (dr > 12 || dg > 12 || db > 12) {
+    std::cerr << "untagged sRGB JPEG did not color-manage to P3 (got "
+              << static_cast<int>(managed[0]) << "," << static_cast<int>(managed[1]) << ","
+              << static_cast<int>(managed[2]) << " expected " << static_cast<int>(srgb_red[0])
+              << "," << static_cast<int>(srgb_red[1]) << "," << static_cast<int>(srgb_red[2])
+              << ")\n";
+    return false;
+  }
+  if (managed[2] > managed[0] + 40) {
+    std::cerr << "WIC Display P3 decode looks channel-swapped (got "
+              << static_cast<int>(managed[0]) << "," << static_cast<int>(managed[1]) << ","
+              << static_cast<int>(managed[2]) << ")\n";
+    return false;
+  }
+  std::cout << "OK WIC color-managed sRGB JPEG to Display P3\n";
+  (*checks)++;
+#endif
+  return true;
+}
+
 }  // namespace
 
 int gui_self_test_main(const std::string& session_path) {
@@ -1002,6 +1088,9 @@ int gui_self_test_main(const std::string& session_path) {
   }
   if (!test_activity_log(&checks)) {
     return fail("activity log");
+  }
+  if (!test_sdr_p3_ingest(&checks)) {
+    return fail("sdr p3 ingest");
   }
   if (!test_hdr_bridge_protocol(&checks)) {
     return fail("hdr bridge protocol");
@@ -1078,14 +1167,44 @@ int gui_self_test_main(const std::string& session_path) {
         has_icc = true;
       }
     }
-    if (!progressive) {
+    std::vector<uint8_t> src_jpeg;
+    unsigned jpeg_w = 0;
+    unsigned jpeg_h = 0;
+    unsigned hdr_w = 0;
+    unsigned hdr_h = 0;
+    bool passthrough = false;
+    if (load_binary_file(encode_item.sdr, &src_jpeg, &err) &&
+        probe_jpeg_sof_size(src_jpeg, &jpeg_w, &jpeg_h) &&
+        probe_hdr_tiff_even_size(encode_item.hdr_tiff, &hdr_w, &hdr_h, &err) && jpeg_w == hdr_w &&
+        jpeg_h == hdr_h) {
+      size_t sos = 0;
+      size_t eoi = 0;
+      if (jpeg_first_scan_range(src_jpeg, &sos, &eoi) && eoi > sos &&
+          eoi - sos <= bytes.size()) {
+        const size_t n = eoi - sos;
+        for (size_t i = 0; i + n <= bytes.size(); ++i) {
+          if (std::memcmp(bytes.data() + i, src_jpeg.data() + sos, n) == 0) {
+            passthrough = true;
+            break;
+          }
+        }
+      }
+    }
+    if (passthrough) {
+      std::cout << "OK SDR JPEG pass-through primary (" << src_jpeg.size() << " byte source)\n";
+      checks++;
+    } else if (!progressive) {
       return fail("default encode primary JPEG is not progressive (SOF2)");
+    } else {
+      std::cout << "OK progressive JPEG with ICC profile\n";
+      checks++;
     }
     if (!has_icc) {
       return fail("default encode is missing an ICC profile");
     }
-    std::cout << "OK progressive JPEG with ICC profile\n";
-    checks++;
+    if (passthrough) {
+      std::cout << "OK pass-through Ultra HDR has ICC profile\n";
+    }
   }
 
   {
@@ -1205,7 +1324,7 @@ int gui_self_test_main(const std::string& session_path) {
       ++samples;
     }
   }
-  if (samples < 1 || differ * 2 >= samples) {
+  if (samples < 1 || differ * 4 < samples) {
     return fail("encoded gain-map JPEG is too similar to synthetic heatmap preview");
   }
   std::cout << "OK Gain preview uses encoded Ultra HDR gain-map JPEG " << encoded_map.width()

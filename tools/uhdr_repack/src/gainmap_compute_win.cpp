@@ -22,31 +22,11 @@ namespace uhdr_repack {
 
 namespace {
 
-float srgb_byte_to_linear(float value) {
-  value /= 255.0f;
-  return value <= 0.04045f ? value / 12.92f
-                            : std::pow((value + 0.055f) / 1.055f, 2.4f);
-}
-
-float luminance_bt709(float r, float g, float b) {
-  return 0.2126f * r + 0.7152f * g + 0.0722f * b;
-}
-
 bool load_sdr_linear_rgba(const std::string& path, unsigned master_w, unsigned master_h,
                           unsigned out_w, unsigned out_h, unsigned crop_x, unsigned crop_y,
                           std::vector<float>* rgba, std::string* error) {
-  std::vector<uint8_t> bytes;
-  if (!wic::decode_scale_crop_to_rgba8(path, master_w, master_h, out_w, out_h, crop_x, crop_y,
-                                       bytes, error))
-    return false;
-  rgba->resize(static_cast<size_t>(out_w) * out_h * 4u);
-  for (size_t i = 0; i < rgba->size(); i += 4) {
-    (*rgba)[i] = srgb_byte_to_linear(bytes[i]);
-    (*rgba)[i + 1] = srgb_byte_to_linear(bytes[i + 1]);
-    (*rgba)[i + 2] = srgb_byte_to_linear(bytes[i + 2]);
-    (*rgba)[i + 3] = 1.0f;
-  }
-  return true;
+  return wic::decode_scale_crop_to_linear_p3(path, master_w, master_h, out_w, out_h, crop_x, crop_y,
+                                             *rgba, error);
 }
 
 bool hdr_half_to_linear(const uhdr_raw_image_t& hdr, std::vector<float>* rgba) {
@@ -56,11 +36,11 @@ bool hdr_half_to_linear(const uhdr_raw_image_t& hdr, std::vector<float>* rgba) {
   const auto* half = static_cast<const uint16_t*>(hdr.planes[UHDR_PLANE_PACKED]);
   for (size_t pixel = 0; pixel < static_cast<size_t>(hdr.w) * hdr.h; ++pixel) {
     const size_t i = pixel * 4u;
-    const LinearRgb rec709 = rec2020_to_linear_srgb(
+    const LinearRgb p3 = rec2020_to_display_p3(
         {half_to_float(half[i]), half_to_float(half[i + 1]), half_to_float(half[i + 2])});
-    (*rgba)[i] = rec709.r;
-    (*rgba)[i + 1] = rec709.g;
-    (*rgba)[i + 2] = rec709.b;
+    (*rgba)[i] = p3.r;
+    (*rgba)[i + 1] = p3.g;
+    (*rgba)[i + 2] = p3.b;
     (*rgba)[i + 3] = half_to_float(half[i + 3]);
   }
   return true;
@@ -92,9 +72,9 @@ bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_ti
   for (size_t pixel = 0; pixel < gain->size(); ++pixel) {
     const size_t i = pixel * 4u;
     const float sdr_l =
-        luminance_bt709(sdr_linear[i], sdr_linear[i + 1], sdr_linear[i + 2]);
+        luminance_display_p3(sdr_linear[i], sdr_linear[i + 1], sdr_linear[i + 2]);
     const float hdr_l =
-        luminance_bt709(hdr_linear[i], hdr_linear[i + 1], hdr_linear[i + 2]);
+        luminance_display_p3(hdr_linear[i], hdr_linear[i + 1], hdr_linear[i + 2]);
     (*gain)[pixel] = std::clamp(hdr_l / std::max(sdr_l, 1e-4f), 1.0f, 1000.0f);
     if (gain_rgb) {
       (*gain_rgb)[pixel * 3u] =
@@ -165,7 +145,7 @@ bool apply_gainmap_to_hdr(RawImageHolder* hdr, const std::string& sdr_path,
       const size_t gi = static_cast<size_t>(oy + y) * static_cast<size_t>(gain_w) + (ox + x);
       const size_t i = pi * 4u;
       const float g = gain[gi];
-      const LinearRgb rec2020 = linear_srgb_to_rec2020(
+      const LinearRgb rec2020 = display_p3_to_rec2020(
           {sdr_linear[i] * g, sdr_linear[i + 1] * g, sdr_linear[i + 2] * g});
       half[i] = float_to_half(rec2020.r);
       half[i + 1] = float_to_half(rec2020.g);

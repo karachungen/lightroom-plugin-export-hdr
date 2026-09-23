@@ -7,6 +7,10 @@
 #include <QImageReader>
 #include <QPalette>
 
+#ifdef Q_OS_WIN
+#include <objbase.h>
+#endif
+
 namespace uhdr_repack {
 
 #ifdef Q_OS_MACOS
@@ -14,6 +18,20 @@ void apply_macos_app_icon();
 #endif
 
 int gui_edit_main(PreviewSession session) {
+#ifdef Q_OS_WIN
+  const HRESULT com_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  struct StaGuard {
+    HRESULT hr;
+    ~StaGuard() {
+      if (hr == S_OK) {
+        CoUninitialize();
+      }
+    }
+  } sta{com_hr};
+  if (FAILED(com_hr) && com_hr != RPC_E_CHANGED_MODE) {
+    return 1;
+  }
+#endif
   int argc = 0;
   char** argv = nullptr;
   QApplication app(argc, argv);

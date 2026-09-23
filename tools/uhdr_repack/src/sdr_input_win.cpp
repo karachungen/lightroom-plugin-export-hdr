@@ -2,7 +2,6 @@
 
 #include "sdr_input.h"
 
-#include "color_primaries.h"
 #include "wic_utils.h"
 #include "yuv_convert.h"
 
@@ -46,10 +45,9 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
 
   std::vector<uint8_t> rgba;
   if (!wic::decode_scale_crop_to_rgba8(path, master_width, master_height, out_w, out_h, crop_x,
-                                       crop_y, rgba, error)) {
+                                       crop_y, rgba, error, wic::Rgba8Space::DisplayP3)) {
     return false;
   }
-  srgb_rgba8888_to_display_p3(rgba.data(), static_cast<size_t>(out_w) * out_h);
 
   uint8_t* py = nullptr;
   uint8_t* pu = nullptr;

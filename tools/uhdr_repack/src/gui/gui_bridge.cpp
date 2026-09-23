@@ -1,6 +1,7 @@
 #include "gui/gui_bridge.h"
 
 #include "activity_log.h"
+#include "color_primaries.h"
 #include "gui/hdr_tiff_client.h"
 #include "gui/sdr_preview_image.h"
 #include "gui/web_chrome.h"
@@ -17,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <string>
 #include <utility>
 #include <vector>
@@ -137,6 +139,107 @@ json itemQueueMetaJson(PreviewDocument* document, int index) {
     j["outputHeight"] = 0;
   }
   return j;
+}
+
+float reinhard_shoulder(float linear) {
+  if (linear <= 1.0f) return std::max(linear, 0.0f);
+  const float excess = linear - 1.0f;
+  return 1.0f + excess / (1.0f + excess);
+}
+
+float unit_to_boost(float t, float min_boost, float max_boost) {
+  t = std::clamp(t, 0.0f, 1.0f);
+  const float lo = std::max(min_boost, 1.0f);
+  const float hi = std::max(max_boost, lo);
+  return lo * std::pow(hi / lo, t);
+}
+
+bool decodeGainmapJpeg(const std::vector<uint8_t>& jpeg, std::vector<float>* luma,
+                       std::vector<float>* rgb, int* w, int* h) {
+  if (jpeg.empty() || !luma || !rgb || !w || !h) return false;
+  QImage img = QImage::fromData(jpeg.data(), static_cast<int>(jpeg.size()));
+  if (img.isNull() || img.width() < 1 || img.height() < 1) return false;
+  img = img.convertToFormat(QImage::Format_RGB32);
+  *w = img.width();
+  *h = img.height();
+  const int n = *w * *h;
+  luma->resize(static_cast<std::size_t>(n));
+  rgb->resize(static_cast<std::size_t>(n) * 3u);
+  for (int y = 0; y < *h; ++y) {
+    const auto* line = reinterpret_cast<const QRgb*>(img.constScanLine(y));
+    for (int x = 0; x < *w; ++x) {
+      const float r = qRed(line[x]) / 255.0f;
+      const float g = qGreen(line[x]) / 255.0f;
+      const float b = qBlue(line[x]) / 255.0f;
+      const std::size_t p = static_cast<std::size_t>(y) * static_cast<std::size_t>(*w) +
+                            static_cast<std::size_t>(x);
+      (*luma)[p] = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+      (*rgb)[p * 3u] = r;
+      (*rgb)[p * 3u + 1] = g;
+      (*rgb)[p * 3u + 2] = b;
+    }
+  }
+  return true;
+}
+
+QImage compositeSdrTimesGain(const QImage& sdr, const std::vector<float>& gain,
+                             const std::vector<float>& gain_rgb, int gain_w, int gain_h,
+                             float min_boost, float max_boost, bool unit_interval) {
+  if (sdr.isNull() || gain_w < 1 || gain_h < 1) return {};
+  QImage out = sdr.convertToFormat(QImage::Format_RGB32);
+  if (out.width() > 1200 || out.height() > 1200) {
+    out = out.scaled(1200, 1200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  }
+  const std::size_t pixels = static_cast<std::size_t>(gain_w) * static_cast<std::size_t>(gain_h);
+  const bool have_rgb = gain_rgb.size() >= pixels * 3u;
+  const bool have_luma = gain.size() >= pixels;
+  if (!have_rgb && !have_luma) return {};
+
+  const int ow = out.width();
+  const int oh = out.height();
+  float gmin = 1.0e9f;
+  float gmax = 0.0f;
+  for (int y = 0; y < oh; ++y) {
+    auto* line = reinterpret_cast<QRgb*>(out.scanLine(y));
+    const int gy = std::clamp(y * gain_h / oh, 0, gain_h - 1);
+    for (int x = 0; x < ow; ++x) {
+      const int gx = std::clamp(x * gain_w / ow, 0, gain_w - 1);
+      const std::size_t p =
+          static_cast<std::size_t>(gy) * static_cast<std::size_t>(gain_w) + static_cast<std::size_t>(gx);
+      float br = 1.0f;
+      float bg = 1.0f;
+      float bb = 1.0f;
+      if (have_rgb) {
+        br = gain_rgb[p * 3u];
+        bg = gain_rgb[p * 3u + 1];
+        bb = gain_rgb[p * 3u + 2];
+      } else {
+        br = bg = bb = gain[p];
+      }
+      if (unit_interval) {
+        br = unit_to_boost(br, min_boost, max_boost);
+        bg = unit_to_boost(bg, min_boost, max_boost);
+        bb = unit_to_boost(bb, min_boost, max_boost);
+      } else {
+        br = std::clamp(br, min_boost, max_boost);
+        bg = std::clamp(bg, min_boost, max_boost);
+        bb = std::clamp(bb, min_boost, max_boost);
+      }
+      gmin = std::min(gmin, std::min(br, std::min(bg, bb)));
+      gmax = std::max(gmax, std::max(br, std::max(bg, bb)));
+      const QRgb px = line[x];
+      const float r = reinhard_shoulder(srgb_eotf(qRed(px) / 255.0f) * br);
+      const float g = reinhard_shoulder(srgb_eotf(qGreen(px) / 255.0f) * bg);
+      const float b = reinhard_shoulder(srgb_eotf(qBlue(px) / 255.0f) * bb);
+      line[x] = qRgb(std::clamp(static_cast<int>(srgb_oetf(r) * 255.0f + 0.5f), 0, 255),
+                     std::clamp(static_cast<int>(srgb_oetf(g) * 255.0f + 0.5f), 0, 255),
+                     std::clamp(static_cast<int>(srgb_oetf(b) * 255.0f + 0.5f), 0, 255));
+    }
+  }
+  activity_log_append("", "viewport",
+                      "gain layer min=" + std::to_string(gmin) + " max=" + std::to_string(gmax) +
+                          (unit_interval ? " jpeg-map" : " ratio-map"));
+  return out;
 }
 
 void downsampleGain(const std::vector<float>& src, int width, int height, int scale,
@@ -348,6 +451,7 @@ void GuiBridge::sendItemReady(int index) {
   }
   chrome_->postToPage(QString::fromStdString(root.dump()));
   sendSlices(index);
+  sendHdrEmulation();
 }
 
 void GuiBridge::sendSlices(int index) {
@@ -448,13 +552,85 @@ void GuiBridge::sendHeatmap(int index) {
   chrome_->postToPage(QString::fromStdString(root.dump()));
 }
 
+void GuiBridge::sendHdrEmulation() {
+  if (!chrome_ || !document_) return;
+  if (viewport_ && viewport_->displaySupportsHdr()) return;
+  if (preview_mode_ != PreviewMode::kFinalHdr) return;
+  if (current_index_ < 0 || current_index_ >= document_->itemCount()) return;
+  const auto& st = document_->state(current_index_);
+  if (st.sdr.isNull()) return;
+
+  const EncodeOptions opt =
+      effective_encode_options(document_->session(), document_->item(current_index_));
+  const std::vector<float>* gain = nullptr;
+  const std::vector<float>* gain_rgb = nullptr;
+  int gain_w = 0;
+  int gain_h = 0;
+  bool unit_interval = false;
+  std::vector<float> jpeg_luma;
+  std::vector<float> jpeg_rgb;
+
+  if (auto* editor = editorForIndex(current_index_); editor && editor->width > 0 && editor->height > 0 &&
+                                                     !editor->gain_map.empty()) {
+    gain = &editor->gain_map;
+    gain_w = editor->width;
+    gain_h = editor->height;
+    if (!editor->gain_rgb.empty()) gain_rgb = &editor->gain_rgb;
+  } else if (!st.gain.empty() && st.gain_width > 0 && st.gain_height > 0) {
+    gain = &st.gain;
+    gain_w = st.gain_width;
+    gain_h = st.gain_height;
+    if (!st.gain_rgb.empty()) gain_rgb = &st.gain_rgb;
+  } else if (decodeGainmapJpeg(st.final_hdr.gainmap_jpeg, &jpeg_luma, &jpeg_rgb, &gain_w, &gain_h)) {
+    gain = &jpeg_luma;
+    gain_rgb = &jpeg_rgb;
+    unit_interval = true;
+  } else {
+    activity_log_append(document_->item(current_index_).id, "viewport",
+                        "emulation skipped (no gain map)");
+    return;
+  }
+
+  const QImage img = compositeSdrTimesGain(st.sdr, gain ? *gain : std::vector<float>{},
+                                           gain_rgb ? *gain_rgb : std::vector<float>{}, gain_w, gain_h,
+                                           opt.min_content_boost, opt.max_content_boost, unit_interval);
+  if (img.isNull()) return;
+  const QString data_url = imageToDataUrl(img, "JPEG");
+  if (data_url.isEmpty()) return;
+  json root;
+  root["type"] = "hdrEmulation";
+  const std::string id = document_->item(current_index_).id;
+  root["id"] = id;
+  root["dataUrl"] = data_url.toStdString();
+  chrome_->postToPage(QString::fromStdString(root.dump()));
+  activity_log_append(id, "viewport",
+                      "emulation sdr=" + std::to_string(st.sdr.width()) + "x" +
+                          std::to_string(st.sdr.height()) + " gain=" + std::to_string(gain_w) + "x" +
+                          std::to_string(gain_h) + (unit_interval ? " jpeg" : " float"));
+}
+
 void GuiBridge::sendDisplayStatus(const HdrViewportStatus& status) {
   if (!chrome_) return;
+  const bool screen_hdr = viewport_ && viewport_->displaySupportsHdr();
+  viewport_hdr_active_ = status.hdr_active && screen_hdr;
+  if (!screen_hdr) viewport_hdr_active_ = false;
   json root;
   root["type"] = "displayStatus";
   root["text"] = (status.backend + " · " + status.swapchain_format).toStdString();
-  root["hdrActive"] = status.hdr_active;
+  root["hdrActive"] = viewport_hdr_active_;
+  root["displayHdr"] = screen_hdr;
+  if (!screen_hdr) {
+    root["warning"] =
+        "This display is not HDR. Previewing a brighter SDR simulation (gain map over SDR).";
+  } else if (status.initialized && !status.hdr_active) {
+    root["warning"] = "HDR output failed on this display. Showing a tone-mapped SDR simulation.";
+  }
+  activity_log_append("", "viewport",
+                      std::string("overlay ") + (viewport_hdr_active_ ? "hdr" : "sdr-fallback"));
   chrome_->postToPage(QString::fromStdString(root.dump()));
+  emitOverlay();
+  emitSliceGuides();
+  if (!screen_hdr) sendHdrEmulation();
 }
 
 void GuiBridge::sendHdrLoading(bool loading, bool ready, const QString& phase) {
@@ -575,10 +751,11 @@ void GuiBridge::applyLiveSettings(bool send_slices, bool send_heatmap) {
   if (send_slices && current_index_ >= 0) {
     sendSlices(current_index_);
   }
+  sendHdrEmulation();
 }
 
 void GuiBridge::emitSliceGuides() {
-  if (preview_mode_ != PreviewMode::kFinalHdr) {
+  if (preview_mode_ != PreviewMode::kFinalHdr || !viewport_hdr_active_) {
     emit sliceGuidesChanged({}, false, 1, 0, 0.5f);
     return;
   }
@@ -633,6 +810,7 @@ void GuiBridge::ensureHdrThenPreview(int index) {
       sendHeatmap(index);
     }
     sendHdrLoading(false, true);
+    sendHdrEmulation();
     emitOverlay();
     emitSliceGuides();
     return;
@@ -798,7 +976,7 @@ void GuiBridge::handleSetSettingsJson(const QString& json_text) {
 void GuiBridge::emitOverlay() {
   const QRect hole = selectedHdrHole();
   const bool visible = preview_mode_ == PreviewMode::kFinalHdr && hasEncodedHdr() &&
-                       hole.width() >= 8 && hole.height() >= 8;
+                       viewport_hdr_active_ && hole.width() >= 8 && hole.height() >= 8;
   emit previewOverlayChanged(preview_rect_, hole, visible);
 }
 
@@ -962,7 +1140,11 @@ void GuiBridge::handleMessage(const QString& json_text) {
     return;
   }
   if (type == "ready") {
+    activity_log_append("", "webview", "ready message received");
     sendSession();
+    if (viewport_) {
+      sendDisplayStatus(viewport_->status());
+    }
     const auto& opt = document_->session().default_encode_options;
     json settings;
     settings["type"] = "settings";
@@ -1062,6 +1244,7 @@ void GuiBridge::handleMessage(const QString& json_text) {
     }
     emitOverlay();
     emitSliceGuides();
+    if (preview_mode_ == PreviewMode::kFinalHdr) sendHdrEmulation();
     return;
   }
   if (type == "setSkipped") {
@@ -1106,6 +1289,9 @@ void GuiBridge::onItemReady(int index) {
       }
     }
     applyLiveSettings(false, preview_mode_ == PreviewMode::kGainMap);
+    if (st.gain.empty() && !document_->item(index).hdr_tiff.empty()) {
+      document_->requestGainMap(index);
+    }
     if (preview_mode_ == PreviewMode::kGainMap) {
       ensureGainHeatmap(index);
     } else if (needsEncodedPreview()) {
@@ -1137,6 +1323,7 @@ void GuiBridge::onFinalPreviewReady(int index) {
   }
   if (preview_mode_ == PreviewMode::kGainMap) sendHeatmap(index);
   sendHdrLoading(false, true);
+  sendHdrEmulation();
   emitOverlay();
   emitSliceGuides();
   if (chrome_ && preview_mode_ == PreviewMode::kFinalHdr) {

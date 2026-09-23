@@ -1,5 +1,6 @@
 #include "gui/hdr_rhi_viewport.h"
 
+#include "activity_log.h"
 #include "color_primaries.h"
 #include "half_float.h"
 
@@ -19,6 +20,15 @@
 #include <array>
 #include <cmath>
 #include <cstring>
+#include <string>
+#include <vector>
+
+#if defined(Q_OS_WIN)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace uhdr_repack {
 
@@ -60,6 +70,53 @@ float tone_map(float value) {
   const float excess = value - 1.0f;
   return 1.0f + excess / (1.0f + excess);
 }
+
+#if defined(Q_OS_WIN)
+bool windows_monitor_hdr_enabled(HMONITOR monitor) {
+  if (!monitor) return false;
+  MONITORINFOEXW info{};
+  info.cbSize = sizeof(info);
+  if (!GetMonitorInfoW(monitor, &info)) return false;
+
+  UINT32 path_count = 0;
+  UINT32 mode_count = 0;
+  if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS) {
+    return false;
+  }
+  std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+  std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+  if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(),
+                         nullptr) != ERROR_SUCCESS) {
+    return false;
+  }
+
+  for (UINT32 i = 0; i < path_count; ++i) {
+    DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+    source.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+    source.header.size = sizeof(source);
+    source.header.adapterId = paths[i].sourceInfo.adapterId;
+    source.header.id = paths[i].sourceInfo.id;
+    if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS) continue;
+    if (wcscmp(info.szDevice, source.viewGdiDeviceName) != 0) continue;
+
+    DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+    color.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+    color.header.size = sizeof(color);
+    color.header.adapterId = paths[i].targetInfo.adapterId;
+    color.header.id = paths[i].targetInfo.id;
+    if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS) continue;
+    return color.advancedColorSupported && color.advancedColorEnabled;
+  }
+  return false;
+}
+
+bool windows_window_hdr_enabled(HWND hwnd) {
+  const HMONITOR monitor =
+      hwnd ? MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+           : MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+  return windows_monitor_hdr_enabled(monitor);
+}
+#endif
 
 struct alignas(16) PreviewUniforms {
   float mode_boost[4];
@@ -113,17 +170,20 @@ class HdrRhiViewport::Impl {
     swapchain->setWindow(q);
 
     QRhiSwapChain::Format selected = QRhiSwapChain::SDR;
+    const bool screen_hdr = q->displaySupportsHdr();
+    if (screen_hdr) {
 #if defined(Q_OS_MACOS)
-    const std::array preferred = {QRhiSwapChain::HDRExtendedSrgbLinear,
-                                  QRhiSwapChain::HDRExtendedDisplayP3Linear};
+      const std::array preferred = {QRhiSwapChain::HDRExtendedSrgbLinear,
+                                    QRhiSwapChain::HDRExtendedDisplayP3Linear};
 #else
-    const std::array preferred = {QRhiSwapChain::HDRExtendedSrgbLinear,
-                                  QRhiSwapChain::HDR10};
+      const std::array preferred = {QRhiSwapChain::HDRExtendedSrgbLinear,
+                                    QRhiSwapChain::HDR10};
 #endif
-    for (const auto candidate : preferred) {
-      if (swapchain->isFormatSupported(candidate)) {
-        selected = candidate;
-        break;
+      for (const auto candidate : preferred) {
+        if (swapchain->isFormatSupported(candidate)) {
+          selected = candidate;
+          break;
+        }
       }
     }
 
@@ -138,10 +198,16 @@ class HdrRhiViewport::Impl {
     viewport_status.initialized = true;
     viewport_status.hdr_active = hdr_active;
     viewport_status.swapchain_format = format_name(selected);
-    if (!hdr_active) {
+    if (!screen_hdr) {
+      viewport_status.error =
+          QStringLiteral("This display is not HDR; showing the SDR image instead");
+    } else if (!hdr_active) {
       viewport_status.error =
           QStringLiteral("HDR output is unavailable on this display; showing tone-mapped SDR");
     }
+    activity_log_append("", "viewport",
+                        std::string(screen_hdr ? "display HDR" : "display SDR") + " swapchain " +
+                            viewport_status.swapchain_format.toStdString());
 
     initialized = true;
     createResources();
@@ -611,6 +677,21 @@ PreviewMode HdrRhiViewport::previewMode() const {
 
 HdrViewportStatus HdrRhiViewport::status() const {
   return d_->viewport_status;
+}
+
+#ifdef Q_OS_MACOS
+bool macos_display_supports_hdr();
+#endif
+
+bool HdrRhiViewport::displaySupportsHdr() const {
+#if defined(Q_OS_WIN)
+  const HWND hwnd = reinterpret_cast<HWND>(const_cast<HdrRhiViewport*>(this)->winId());
+  return windows_window_hdr_enabled(hwnd);
+#elif defined(Q_OS_MACOS)
+  return macos_display_supports_hdr();
+#else
+  return false;
+#endif
 }
 
 QImage HdrRhiViewport::renderSdrFallback() const {

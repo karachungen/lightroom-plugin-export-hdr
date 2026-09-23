@@ -40,6 +40,7 @@ class MainWindow : public QMainWindow {
 
  private:
   void applyOverlayGeometry();
+  void ensureWebAttached();
   void prepareItemGainMaps();
   void failEncode(const QString& title, const QString& error);
   void finishEncodeSuccess();
@@ -54,9 +55,8 @@ class MainWindow : public QMainWindow {
   std::vector<int> encode_queue_;
   size_t encode_cursor_ = 0;
   PreviewResult encode_result_;
-#if defined(Q_OS_WIN)
-  bool windows_notice_shown_ = false;
-#endif
+  bool web_attached_ = false;
+  QString pending_web_root_;
   QRect overlay_rect_;
   QRect hdr_hole_rect_;
   bool overlay_visible_ = false;

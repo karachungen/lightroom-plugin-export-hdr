@@ -1,6 +1,7 @@
 #include "encode_engine.h"
 
 #include "gainmap_compute.h"
+#include "jpeg_container.h"
 #include "resize_lanczos.h"
 #include "sdr_input.h"
 #include "slice_plan.h"
@@ -19,13 +20,37 @@ namespace fs = std::filesystem;
 
 namespace {
 
-bool encode_pair(const RawImageHolder& hdr, const RawImageHolder& sdr, const EncodeOptions& opt,
+bool encode_pair(const RawImageHolder& hdr, const RawImageHolder* sdr, const EncodeOptions& opt,
                  const std::string& out_path, std::string* err) {
   if (!encode_ultra_hdr_jpeg(hdr, sdr, opt, out_path, err)) {
     std::cerr << "encode: " << *err << "\n";
     return false;
   }
   std::cout << "Wrote " << out_path << "\n";
+  return true;
+}
+
+bool load_sdr_jpeg_passthrough(const EncodeRequest& req, unsigned hdr_w, unsigned hdr_h,
+                               EncodeOptions* opt, std::string* err) {
+  if (!opt) return false;
+  opt->sdr_jpeg.clear();
+  if (req.slice_aspect != SliceAspect::kNone) return false;
+  if (req.preview_max_edge >= 2) return false;
+  if (req.output_width >= 2 || req.output_height >= 2) return false;
+  if (!req.watermark_config.empty()) return false;
+  unsigned jpeg_w = 0;
+  unsigned jpeg_h = 0;
+  std::string probe_err;
+  if (!probe_jpeg_sof_size(req.base_path, &jpeg_w, &jpeg_h, &probe_err)) {
+    return false;
+  }
+  if (jpeg_w != hdr_w || jpeg_h != hdr_h) return false;
+  if (!load_binary_file(req.base_path, &opt->sdr_jpeg, err)) {
+    opt->sdr_jpeg.clear();
+    return false;
+  }
+  std::cerr << "SDR JPEG pass-through " << jpeg_w << "x" << jpeg_h << " (" << opt->sdr_jpeg.size()
+            << " bytes)\n";
   return true;
 }
 
@@ -147,7 +172,7 @@ bool encode_crop(const EncodeRequest& req, unsigned master_w, unsigned master_h,
     sdr_enc = &sdr_out;
   }
   report_step(req, step_prefix, jpeg_step(req, out_path));
-  return encode_pair(*hdr_enc, *sdr_enc, opt, out_path, err);
+  return encode_pair(*hdr_enc, sdr_enc, opt, out_path, err);
 }
 
 }  // namespace
@@ -225,7 +250,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     if (!req.watermark_config.empty()) opt.watermark_config = req.watermark_config;
     if (!req.metadata_patch.empty()) opt.metadata_patch = req.metadata_patch;
     report_step(req, "", jpeg_step(req, req.out_path));
-    if (!encode_pair(*hdr_enc, *sdr_enc, opt, req.out_path, &err)) {
+    if (!encode_pair(*hdr_enc, sdr_enc, opt, req.out_path, &err)) {
       if (error_out) *error_out = err;
       return 5;
     }
@@ -242,13 +267,6 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
 
     master_w = hdr.ref().w;
     master_h = hdr.ref().h;
-
-    report_step(req, "", "Loading SDR JPEG");
-    if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr, &err)) {
-      if (error_out) *error_out = "SDR base: " + err;
-      std::cerr << "SDR base: " << err << "\n";
-      return 4;
-    }
 
     if (!req.gainmap_in.empty()) {
       report_step(req, "", "Applying gain map");
@@ -272,13 +290,27 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
 
     unsigned out_w = master_w;
     unsigned out_h = master_h;
+    encode_target_size(req, hdr.ref().w, hdr.ref().h, &out_w, &out_h);
+    const bool resized = out_w != master_w || out_h != master_h;
+    const bool passthrough =
+        !resized && load_sdr_jpeg_passthrough(req, master_w, master_h, &opt, &err);
+    if (!passthrough) {
+      opt.sdr_jpeg.clear();
+      report_step(req, "", "Loading SDR JPEG");
+      if (!load_sdr_base_raw(req.base_path, master_w, master_h, &sdr, &err)) {
+        if (error_out) *error_out = "SDR base: " + err;
+        std::cerr << "SDR base: " << err << "\n";
+        return 4;
+      }
+    }
+
     RawImageHolder hdr_out;
     RawImageHolder sdr_out;
     const RawImageHolder* hdr_enc = &hdr;
-    const RawImageHolder* sdr_enc = &sdr;
-    if (encode_target_size(req, hdr.ref().w, hdr.ref().h, &out_w, &out_h)) {
-      if (hdr.ref().w != out_w || hdr.ref().h != out_h || sdr.ref().w != out_w ||
-          sdr.ref().h != out_h) {
+    const RawImageHolder* sdr_enc = passthrough ? nullptr : &sdr;
+    if (resized) {
+      const bool sdr_differs = sdr_enc && (sdr.ref().w != out_w || sdr.ref().h != out_h);
+      if (hdr.ref().w != out_w || hdr.ref().h != out_h || sdr_differs) {
         report_step(req, "", resize_step(req, out_w, out_h));
       }
       if (hdr.ref().w != out_w || hdr.ref().h != out_h) {
@@ -288,7 +320,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
         }
         hdr_enc = &hdr_out;
       }
-      if (sdr.ref().w != out_w || sdr.ref().h != out_h) {
+      if (sdr_enc && (sdr.ref().w != out_w || sdr.ref().h != out_h)) {
         if (!resize_sdr_lanczos_sharpen(sdr, out_w, out_h, &sdr_out, &err)) {
           if (error_out) *error_out = err;
           return 5;
@@ -298,7 +330,7 @@ int encode_from_paths(const EncodeRequest& req, std::string* error_out) {
     }
 
     report_step(req, "", jpeg_step(req, req.out_path));
-    if (!encode_pair(*hdr_enc, *sdr_enc, opt, req.out_path, &err)) {
+    if (!encode_pair(*hdr_enc, sdr_enc, opt, req.out_path, &err)) {
       if (error_out) *error_out = err;
       return 5;
     }

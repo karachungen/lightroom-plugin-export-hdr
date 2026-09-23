@@ -12,6 +12,7 @@
 #include <QImage>
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -83,6 +84,32 @@ bool sdr_preview_size(const std::string& path, int* width, int* height, std::str
   if (!open_frame(path, factory, frame, error)) return false;
   return frame_size(frame.Get(), width, height, error);
 }
+
+namespace {
+
+bool copy_srgb_preview(const std::string& path, QImage* out, std::string* error) {
+  std::vector<uint8_t> bytes;
+  unsigned w = 0;
+  unsigned h = 0;
+  if (!wic::decode_to_srgb_rgba8(path, bytes, &w, &h, error) || w < 1 || h < 1) {
+    return false;
+  }
+  QImage rgba(static_cast<int>(w), static_cast<int>(h), QImage::Format_RGBA8888);
+  rgba.fill(0);
+  if (static_cast<unsigned>(rgba.bytesPerLine()) == w * 4u) {
+    std::memcpy(rgba.bits(), bytes.data(), bytes.size());
+  } else {
+    for (unsigned y = 0; y < h; ++y) {
+      std::memcpy(rgba.scanLine(static_cast<int>(y)),
+                  bytes.data() + static_cast<size_t>(y) * static_cast<size_t>(w) * 4u,
+                  static_cast<size_t>(w) * 4u);
+    }
+  }
+  *out = std::move(rgba);
+  return true;
+}
+
+}  // namespace
 
 bool copy_wic_source(IWICImagingFactory* factory, IWICBitmapSource* source, int w, int h,
                      const std::string& path, QImage* out, std::string* error) {
@@ -187,7 +214,7 @@ bool load_sdr_preview_image(const std::string& path, QImage* out, std::string* e
   const bool shrink = max_edge >= 2 && fit_preview_long_edge(w, h, max_edge, &dst_w, &dst_h) &&
                       (dst_w < w || dst_h < h);
   if (!shrink) {
-    return copy_wic_source(factory.Get(), frame.Get(), w, h, path, out, error);
+    return copy_srgb_preview(path, out, error);
   }
   if (jpeg_native_scale(factory.Get(), frame.Get(), w, h, max_edge, path, out, error)) {
     return true;

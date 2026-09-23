@@ -1,5 +1,7 @@
 #include "gui/web_chrome.h"
 
+#include "activity_log.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -66,6 +68,7 @@ QString extract_web_assets() {
     return {};
   }
   cached = base;
+  activity_log_append("", "webview", "assets " + cached.toStdString());
   return cached;
 }
 

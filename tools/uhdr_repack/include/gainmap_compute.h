@@ -16,7 +16,7 @@ bool compute_auto_gainmap(const std::string& sdr_path, const std::string& hdr_ti
 
 /**
  * Bake an edited luma gain map into the HDR buffer in Rec.2020:
- * HDR = linear_sRGB_to_Rec2020(SDR) * gain. Optional crop indexes a full-size map.
+ * HDR = display_p3_to_Rec2020(linear_P3_SDR * gain). Optional crop indexes a full-size map.
  */
 bool apply_gainmap_to_hdr(RawImageHolder* hdr, const std::string& sdr_path,
                           const std::string& gainmap_path, std::string* error,

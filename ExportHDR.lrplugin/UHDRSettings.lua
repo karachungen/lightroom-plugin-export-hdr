@@ -179,6 +179,16 @@ function UHDR.forceOverwriteExistingFiles(settings)
 	settings.LR_collisionHandling = "overwrite"
 end
 
+--- SDR JPEG must be Display P3 so the Ultra HDR primary is not clipped to sRGB first.
+UHDR.SDR_COLOR_SPACE = "DisplayP3"
+
+function UHDR.forceSdrJpegColorSpace(settings)
+	if not settings then
+		return
+	end
+	settings.LR_export_colorSpace = UHDR.SDR_COLOR_SPACE
+end
+
 function UHDR.applyDefaults(propertyTable)
 	local d = UHDR.defaults()
 	for k, v in pairs(d) do
@@ -186,6 +196,7 @@ function UHDR.applyDefaults(propertyTable)
 			propertyTable[k] = v
 		end
 	end
+	UHDR.forceSdrJpegColorSpace(propertyTable)
 end
 
 return UHDR

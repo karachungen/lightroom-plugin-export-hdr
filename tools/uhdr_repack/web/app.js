@@ -84,6 +84,9 @@
     encodedHeight: 0,
     encodedBytes: 0,
     hdrCached: false,
+    hdrEmulationImage: null,
+    hdrDisplayActive: null,
+    hdrDisplayWarning: "",
     heatmapImage: null,
     gainmapEncoded: false,
     gainmapChannels: "luma",
@@ -426,7 +429,7 @@
           }
         }
         setHdrLoading(!!msg.loading, msg.phase);
-        if (!msg.loading && state.hdrCached && state.mode === "hdr") {
+        if (!msg.loading && state.hdrCached && state.mode === "hdr" && state.hdrDisplayActive) {
           document.body.classList.add("mode-hdr-ready");
         } else if (!msg.loading && !state.hdrCached) {
           document.body.classList.remove("mode-hdr-ready");
@@ -436,6 +439,21 @@
         break;
       case "settings":
         applySettings(msg);
+        break;
+      case "displayStatus":
+        state.hdrDisplayActive = msg.hdrActive === true;
+        state.hdrDisplayWarning = msg.warning || (!msg.displayHdr
+          ? "This display is not HDR. Previewing a brighter SDR simulation (gain map over SDR)."
+          : "");
+        applyHdrDisplayWarning();
+        drawPreview();
+        break;
+      case "hdrEmulation":
+        if (msg.id && msg.id !== state.currentId) return;
+        if (!msg.dataUrl) return;
+        state.hdrEmulationImage = new Image();
+        state.hdrEmulationImage.onload = drawPreview;
+        state.hdrEmulationImage.src = msg.dataUrl;
         break;
       default:
         break;
@@ -560,6 +578,7 @@
     state.encodedHeight = 0;
     state.encodedBytes = 0;
     state.hdrCached = false;
+    state.hdrEmulationImage = null;
     document.body.classList.remove("mode-hdr-ready");
     updateOutputSize();
     if (notify) post({ type: "selectItem", id });
@@ -1490,12 +1509,16 @@
       if (state.heatmapImage) {
         ctx.drawImage(state.heatmapImage, s.offsetX, s.offsetY, s.dw, s.dh);
       }
+    } else if (state.mode === "hdr" && state.hdrEmulationImage &&
+               state.hdrEmulationImage.naturalWidth > 0) {
+      ctx.drawImage(state.hdrEmulationImage, s.offsetX, s.offsetY, s.dw, s.dh);
     } else if (state.sdrImage) {
       ctx.drawImage(state.sdrImage, s.offsetX, s.offsetY, s.dw, s.dh);
     } else {
       return;
     }
-    if (state.slices.length && state.settings.sliceAspect !== "none" && state.mode !== "hdr") {
+    if (state.slices.length && state.settings.sliceAspect !== "none" &&
+        (state.mode !== "hdr" || !state.hdrDisplayActive)) {
       const ux = Math.min.apply(null, state.slices.map((r) => r.x));
       const uy = Math.min.apply(null, state.slices.map((r) => r.y));
       const u2 = Math.max.apply(null, state.slices.map((r) => r.x + r.w));
@@ -1666,7 +1689,7 @@
     const thumbs = !opts || opts.thumbs !== false;
     const reportRect = !opts || opts.reportRect !== false;
     updateSliceHint();
-    const htmlGuides = state.mode !== "hdr";
+    const htmlGuides = state.mode !== "hdr" || !state.hdrDisplayActive;
     const showThumbs = state.slices.length && state.sdrImage && state.settings.sliceAspect !== "none";
     sliceThumbs.hidden = !showThumbs;
     sliceOverlay.classList.toggle("is-active", showThumbs && htmlGuides && state.cropMeta.slack > 0);
@@ -1804,6 +1827,14 @@
     if (status) status.textContent = sdrLoadCopy(msg || {});
   }
 
+  function applyHdrDisplayWarning() {
+    const el = document.getElementById("hdr-display-warn");
+    if (!el) return;
+    const show = state.mode === "hdr" && !!state.hdrDisplayWarning;
+    el.hidden = !show;
+    if (show) el.textContent = state.hdrDisplayWarning;
+  }
+
   function setHdrLoading(loading, phase) {
     if (state.encoding && !loading) return;
     const loader = document.getElementById("hdr-loader");
@@ -1831,7 +1862,7 @@
   function setMode(mode) {
     if (mode === "live" || mode === "final") mode = "hdr";
     state.mode = mode;
-    const keepHdrReady = mode === "hdr" && state.hdrCached;
+    const keepHdrReady = mode === "hdr" && state.hdrCached && state.hdrDisplayActive;
     document.body.className = `mode-${mode}${state.loaded ? "" : " is-loading"}`;
     document.body.classList.remove("is-hdr-loading");
     if (keepHdrReady) {
@@ -1846,6 +1877,7 @@
       btn.classList.toggle("active", btn.dataset.mode === mode);
     });
     drawPreview();
+    applyHdrDisplayWarning();
     post({ type: "setMode", mode });
     reportPreviewRect();
     updateOutputSize();

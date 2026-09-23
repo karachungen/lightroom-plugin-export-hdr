@@ -24,22 +24,13 @@ local ExportHDRServiceProvider = {}
 --- Export To destination, dialog section, and progress (distinct from LrPluginName in Info.lua).
 local EXPORT_UI_TITLE = "Ultra HDR"
 local ISSUES_URL = "https://github.com/karachungen/lightroom-plugin-export-hdr/issues"
-local windowsNoticeShown = false
 
-local function showWindowsUntestedNotice()
-	if not CMD.isWindows() or windowsNoticeShown then
-		return
-	end
-	windowsNoticeShown = true
-	local result = LrDialogs.confirm(
-		"Version 3 is only tested on macOS.",
-		"Windows may have issues. If something breaks, please open a GitHub issue:\n" .. ISSUES_URL,
-		"Continue",
-		"Open issues"
-	)
+local function failExport(msg)
+	local result = LrDialogs.confirm(EXPORT_UI_TITLE, msg, "OK", "Open issues")
 	if result == "cancel" then
 		LrHttp.openUrlInBrowser(ISSUES_URL)
 	end
+	error(msg)
 end
 
 ExportHDRServiceProvider.hideSections = { "video" }
@@ -58,6 +49,7 @@ ExportHDRServiceProvider.exportPresetFields = exportPresetFields
 function ExportHDRServiceProvider.startDialog(propertyTable)
 	UHDR.applyDefaults(propertyTable)
 	UHDR.forceOverwriteExistingFiles(propertyTable)
+	UHDR.forceSdrJpegColorSpace(propertyTable)
 	-- Keep Existing Files on overwrite so Lightroom does not ask on re-export.
 	if propertyTable and not propertyTable._uhdrOverwriteObserver then
 		propertyTable._uhdrOverwriteObserver = true
@@ -69,12 +61,22 @@ function ExportHDRServiceProvider.startDialog(propertyTable)
 			end)
 		end)
 	end
-	showWindowsUntestedNotice()
+	if propertyTable and not propertyTable._uhdrColorSpaceObserver then
+		propertyTable._uhdrColorSpaceObserver = true
+		pcall(function()
+			propertyTable:addObserver("LR_export_colorSpace", function(props, _key, value)
+				if value ~= UHDR.SDR_COLOR_SPACE then
+					props.LR_export_colorSpace = UHDR.SDR_COLOR_SPACE
+				end
+			end)
+		end)
+	end
 end
 
 function ExportHDRServiceProvider.updateExportSettings(exportSettings)
 	UHDR.applyDefaults(exportSettings)
 	UHDR.forceOverwriteExistingFiles(exportSettings)
+	UHDR.forceSdrJpegColorSpace(exportSettings)
 end
 
 function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
@@ -86,7 +88,7 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 	local howTo = {
 		"How to use:",
 		"In Export To, choose ULTRA HDR.",
-		"File Settings are JPEG for the SDR base. Image Sizing applies to the JPEG as you set it. The HDR TIFF pass is capped at a 2880px short edge (never upscaled) so large panoramas stay usable.",
+		"File Settings are JPEG for the SDR base, locked to Display P3 so wide-gamut color is not clipped to sRGB before Ultra HDR. Image Sizing applies to the JPEG as you set it. The HDR TIFF pass is Rec.2020 32-bit, capped at a 2880px short edge (never upscaled) so large panoramas stay usable.",
 		"The plug-in writes SDR JPEGs and opens Ultra HDR. HDR TIFF is rendered for the current photo (Gain/HDR preview) or one photo at a time on Encode.",
 		"Existing files at the export path are always overwritten (no Ask / Skip prompt).",
 		"Use HDR editing in Develop when needed (Lightroom 14+).",
@@ -111,7 +113,7 @@ function ExportHDRServiceProvider.sectionsForTopOfDialog(f, propertyTable)
 							fill_horizontal = 1,
 							width_in_chars = 55,
 							title = table.concat(howTo, "\n"),
-							height_in_lines = #howTo + 1,
+							height_in_lines = #howTo + 2,
 						},
 					},
 					f:spacer { height = f:control_spacing() },
@@ -415,16 +417,16 @@ local function assertFinalUltraHdr(binary, outPath, logPath, sdrSizeBytes)
 		)
 	end
 	if not outSize or outSize <= 0 or not jpegHeaderLooksValid(outPath) then
-		error("Ultra HDR: encoder output is missing or not a JPEG: " .. tostring(outPath))
+		failExport("Ultra HDR: encoder output is missing or not a JPEG: " .. tostring(outPath))
 	end
 	if sdrSizeBytes and outSize == sdrSizeBytes then
-		error(
+		failExport(
 			"Ultra HDR: final export matches SDR base size — gain map was not written to "
 				.. tostring(outPath)
 		)
 	end
 	if not inspectIsUltraHdr(binary, outPath) then
-		error("Ultra HDR: --inspect reports the final export is not Ultra HDR: " .. tostring(outPath))
+		failExport("Ultra HDR: --inspect reports the final export is not Ultra HDR: " .. tostring(outPath))
 	end
 end
 
@@ -711,27 +713,24 @@ local function fulfillOnDemandHdrTiff(item, propertyTable, previewWorkRoot)
 end
 
 function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportContext)
-	LrDialogs.attachErrorDialogToFunctionContext(functionContext)
-
 	local propertyTable = exportContext.propertyTable
 	UHDR.applyDefaults(propertyTable)
 	UHDR.forceOverwriteExistingFiles(propertyTable)
-	showWindowsUntestedNotice()
+	UHDR.forceSdrJpegColorSpace(propertyTable)
 
 	local err = UHDR.validate(propertyTable)
 	if err then
-		LrDialogs.message("Ultra HDR", err, "warning")
-		error(err)
+		failExport(err)
 	end
 
 	local binary = CMD.bundledBinaryPath()
 	if not CMD.binaryExists(binary) then
-		local msg = "uhdr_repack not found at:\n"
-			.. binary
-			.. "\n\n"
-			.. CMD.bundleInstructions()
-		LrDialogs.message("Ultra HDR", msg, "critical")
-		error(msg)
+		failExport(
+			"uhdr_repack not found at:\n"
+				.. binary
+				.. "\n\n"
+				.. CMD.bundleInstructions()
+		)
 	end
 
 	local destDir = propertyTable.LR_export_destinationPathPrefix
@@ -840,7 +839,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		if not renderOk then
 			local msg = "Failed to render base export: " .. tostring(basePathOrMsg)
 			Log.append(fallbackLog(), msg .. "\n")
-			error(msg)
+			failExport(msg)
 		end
 
 		local basePath = basePathOrMsg
@@ -853,7 +852,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 
 		local photo = rendition.photo
 		if not photo then
-			error("Ultra HDR: missing photo for rendition.")
+			failExport("Ultra HDR: missing photo for rendition.")
 		end
 
 		Log.append(logPath, "\n--- Photo ---\nBase export: " .. tostring(basePath) .. "\n")
@@ -878,7 +877,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		end)
 		if not sdrCopyOk or not LrFileUtils.exists(encodeBasePath) then
 			safeDeleteTree(tempDir)
-			error("Ultra HDR: could not copy SDR base for encoding.")
+			failExport("Ultra HDR: could not copy SDR base for encoding.")
 		end
 		Log.append(logPath, "Encode staging SDR: " .. tostring(encodeBasePath) .. "\n")
 
@@ -996,7 +995,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 		end
 		if sx ~= 0 then
 			releaseExportMemory()
-			error(
+			failExport(
 				"Ultra HDR preview failed (exit "
 					.. tostring(sx)
 					.. "). See log: "
@@ -1041,7 +1040,7 @@ function ExportHDRServiceProvider.processRenderedPhotos(functionContext, exportC
 				elseif not pathEqual(srcFile, destFile) then
 					local promoteOk, promoteErr = promoteEncodedFile(srcFile, destFile, logPath, item.sdrSize)
 					if not promoteOk then
-						error(
+						failExport(
 							"Ultra HDR: could not promote preview-encoded JPEG: "
 								.. tostring(promoteErr)
 								.. " ("

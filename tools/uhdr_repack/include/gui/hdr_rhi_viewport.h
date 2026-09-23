@@ -56,6 +56,8 @@ class HdrRhiViewport final : public QWindow {
 
   PreviewMode previewMode() const;
   HdrViewportStatus status() const;
+  /** True when the window's current screen has HDR/advanced color enabled. */
+  bool displaySupportsHdr() const;
 
   /** CPU SDR fallback used by headless tests and non-HDR screenshot capture. */
   QImage renderSdrFallback() const;

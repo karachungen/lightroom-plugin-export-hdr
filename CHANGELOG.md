@@ -7,6 +7,20 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.6 — 🪟 Not a Mac port
+
+> The editor finally runs where the Start menu lives. JPEGs arrive as files, not as a pile of pixels dumped on the WebView lawn. Yes, it still works on a Mac; the punchline is the other OS.
+
+### Added
+
+- Windows Ultra HDR editor: WebView2 chrome, WIC JPEG/TIFF decode, and an HDR preview path that actually opens on a PC.
+- SDR JPEG export is locked to Display P3 so the Ultra HDR primary is not clipped to sRGB before encode.
+
+### Changed
+
+- The editor takes SDR (and on-demand HDR) as files on disk. The web UI is not fed a decoded pixel dump of the photo.
+- JPEG size and scan ranges are read from the container so Windows encode/preview does not have to round-trip the whole image through Qt.
+
 ## v3.0.5 — 🧠 Leave it on disk
 
 > A large panorama was decoded in full just to draw the editor. The preview is smaller now. The export still reads the original file.

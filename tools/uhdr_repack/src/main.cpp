@@ -12,7 +12,6 @@
 #endif
 
 #ifdef _WIN32
-#include <objbase.h>
 #include <windows.h>
 #endif
 
@@ -20,16 +19,6 @@ namespace uhdr_repack {
 
 #ifdef _WIN32
 namespace {
-
-struct ComInit {
-  HRESULT hr;
-  ComInit() : hr(CoInitializeEx(nullptr, COINIT_MULTITHREADED)) {}
-  ~ComInit() {
-    if (SUCCEEDED(hr)) {
-      CoUninitialize();
-    }
-  }
-};
 
 std::string wide_to_utf8(const wchar_t* wide) {
   if (!wide || wide[0] == L'\0') {
@@ -134,12 +123,6 @@ static int run(int argc, char** argv) {
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t** wargv) {
-  uhdr_repack::ComInit com;
-  if (com.hr != S_OK && com.hr != S_FALSE && FAILED(com.hr)) {
-    std::cerr << "CoInitializeEx failed\n";
-    return 1;
-  }
-
   std::vector<std::string> utf8_args;
   std::vector<char*> argv_ptrs;
   utf8_args.reserve(static_cast<size_t>(argc));

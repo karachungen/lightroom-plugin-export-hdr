@@ -75,6 +75,12 @@ bool WebChrome::attachTo(QWidget* container, QString* error) {
   return true;
 }
 
+void WebChrome::syncBounds() {
+  if (!impl_->web_view || !impl_->container) return;
+  NSView* parent_view = reinterpret_cast<NSView*>(impl_->container->winId());
+  impl_->web_view.frame = parent_view.bounds;
+}
+
 void WebChrome::loadApp(const QString& web_root) {
   if (!impl_->web_view) return;
   const QUrl url = QUrl::fromLocalFile(web_root + QStringLiteral("/index.html"));

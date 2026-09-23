@@ -19,18 +19,6 @@ namespace uhdr_repack {
 
 namespace {
 
-float srgb_byte_to_linear(float c) {
-  c /= 255.f;
-  if (c <= 0.04045f) {
-    return c / 12.92f;
-  }
-  return std::pow((c + 0.055f) / 1.055f, 2.4f);
-}
-
-float luminance_bt709(float r, float g, float b) {
-  return 0.2126f * r + 0.7152f * g + 0.0722f * b;
-}
-
 bool load_sdr_linear_rgba(const std::string& path, unsigned master_width, unsigned master_height,
                           unsigned out_w, unsigned out_h, unsigned crop_x, unsigned crop_y,
                           std::vector<float>* rgba, std::string* error) {
@@ -56,36 +44,49 @@ bool load_sdr_linear_rgba(const std::string& path, unsigned master_width, unsign
     const CGRect outRect = CGRectMake((CGFloat)crop_x, (CGFloat)crop_y, (CGFloat)out_w, (CGFloat)out_h);
     CIImage* cropped = [scaled imageByCroppingToRect:outRect];
 
-    CGColorSpaceRef srgb = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    if (!srgb) {
-      if (error) *error = "Could not create sRGB color space";
+    CGColorSpaceRef p3 = CGColorSpaceCreateWithName(kCGColorSpaceLinearDisplayP3);
+    bool linear_p3 = p3 != nullptr;
+    if (!p3) p3 = CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3);
+    if (!p3) {
+      if (error) *error = "Could not create Display P3 color space";
       return false;
     }
-    CIContext* ctx = [CIContext contextWithOptions:@{kCIContextWorkingColorSpace : (__bridge id)srgb}];
+    CIContext* ctx = [CIContext contextWithOptions:@{kCIContextWorkingColorSpace : (__bridge id)p3}];
     if (!ctx) {
-      CGColorSpaceRelease(srgb);
+      CGColorSpaceRelease(p3);
       if (error) *error = "Could not create CIContext";
       return false;
     }
 
-    std::vector<uint8_t> buf(static_cast<size_t>(out_w) * static_cast<size_t>(out_h) * 4);
-    [ctx render:cropped
-        toBitmap:buf.data()
-        rowBytes:(size_t)out_w * 4
-          bounds:outRect
-          format:kCIFormatRGBA8
-      colorSpace:srgb];
-    CGColorSpaceRelease(srgb);
-
-    for (unsigned y = 0; y < out_h; ++y) {
-      for (unsigned x = 0; x < out_w; ++x) {
-        const size_t i = (static_cast<size_t>(y) * out_w + x) * 4;
-        (*rgba)[i + 0] = srgb_byte_to_linear(static_cast<float>(buf[i + 0]));
-        (*rgba)[i + 1] = srgb_byte_to_linear(static_cast<float>(buf[i + 1]));
-        (*rgba)[i + 2] = srgb_byte_to_linear(static_cast<float>(buf[i + 2]));
-        (*rgba)[i + 3] = 1.f;
+    if (linear_p3) {
+      [ctx render:cropped
+          toBitmap:rgba->data()
+          rowBytes:(size_t)out_w * 4 * sizeof(float)
+            bounds:outRect
+            format:kCIFormatRGBAf
+        colorSpace:p3];
+      for (unsigned i = 0; i < out_w * out_h; ++i) {
+        (*rgba)[static_cast<size_t>(i) * 4u + 3u] = 1.f;
+      }
+    } else {
+      std::vector<uint8_t> buf(static_cast<size_t>(out_w) * static_cast<size_t>(out_h) * 4);
+      [ctx render:cropped
+          toBitmap:buf.data()
+          rowBytes:(size_t)out_w * 4
+            bounds:outRect
+            format:kCIFormatRGBA8
+        colorSpace:p3];
+      for (unsigned y = 0; y < out_h; ++y) {
+        for (unsigned x = 0; x < out_w; ++x) {
+          const size_t i = (static_cast<size_t>(y) * out_w + x) * 4;
+          (*rgba)[i + 0] = srgb_eotf(static_cast<float>(buf[i + 0]) / 255.f);
+          (*rgba)[i + 1] = srgb_eotf(static_cast<float>(buf[i + 1]) / 255.f);
+          (*rgba)[i + 2] = srgb_eotf(static_cast<float>(buf[i + 2]) / 255.f);
+          (*rgba)[i + 3] = 1.f;
+        }
       }
     }
+    CGColorSpaceRelease(p3);
   }
   return true;
 }
@@ -98,8 +99,8 @@ bool gain_from_buffers(const std::vector<float>& sdr_linear, const std::vector<f
   if (gain_rgb) gain_rgb->resize(pixels * 3u);
   for (size_t p = 0; p < pixels; ++p) {
     const size_t i = p * 4;
-    const float sdr_l = luminance_bt709(sdr_linear[i], sdr_linear[i + 1], sdr_linear[i + 2]);
-    const float hdr_l = luminance_bt709(hdr_linear[i], hdr_linear[i + 1], hdr_linear[i + 2]);
+    const float sdr_l = luminance_display_p3(sdr_linear[i], sdr_linear[i + 1], sdr_linear[i + 2]);
+    const float hdr_l = luminance_display_p3(hdr_linear[i], hdr_linear[i + 1], hdr_linear[i + 2]);
     float g = hdr_l / std::max(sdr_l, 1e-4f);
     g = std::clamp(g, 1.0f, 1000.0f);
     (*gain)[p] = g;
@@ -124,11 +125,11 @@ bool hdr_half_to_linear(const uhdr_raw_image_t& hdr, std::vector<float>* rgba) {
   const auto* half = static_cast<const uint16_t*>(hdr.planes[UHDR_PLANE_PACKED]);
   for (size_t p = 0; p < pixels; ++p) {
     const size_t i = p * 4;
-    const LinearRgb rec709 = rec2020_to_linear_srgb(
+    const LinearRgb p3 = rec2020_to_display_p3(
         {half_to_float(half[i]), half_to_float(half[i + 1]), half_to_float(half[i + 2])});
-    (*rgba)[i] = rec709.r;
-    (*rgba)[i + 1] = rec709.g;
-    (*rgba)[i + 2] = rec709.b;
+    (*rgba)[i] = p3.r;
+    (*rgba)[i + 1] = p3.g;
+    (*rgba)[i + 2] = p3.b;
     (*rgba)[i + 3] = half_to_float(half[i + 3]);
   }
   return true;
@@ -242,7 +243,7 @@ bool apply_gainmap_to_hdr(RawImageHolder* hdr, const std::string& sdr_path,
       const size_t gi = static_cast<size_t>(oy + y) * static_cast<size_t>(gw) + (ox + x);
       const size_t i = pi * 4;
       const float g = gain[gi];
-      const LinearRgb rec2020 = linear_srgb_to_rec2020(
+      const LinearRgb rec2020 = display_p3_to_rec2020(
           {sdr_linear[i] * g, sdr_linear[i + 1] * g, sdr_linear[i + 2] * g});
       half[i] = float_to_half(rec2020.r);
       half[i + 1] = float_to_half(rec2020.g);

@@ -244,6 +244,14 @@ body {
   line-height: 1.35;
 }
 #preview-memory-note[hidden] { display: none; }
+#hdr-display-warn {
+  color: var(--ember);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  opacity: 0.95;
+}
+#hdr-display-warn[hidden] { display: none; }
 #slice-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 #slice-overlay.is-active { pointer-events: auto; cursor: grab; }
 #slice-overlay.is-dragging { cursor: grabbing; }

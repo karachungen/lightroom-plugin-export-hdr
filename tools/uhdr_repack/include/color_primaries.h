@@ -44,6 +44,18 @@ inline LinearRgb display_p3_to_linear_srgb(LinearRgb value) {
   return mul_mat3(k, value);
 }
 
+inline LinearRgb rec2020_to_display_p3(LinearRgb value) {
+  return linear_srgb_to_display_p3(rec2020_to_linear_srgb(value));
+}
+
+inline LinearRgb display_p3_to_rec2020(LinearRgb value) {
+  return linear_srgb_to_rec2020(display_p3_to_linear_srgb(value));
+}
+
+inline float luminance_display_p3(float r, float g, float b) {
+  return 0.22897456f * r + 0.69173852f * g + 0.07928691f * b;
+}
+
 inline LinearRgb tone_map_extended_reinhard(LinearRgb value) {
   const auto shoulder = [](float c) {
     if (c <= 1.0f) return c > 0.0f ? c : 0.0f;
@@ -93,6 +105,24 @@ inline void srgb_rgba8888_to_display_p3(uint8_t* rgba, std::size_t pixel_count) 
     p[0] = encode(p3.r);
     p[1] = encode(p3.g);
     p[2] = encode(p3.b);
+  }
+}
+
+/** In-place Display P3 8-bit RGBA → sRGB 8-bit (sRGB transfer). */
+inline void display_p3_rgba8888_to_srgb(uint8_t* rgba, std::size_t pixel_count) {
+  if (!rgba) return;
+  for (std::size_t i = 0; i < pixel_count; ++i) {
+    uint8_t* p = rgba + i * 4;
+    LinearRgb lin{srgb_eotf(p[0] / 255.0f), srgb_eotf(p[1] / 255.0f),
+                  srgb_eotf(p[2] / 255.0f)};
+    LinearRgb srgb = display_p3_to_linear_srgb(lin);
+    auto encode = [](float c) -> uint8_t {
+      const float s = std::clamp(srgb_oetf(c), 0.0f, 1.0f);
+      return static_cast<uint8_t>(std::lround(s * 255.0f));
+    };
+    p[0] = encode(srgb.r);
+    p[1] = encode(srgb.g);
+    p[2] = encode(srgb.b);
   }
 }
 

@@ -22,9 +22,9 @@ flowchart TB
   end
 
   subgraph sdrBranch [SDR side]
-    sdrLoad["Open base decode to RGBA8"]
+    sdrLoad["Color-manage JPEG ICC to Display P3 RGBA8"]
     sdrMatch["Scale to match HDR width and height"]
-    sdrYcc["Convert to BT709 full range YCbCr 4:2:0 planes"]
+    sdrYcc["Convert to BT.601 full-range YCbCr 4:2:0"]
     sdrLoad --> sdrMatch --> sdrYcc
   end
 
@@ -42,7 +42,7 @@ flowchart TB
 ```
 
 - **HDR path** — Core Image (macOS) or WIC (Windows) → **linear BT.2020** half-float for libultrahdr.
-- **SDR path** — Resize to match, then **Display P3 BT.601 YCbCr 4:2:0** for the SDR primary JPEG (Display P3 ICC from libultrahdr).
+- **SDR path** — Color-managed decode (ICC, or sRGB if untagged) into **Display P3** 8-bit, resize to match, then **BT.601 YCbCr 4:2:0** for the SDR primary JPEG (Display P3 ICC from libultrahdr). Gain maps are computed in **linear Display P3** against Rec.2020 HDR.
 - **Encode** — Gain map + **XMP** (`hdrgm` / GContainer-style). Primary and gain-map JPEGs are **progressive**. Primary (SDR) XMP also gets **xmpRights** (`WebStatement` https://hdr.karachun.by/, `UsageTerms` GitHub repo).
 
 ## Build

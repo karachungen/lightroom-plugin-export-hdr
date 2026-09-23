@@ -1,5 +1,6 @@
 #include "gui/main_window.h"
 
+#include "activity_log.h"
 #include "gui/gui_bridge.h"
 #include "gui/preview_document.h"
 #include "gui/web_chrome.h"
@@ -7,7 +8,6 @@
 
 #include <QAbstractButton>
 #include <QDesktopServices>
-#include <QPushButton>
 #include <QFileDialog>
 #include <QFutureWatcher>
 #include <QIcon>
@@ -17,6 +17,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QPoint>
+#include <QPushButton>
 #include <QResizeEvent>
 #include <QShowEvent>
 #include <QUrl>
@@ -29,6 +30,24 @@
 #include <cmath>
 #include <functional>
 #include <vector>
+
+namespace {
+
+void showCriticalWithIssues(QWidget* parent, const QString& title, const QString& text) {
+  QMessageBox box(parent);
+  box.setIcon(QMessageBox::Critical);
+  box.setWindowTitle(title);
+  box.setText(text);
+  QPushButton* issues = box.addButton(QObject::tr("Open issues"), QMessageBox::ActionRole);
+  box.addButton(QMessageBox::Ok);
+  box.exec();
+  if (box.clickedButton() == static_cast<QAbstractButton*>(issues)) {
+    QDesktopServices::openUrl(
+        QUrl(QStringLiteral("https://github.com/karachungen/lightroom-plugin-export-hdr/issues")));
+  }
+}
+
+}  // namespace
 
 namespace uhdr_repack {
 
@@ -129,6 +148,19 @@ class SliceGuideOverlay : public QWidget {
   float press_offset_ = 0.5f;
 };
 
+class WebHost : public QWidget {
+ public:
+  explicit WebHost(QWidget* parent = nullptr) : QWidget(parent) {
+    setAttribute(Qt::WA_NativeWindow);
+    setAttribute(Qt::WA_DontCreateNativeAncestors);
+    setAttribute(Qt::WA_NoSystemBackground);
+    setAutoFillBackground(false);
+  }
+
+ protected:
+  void paintEvent(QPaintEvent*) override {}
+};
+
 class MainWindow::Ui {
  public:
   QWidget* web_container = nullptr;
@@ -149,7 +181,7 @@ MainWindow::MainWindow(PreviewSession session, QWidget* parent)
   central->setContentsMargins(0, 0, 0, 0);
   setCentralWidget(central);
 
-  ui_->web_container = new QWidget(central);
+  ui_->web_container = new WebHost(central);
   ui_->web_container->setGeometry(central->rect());
 
   viewport_ = new HdrRhiViewport();
@@ -164,16 +196,19 @@ MainWindow::MainWindow(PreviewSession session, QWidget* parent)
   chrome_ = new WebChrome(this);
   bridge_ = new GuiBridge(document_.get(), viewport_, chrome_, this);
 
-  QString attach_error;
-  if (!chrome_->attachTo(ui_->web_container, &attach_error)) {
-    QMessageBox::critical(this, tr("Web UI failed"), attach_error);
-  }
+  connect(chrome_, &WebChrome::attachFailed, this, [this](const QString& error) {
+    showCriticalWithIssues(this, tr("Web UI failed"), error);
+  });
+  connect(chrome_, &WebChrome::loadFinished, this, [this]() {
+    if (chrome_) chrome_->syncBounds();
+  });
 
-  const QString web_root = extract_web_assets();
-  if (web_root.isEmpty()) {
-    QMessageBox::critical(this, tr("Web UI failed"), tr("Could not extract embedded web assets."));
+  pending_web_root_ = extract_web_assets();
+  if (pending_web_root_.isEmpty()) {
+    showCriticalWithIssues(this, tr("Web UI failed"),
+                           tr("Could not extract embedded web assets."));
   } else {
-    chrome_->loadApp(web_root);
+    chrome_->loadApp(pending_web_root_);
   }
 
   connect(chrome_, &WebChrome::messageReceived, bridge_, &GuiBridge::handleMessage);
@@ -212,33 +247,36 @@ MainWindow::~MainWindow() {
   if (viewport_) viewport_->releaseSwapChain();
 }
 
-void MainWindow::showEvent(QShowEvent* event) {
-  QMainWindow::showEvent(event);
-#if defined(Q_OS_WIN)
-  if (windows_notice_shown_) {
+void MainWindow::ensureWebAttached() {
+  if (web_attached_ || !chrome_ || !ui_->web_container) {
     return;
   }
-  windows_notice_shown_ = true;
-  QMessageBox box(this);
-  box.setIcon(QMessageBox::Warning);
-  box.setWindowTitle(tr("Ultra HDR"));
-  box.setText(tr("Version 3 is only tested on macOS."));
-  box.setInformativeText(
-      tr("Windows may have issues. If something breaks, please open a GitHub issue."));
-  QPushButton* issues = box.addButton(tr("Open issues"), QMessageBox::ActionRole);
-  box.addButton(QMessageBox::Ok);
-  box.exec();
-  if (box.clickedButton() == static_cast<QAbstractButton*>(issues)) {
-    QDesktopServices::openUrl(
-        QUrl(QStringLiteral("https://github.com/karachungen/lightroom-plugin-export-hdr/issues")));
+  web_attached_ = true;
+  QString attach_error;
+  if (!chrome_->attachTo(ui_->web_container, &attach_error)) {
+    showCriticalWithIssues(this, tr("Web UI failed"), attach_error);
+    return;
   }
-#endif
+  if (!pending_web_root_.isEmpty()) {
+    chrome_->loadApp(pending_web_root_);
+  }
+}
+
+void MainWindow::showEvent(QShowEvent* event) {
+  QMainWindow::showEvent(event);
+  ensureWebAttached();
+  if (chrome_) {
+    chrome_->syncBounds();
+  }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
   QMainWindow::resizeEvent(event);
   if (auto* central = centralWidget()) {
     ui_->web_container->setGeometry(central->rect());
+  }
+  if (chrome_) {
+    chrome_->syncBounds();
   }
   applyOverlayGeometry();
 }
@@ -263,6 +301,8 @@ void MainWindow::applyOverlayGeometry() {
   if (ui_->viewport_container) {
     if (!overlay_visible_ || hdr_hole_rect_.width() < 8 || hdr_hole_rect_.height() < 8) {
       ui_->viewport_container->hide();
+      ui_->viewport_container->setGeometry(QRect(0, 0, 1, 1));
+      if (ui_->web_container) ui_->web_container->raise();
     } else {
       ui_->viewport_container->setGeometry(hdr_hole_rect_);
       ui_->viewport_container->show();
@@ -270,9 +310,15 @@ void MainWindow::applyOverlayGeometry() {
     }
   }
   if (ui_->slice_overlay) {
-    if (overlay_rect_.width() >= 8 && overlay_rect_.height() >= 8 && ui_->slice_overlay->isVisible()) {
+    // Native crop guides sit on the QRhi HDR hole. Over WebView2, CompositionMode_Clear
+    // punches a black hole through the page, so keep them off for the canvas simulation.
+    if (overlay_visible_ && overlay_rect_.width() >= 8 && overlay_rect_.height() >= 8 &&
+        ui_->slice_overlay->isVisible()) {
       ui_->slice_overlay->setGeometry(overlay_rect_);
       ui_->slice_overlay->raise();
+    } else {
+      ui_->slice_overlay->hide();
+      if (ui_->web_container) ui_->web_container->raise();
     }
   }
 }
@@ -421,7 +467,7 @@ void MainWindow::encodeNextQueuedItem() {
 void MainWindow::failEncode(const QString& title, const QString& error) {
   encode_aborted_ = true;
   showEncodeProgress(false, title);
-  QMessageBox::critical(this, title, error);
+  showCriticalWithIssues(this, title, error);
 }
 
 void MainWindow::finishEncodeSuccess() {

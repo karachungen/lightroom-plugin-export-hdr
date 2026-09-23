@@ -22,12 +22,14 @@ class WebChrome : public QObject {
 
   bool attachTo(QWidget* container, QString* error = nullptr);
   void loadApp(const QString& web_root);
+  void syncBounds();
   void postToPage(const QString& json);
   void evaluateJavaScript(const QString& script);
 
  signals:
   void messageReceived(const QString& json);
   void loadFinished();
+  void attachFailed(const QString& error);
 
  public slots:
   void deliverMessage(const QString& json) { emit messageReceived(json); }
