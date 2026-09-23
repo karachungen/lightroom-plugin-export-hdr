@@ -7,6 +7,15 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.0.7 — 🧺 Color-safe cycle
+
+> Someone ran the HDR frame with the whites. Rec.2020 went through an sRGB wash, the clamp rinsed the dye out, and the reds came back pale. This load is sorted: decoded color goes to the display's own primaries, and the washing machine does not get a vote.
+
+### Fixed
+
+- HDR preview converts decoded Rec.2020 and Display P3 into the swapchain primaries in one step. Channels outside sRGB are no longer zeroed by an intermediate clamp.
+- On macOS, EDR headroom comes from the window's screen. The native swapchain opens when that screen has headroom, and the web canvas stays hidden so the tone-mapped preview does not cover it.
+
 ## v3.0.6 — 🪟 Not a Mac port
 
 > The editor finally runs where the Start menu lives. JPEGs arrive as files, not as a pile of pixels dumped on the WebView lawn. Yes, it still works on a Mac; the punchline is the other OS.
