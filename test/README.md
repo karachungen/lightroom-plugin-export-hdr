@@ -20,6 +20,6 @@ The smoke scripts include a Cyrillic folder path test (`test/тест/`). Lightr
 
 If these files are missing, the script exits with a clear message.
 
-**HDR stop / color chart** (`test/hdr-chart/`): committed `hdr-chart.tif` (linear Rec.2020) and `sdr-chart.jpg` (Display P3) at 1440×1920. Rebuild with `uhdr_repack --write-hdr-chart test/hdr-chart`. Check encode recovery with `--check-hdr-chart` (writes gitignored `chart-uhdr.jpg`).
+**HDR stop / color chart** (`test/hdr-chart/`): committed `hdr-chart.tif` (linear Rec.2020) and `sdr-chart.jpg` (Display P3) at 1440×1920. Open the editor with `.\scripts\run_hdr_chart_edit.ps1` (Windows) or `./scripts/run_hdr_chart_edit.sh`. Rebuild with `uhdr_repack --write-hdr-chart test/hdr-chart`. Check encode recovery with `--check-hdr-chart` (writes gitignored `chart-uhdr.jpg`).
 
 **Unicode paths:** the smoke scripts also encode to `test/тест/out_uhdr.jpg` (Cyrillic folder name, normal output filename) to verify UTF-8 path handling on Windows and macOS. Inputs stay ASCII (`hdr-raw.tif`, `sdr.jpg`).
