@@ -11,6 +11,9 @@
 #include <iostream>
 #include <vector>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <oleauto.h>
 #include <propidl.h>
@@ -145,7 +148,7 @@ bool jpeg_native_scale(IWICImagingFactory* factory, IWICBitmapFrameDecode* frame
   native.fill(0);
   const UINT stride = static_cast<UINT>(native.bytesPerLine());
   const UINT bytes = stride * rh;
-  const GUID format = GUID_WICPixelFormat32bppRGBA;
+  WICPixelFormatGUID format = GUID_WICPixelFormat32bppRGBA;
   const HRESULT hr = transform->CopyPixels(nullptr, rw, rh, &format, WICBitmapTransformRotate0,
                                            stride, bytes, native.bits());
   if (FAILED(hr)) return false;
