@@ -17,10 +17,12 @@ jobs:
       matrix:
         include:
           - id: macos-arm64
+            runner: macos-26
             artifact: ExportHDR.lrplugin-macos-arm64.zip
           - id: windows-x64
+            runner: windows-latest
             artifact: ExportHDR.lrplugin-windows-x64.zip
-    runs-on: self-hosted
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -166,7 +168,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
