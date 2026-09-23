@@ -15,6 +15,7 @@
 #include <csetjmp>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -24,10 +25,12 @@
 #include <vector>
 
 extern "C" {
+#ifndef _WIN32
 #ifndef HAVE_BOOLEAN
 #define HAVE_BOOLEAN
-#endif
 typedef int boolean;
+#endif
+#endif
 #include <jpeglib.h>
 }
 
@@ -1096,6 +1099,14 @@ int check_hdr_chart_main(const std::string& dir) {
     std::cerr << "missing chart files; run --write-hdr-chart " << dir << " first\n";
     return 1;
   }
+
+  // NEON and SSE libjpeg-turbo Huffman tables are not byte-identical.
+  // The chart snapshot is the scalar encoder output on both platforms.
+#ifdef _WIN32
+  _putenv_s("JSIMD_FORCENONE", "1");
+#else
+  setenv("JSIMD_FORCENONE", "1", 1);
+#endif
 
   EncodeRequest req;
   req.hdr_tiff = tiff;
