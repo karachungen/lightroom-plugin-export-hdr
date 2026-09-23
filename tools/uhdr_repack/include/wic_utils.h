@@ -2,6 +2,10 @@
 
 #ifdef _WIN32
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <string>
 #include <vector>
 

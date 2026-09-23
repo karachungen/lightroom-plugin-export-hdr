@@ -1,5 +1,9 @@
 #ifdef _WIN32
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "gui/sdr_preview_image.h"
 
 #include "wic_utils.h"
@@ -11,9 +15,6 @@
 #include <iostream>
 #include <vector>
 
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
 #include <oleauto.h>
 #include <propidl.h>
