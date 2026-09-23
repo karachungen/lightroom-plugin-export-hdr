@@ -184,4 +184,5 @@ if ((Test-Path -LiteralPath $Dsc) -and (Test-Path -LiteralPath $DscHdr)) {
 }
 
 Remove-Item -Force -ErrorAction SilentlyContinue $SdrCopy
-exit 0
+& (Join-Path $ScriptDir "check_hdr_chart_snapshot.ps1")
+exit $LASTEXITCODE
