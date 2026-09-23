@@ -27,6 +27,7 @@ extern "C" {
 #ifndef HAVE_BOOLEAN
 #define HAVE_BOOLEAN
 #endif
+typedef int boolean;
 #include <jpeglib.h>
 }
 
@@ -500,6 +501,114 @@ std::vector<uint8_t> display_p3_icc() {
   return icc;
 }
 
+void put_curv_linear(std::vector<uint8_t>& b) {
+  const char t[] = {'c', 'u', 'r', 'v'};
+  b.insert(b.end(), t, t + 4);
+  put_be32(b, 0);
+  put_be32(b, 0);
+}
+
+std::vector<uint8_t> linear_rec2020_icc() {
+  const float rgb_to_xyz_d65[9] = {0.63695805f, 0.14461690f, 0.16888098f, 0.26270021f, 0.67799807f,
+                                   0.05930172f, 0.00000000f, 0.02807269f, 1.06098506f};
+  const float bradford[9] = {0.8951f, 0.2664f, -0.1614f, -0.7502f, 1.7135f, 0.0367f, 0.0389f,
+                             -0.0685f, 1.0296f};
+  const float bradford_inv[9] = {0.9869929f, -0.1470543f, 0.1599627f, 0.4323053f, 0.5183603f,
+                                 0.0492912f, -0.0085287f, 0.0400428f, 0.9684867f};
+  const float d65[3] = {0.95047f, 1.0f, 1.08883f};
+  const float d50[3] = {0.96422f, 1.0f, 0.82521f};
+  float src_lms[3] = {bradford[0] * d65[0] + bradford[1] * d65[1] + bradford[2] * d65[2],
+                      bradford[3] * d65[0] + bradford[4] * d65[1] + bradford[5] * d65[2],
+                      bradford[6] * d65[0] + bradford[7] * d65[1] + bradford[8] * d65[2]};
+  float dst_lms[3] = {bradford[0] * d50[0] + bradford[1] * d50[1] + bradford[2] * d50[2],
+                      bradford[3] * d50[0] + bradford[4] * d50[1] + bradford[5] * d50[2],
+                      bradford[6] * d50[0] + bradford[7] * d50[1] + bradford[8] * d50[2]};
+  float scale[9] = {dst_lms[0] / src_lms[0], 0, 0, 0, dst_lms[1] / src_lms[1], 0, 0, 0,
+                    dst_lms[2] / src_lms[2]};
+  float tmp[9];
+  float adapt[9];
+  mul3(scale, bradford, tmp);
+  mul3(bradford_inv, tmp, adapt);
+  float m[9];
+  mul3(adapt, rgb_to_xyz_d65, m);
+
+  const char* desc = "Linear Rec.2020";
+  const char* cprt = "CC0";
+  std::vector<uint8_t> rxyz, gxyz, bxyz, wtpt, rtrc, descb, cprtb;
+  put_xyz_d50(rxyz, m[0], m[3], m[6]);
+  put_xyz_d50(gxyz, m[1], m[4], m[7]);
+  put_xyz_d50(bxyz, m[2], m[5], m[8]);
+  put_xyz_d50(wtpt, d50[0], d50[1], d50[2]);
+  put_curv_linear(rtrc);
+  put_desc(descb, desc);
+  put_desc(cprtb, cprt);
+
+  const int ntags = 9;
+  const uint32_t tag_table = 128;
+  const uint32_t data0 = tag_table + 4 + static_cast<uint32_t>(ntags) * 12;
+  struct Tag {
+    uint32_t sig;
+    std::vector<uint8_t>* data;
+  };
+  Tag tags[] = {
+      {0x63707274, &cprtb}, {0x64657363, &descb}, {0x77747074, &wtpt},
+      {0x7258595A, &rxyz},  {0x6758595A, &gxyz},  {0x6258595A, &bxyz},
+      {0x72545243, &rtrc},  {0x67545243, &rtrc},  {0x62545243, &rtrc},
+  };
+  uint32_t off = data0;
+  uint32_t offsets[9];
+  for (int i = 0; i < ntags; ++i) {
+    offsets[i] = off;
+    off += static_cast<uint32_t>(tags[i].data->size());
+    off = (off + 3u) & ~3u;
+  }
+  const uint32_t size = off;
+  std::vector<uint8_t> icc(size, 0);
+  auto w32 = [&](uint32_t at, uint32_t v) {
+    icc[at] = static_cast<uint8_t>(v >> 24);
+    icc[at + 1] = static_cast<uint8_t>(v >> 16);
+    icc[at + 2] = static_cast<uint8_t>(v >> 8);
+    icc[at + 3] = static_cast<uint8_t>(v);
+  };
+  w32(0, size);
+  icc[4] = 'a';
+  icc[5] = 'c';
+  icc[6] = 's';
+  icc[7] = 'p';
+  icc[8] = 'm';
+  icc[9] = 'n';
+  icc[10] = 't';
+  icc[11] = 'r';
+  icc[12] = 'R';
+  icc[13] = 'G';
+  icc[14] = 'B';
+  icc[15] = ' ';
+  icc[16] = 'X';
+  icc[17] = 'Y';
+  icc[18] = 'Z';
+  icc[19] = ' ';
+  icc[36] = 'a';
+  icc[37] = 'c';
+  icc[38] = 's';
+  icc[39] = 'p';
+  w32(68, 0x0000F6D6);
+  w32(72, 0x00010000);
+  w32(76, 0x0000D32D);
+  icc[80] = 'u';
+  icc[81] = 'h';
+  icc[82] = 'd';
+  icc[83] = 'r';
+  w32(128, static_cast<uint32_t>(ntags));
+  for (int i = 0; i < ntags; ++i) {
+    const uint32_t e = 132 + static_cast<uint32_t>(i) * 12;
+    w32(e, tags[i].sig);
+    w32(e + 4, offsets[i]);
+    w32(e + 8, static_cast<uint32_t>(tags[i].data->size()));
+    std::memcpy(icc.data() + offsets[i], tags[i].data->data(), tags[i].data->size());
+  }
+  return icc;
+}
+
 struct JpegErr {
   jpeg_error_mgr pub;
   jmp_buf jump;
@@ -581,12 +690,14 @@ void ifd_entry(std::vector<uint8_t>& b, uint16_t tag, uint16_t type, uint32_t co
 }
 
 bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, std::string* error) {
-  const uint32_t ntags = 11;
+  const std::vector<uint8_t> icc = linear_rec2020_icc();
+  const uint32_t ntags = 12;
   const uint32_t ifd = 8;
   const uint32_t extra = ifd + 2 + ntags * 12 + 4;
   const uint32_t bits_off = extra;
   const uint32_t fmt_off = extra + 8;
-  const uint32_t data_off = extra + 16;
+  const uint32_t icc_off = extra + 16;
+  const uint32_t data_off = (icc_off + static_cast<uint32_t>(icc.size()) + 1u) & ~1u;
   const uint32_t nbytes = static_cast<uint32_t>(kWidth) * static_cast<uint32_t>(kHeight) * 12u;
 
   std::vector<uint8_t> file;
@@ -607,6 +718,7 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, st
   ifd_entry(file, 279, 4, 1, nbytes);
   ifd_entry(file, 284, 3, 1, 1);
   ifd_entry(file, 339, 3, 3, fmt_off);
+  ifd_entry(file, 34675, 7, static_cast<uint32_t>(icc.size()), icc_off);
   put_u32(file, 0);
   put_u16(file, 32);
   put_u16(file, 32);
@@ -616,6 +728,12 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, st
   put_u16(file, 3);
   put_u16(file, 3);
   put_u16(file, 0);
+  file.insert(file.end(), icc.begin(), icc.end());
+  if (file.size() > data_off) {
+    if (error) *error = "internal TIFF header size mismatch";
+    return false;
+  }
+  file.resize(data_off, 0);
   if (file.size() != data_off) {
     if (error) *error = "internal TIFF header size mismatch";
     return false;
@@ -664,6 +782,21 @@ bool verify_tiff_plus4(const std::string& path, std::string* error) {
   if (std::fabs(recovered - 16.0f) > 0.5f) {
     if (error) {
       *error = "reloaded +4 NEUTRAL is " + std::to_string(recovered) + " (expected 16). The TIFF was not read as linear Rec.2020.";
+    }
+    return false;
+  }
+
+  const int red_row = 7;
+  const int rx = patch_x(col) + kPatch / 2;
+  const int ry = patch_y(red_row) + kPatch / 2;
+  const size_t ri = (static_cast<size_t>(ry) * r.stride[UHDR_PLANE_PACKED] + static_cast<size_t>(rx)) * 4u;
+  const float rr = half_to_float(src[ri]);
+  const float rg = half_to_float(src[ri + 1]);
+  const float rb = half_to_float(src[ri + 2]);
+  if (std::fabs(rr - 16.0f) > 0.5f || std::fabs(rg) > 0.5f || std::fabs(rb) > 0.5f) {
+    if (error) {
+      *error = "reloaded +4 R2020 is (" + std::to_string(rr) + ", " + std::to_string(rg) + ", " +
+               std::to_string(rb) + ") expected (16, 0, 0). The TIFF was color-managed away from linear Rec.2020.";
     }
     return false;
   }
@@ -795,6 +928,111 @@ float hue_err(LinearRgb a, LinearRgb b) {
   return std::max(std::fabs(na.r - nb.r), std::max(std::fabs(na.g - nb.g), std::fabs(na.b - nb.b)));
 }
 
+bool decode_jpeg_rgb(const uint8_t* data, unsigned long size, std::vector<uint8_t>* rgb, int* width,
+                     int* height, std::string* error) {
+  jpeg_decompress_struct cinfo{};
+  JpegErr jerr{};
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = jpeg_fail;
+  if (setjmp(jerr.jump)) {
+    jpeg_destroy_decompress(&cinfo);
+    if (error) *error = "libjpeg failed to decode the gain map";
+    return false;
+  }
+  jpeg_create_decompress(&cinfo);
+  jpeg_mem_src(&cinfo, const_cast<unsigned char*>(data), size);
+  if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
+    jpeg_destroy_decompress(&cinfo);
+    if (error) *error = "gain map is not a JPEG";
+    return false;
+  }
+  cinfo.out_color_space = JCS_RGB;
+  jpeg_start_decompress(&cinfo);
+  *width = static_cast<int>(cinfo.output_width);
+  *height = static_cast<int>(cinfo.output_height);
+  rgb->assign(static_cast<size_t>(*width) * static_cast<size_t>(*height) * 3u, 0);
+  while (cinfo.output_scanline < cinfo.output_height) {
+    uint8_t* row = rgb->data() + static_cast<size_t>(cinfo.output_scanline) * static_cast<size_t>(*width) * 3u;
+    JSAMPROW rows[1] = {row};
+    jpeg_read_scanlines(&cinfo, rows, 1);
+  }
+  jpeg_finish_decompress(&cinfo);
+  jpeg_destroy_decompress(&cinfo);
+  return true;
+}
+
+bool r2020_plus4_gain_chromatic(const std::string& path, float* red, float* green, float* blue,
+                                std::string* error) {
+  std::ifstream input = open_input_binary(path);
+  if (!input) {
+    if (error) *error = "could not open " + path;
+    return false;
+  }
+  std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  uhdr_codec_private_t* decoder = uhdr_create_decoder();
+  if (!decoder) {
+    if (error) *error = "uhdr_create_decoder failed";
+    return false;
+  }
+  uhdr_compressed_image_t compressed{};
+  compressed.data = bytes.data();
+  compressed.data_sz = bytes.size();
+  compressed.capacity = bytes.size();
+  compressed.cg = UHDR_CG_UNSPECIFIED;
+  compressed.ct = UHDR_CT_UNSPECIFIED;
+  compressed.range = UHDR_CR_UNSPECIFIED;
+  uhdr_error_info_t st = uhdr_dec_set_image(decoder, &compressed);
+  if (st.error_code == UHDR_CODEC_OK) st = uhdr_dec_probe(decoder);
+  uhdr_mem_block_t* gain = st.error_code == UHDR_CODEC_OK ? uhdr_dec_get_gainmap_image(decoder) : nullptr;
+  if (!gain || !gain->data || gain->data_sz == 0) {
+    uhdr_release_decoder(decoder);
+    if (error) *error = "encoded chart has no gain-map image";
+    return false;
+  }
+  std::vector<uint8_t> rgb;
+  int gw = 0;
+  int gh = 0;
+  const bool decoded =
+      decode_jpeg_rgb(static_cast<const uint8_t*>(gain->data), static_cast<unsigned long>(gain->data_sz),
+                      &rgb, &gw, &gh, error);
+  uhdr_release_decoder(decoder);
+  if (!decoded) return false;
+  if (gw < 2 || gh < 2) {
+    if (error) *error = "gain map is empty";
+    return false;
+  }
+
+  const int col = 4;
+  const int row = 7;
+  const int sx = patch_x(col) + (kPatch - kSample) / 2;
+  const int sy = patch_y(row) + (kPatch - kSample) / 2;
+  const int x0 = std::clamp(sx * gw / kWidth, 0, gw - 1);
+  const int y0 = std::clamp(sy * gh / kHeight, 0, gh - 1);
+  const int x1 = std::clamp(x0 + std::max(1, kSample * gw / kWidth), x0 + 1, gw);
+  const int y1 = std::clamp(y0 + std::max(1, kSample * gh / kHeight), y0 + 1, gh);
+  double ar = 0;
+  double ag = 0;
+  double ab = 0;
+  int n = 0;
+  for (int y = y0; y < y1; ++y) {
+    for (int x = x0; x < x1; ++x) {
+      const size_t i = (static_cast<size_t>(y) * static_cast<size_t>(gw) + static_cast<size_t>(x)) * 3u;
+      ar += rgb[i];
+      ag += rgb[i + 1];
+      ab += rgb[i + 2];
+      ++n;
+    }
+  }
+  if (n == 0) {
+    if (error) *error = "gain map sample was empty";
+    return false;
+  }
+  *red = static_cast<float>(ar / n / 255.0);
+  *green = static_cast<float>(ag / n / 255.0);
+  *blue = static_cast<float>(ab / n / 255.0);
+  return true;
+}
+
 }  // namespace
 
 int write_hdr_chart_main(const std::string& dir) {
@@ -841,7 +1079,8 @@ int write_hdr_chart_main(const std::string& dir) {
   std::cout << "Wrote " << tiff << "\n";
   std::cout << "Wrote " << jpeg << " (" << jpeg_bytes.size() << " bytes, Display P3 ICC)\n";
   std::cout << "Wrote " << man << "\n";
-  std::cout << kWidth << "x" << kHeight << " linear Rec.2020, +4 NEUTRAL reloaded as 16\n";
+  std::cout << kWidth << "x" << kHeight
+            << " linear Rec.2020, +4 NEUTRAL reloaded as 16, +4 R2020 reloaded as (16, 0, 0)\n";
   return 0;
 }
 
@@ -930,12 +1169,30 @@ int check_hdr_chart_main(const std::string& dir) {
     }
   }
   std::fflush(stdout);
+
+  float gain_r = 0;
+  float gain_g = 0;
+  float gain_b = 0;
+  if (!r2020_plus4_gain_chromatic(out, &gain_r, &gain_g, &gain_b, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  // Code 1 is the map's own peak (here past +4, because +5 is in the chart). A washed
+  // map boosts every channel together; a chromatic map leaves green near zero.
+  const bool chromatic = gain_r >= 0.50f && gain_g <= 0.10f && (gain_r - gain_g) >= 0.50f;
+  std::printf("R2020 +4 gain RGB %.3f %.3f %.3f %s\n", gain_r, gain_g, gain_b,
+              chromatic ? "PASS" : "FAIL");
+  if (!chromatic) {
+    std::cerr << "R2020 +4 gain map is gray (washed). Red must stay well above green, and green near none.\n";
+    ++failures;
+  }
+
   if (failures) {
     std::cerr << failures << " gated patch(es) failed\n";
     return 1;
   }
   std::cout << "All gated P3-safe patches recovered within " << kStopTol << " stop and " << kHueTol
-            << " hue.\n";
+            << " hue. R2020 +4 gain stayed chromatic.\n";
   return 0;
 }
 

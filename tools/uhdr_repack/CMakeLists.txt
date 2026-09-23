@@ -125,6 +125,7 @@ set(_UHDR_CORE_SOURCES
   src/gainmap_loader.cpp
   src/verify.cpp
   src/half_float.cpp
+  src/tiff_float.cpp
   src/hdr_chart.cpp
   src/yuv_convert.cpp
 )
