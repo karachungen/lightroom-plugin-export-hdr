@@ -554,6 +554,7 @@ void GuiBridge::sendHeatmap(int index) {
 
 void GuiBridge::sendHdrEmulation() {
   if (!chrome_ || !document_) return;
+  if (viewport_hdr_active_) return;
   if (viewport_ && viewport_->displaySupportsHdr()) return;
   if (preview_mode_ != PreviewMode::kFinalHdr) return;
   if (current_index_ < 0 || current_index_ >= document_->itemCount()) return;
@@ -612,8 +613,15 @@ void GuiBridge::sendHdrEmulation() {
 void GuiBridge::sendDisplayStatus(const HdrViewportStatus& status) {
   if (!chrome_) return;
   const bool screen_hdr = viewport_ && viewport_->displaySupportsHdr();
-  viewport_hdr_active_ = status.hdr_active && screen_hdr;
-  if (!screen_hdr) viewport_hdr_active_ = false;
+  // The viewport is created hidden. Show it as soon as the screen has EDR headroom
+  // so exposeEvent can open an HDR swapchain. Hide it again if that format is refused.
+  if (!screen_hdr) {
+    viewport_hdr_active_ = false;
+  } else if (!status.initialized) {
+    viewport_hdr_active_ = true;
+  } else {
+    viewport_hdr_active_ = status.hdr_active;
+  }
   json root;
   root["type"] = "displayStatus";
   root["text"] = (status.backend + " · " + status.swapchain_format).toStdString();

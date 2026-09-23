@@ -128,6 +128,11 @@ struct alignas(16) PreviewUniforms {
 
 }  // namespace
 
+#ifdef Q_OS_MACOS
+bool macos_display_supports_hdr(QWindow* window);
+float macos_window_edr_headroom(QWindow* window);
+#endif
+
 class HdrRhiViewport::Impl {
  public:
   explicit Impl(HdrRhiViewport* owner) : q(owner) {}
@@ -205,9 +210,13 @@ class HdrRhiViewport::Impl {
       viewport_status.error =
           QStringLiteral("HDR output is unavailable on this display; showing tone-mapped SDR");
     }
-    activity_log_append("", "viewport",
-                        std::string(screen_hdr ? "display HDR" : "display SDR") + " swapchain " +
-                            viewport_status.swapchain_format.toStdString());
+    std::string display_detail = screen_hdr ? "display HDR" : "display SDR";
+#if defined(Q_OS_MACOS)
+    display_detail += " headroom " +
+                      QString::number(macos_window_edr_headroom(q), 'f', 3).toStdString();
+#endif
+    display_detail += " swapchain " + viewport_status.swapchain_format.toStdString();
+    activity_log_append("", "viewport", display_detail);
 
     initialized = true;
     createResources();
@@ -679,16 +688,12 @@ HdrViewportStatus HdrRhiViewport::status() const {
   return d_->viewport_status;
 }
 
-#ifdef Q_OS_MACOS
-bool macos_display_supports_hdr();
-#endif
-
 bool HdrRhiViewport::displaySupportsHdr() const {
 #if defined(Q_OS_WIN)
   const HWND hwnd = reinterpret_cast<HWND>(const_cast<HdrRhiViewport*>(this)->winId());
   return windows_window_hdr_enabled(hwnd);
 #elif defined(Q_OS_MACOS)
-  return macos_display_supports_hdr();
+  return macos_display_supports_hdr(const_cast<HdrRhiViewport*>(this));
 #else
   return false;
 #endif
