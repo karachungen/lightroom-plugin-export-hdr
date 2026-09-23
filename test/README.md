@@ -20,4 +20,6 @@ The smoke scripts include a Cyrillic folder path test (`test/тест/`). Lightr
 
 If these files are missing, the script exits with a clear message.
 
+**HDR stop / color chart** (`test/hdr-chart/`): committed `hdr-chart.tif` (float linear Rec.2020, profile embedded) and `sdr-chart.jpg` (Display P3) at 1440×1920. Open the editor with `.\scripts\run_hdr_chart_edit.ps1` (Windows) or `./scripts/run_hdr_chart_edit.sh`. Rebuild with `uhdr_repack --write-hdr-chart test/hdr-chart`. Check encode recovery with `--check-hdr-chart` (writes gitignored `chart-uhdr.jpg`). R2020 +4 must come back as `(16, 0, 0)` and its gain map must stay chromatic. `chart-uhdr.snapshot.jpg` is the golden Ultra HDR file; `scripts/check_hdr_chart_snapshot.sh` and `scripts/check_hdr_chart_snapshot.ps1` fail unless a new encode matches it byte for byte. Regenerating the snapshot is a deliberate commit when the encoder output is supposed to change.
+
 **Unicode paths:** the smoke scripts also encode to `test/тест/out_uhdr.jpg` (Cyrillic folder name, normal output filename) to verify UTF-8 path handling on Windows and macOS. Inputs stay ASCII (`hdr-raw.tif`, `sdr.jpg`).

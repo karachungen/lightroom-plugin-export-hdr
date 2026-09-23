@@ -209,6 +209,7 @@ body {
 #zoom-controls button:disabled { opacity: 0.35; cursor: default; }
 #zoom-fit { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 #preview-canvas { width: 100%; height: 100%; display: block; }
+body.mode-hdr-ready #preview-canvas { visibility: hidden; }
 #preview-hud {
   flex: 0 0 auto;
   z-index: 5;

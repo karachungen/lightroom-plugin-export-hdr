@@ -264,3 +264,4 @@ if ! grep -Eq '^sdr: [0-9]+x[0-9]+$' "$probe_log"; then
 	exit 15
 fi
 echo "OK: SDR JPEG preview encode."
+bash "$SCRIPT_DIR/check_hdr_chart_snapshot.sh"

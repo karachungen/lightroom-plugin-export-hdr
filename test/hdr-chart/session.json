@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "work_dir": "test/hdr-chart",
+  "result_path": "test/hdr-chart/result.json",
+  "items": [
+    {
+      "id": "hdr_chart",
+      "label": "HDR stop / color chart — 1440×1920 3:4",
+      "sdr": "test/hdr-chart/sdr-chart.jpg",
+      "hdr_tiff": "test/hdr-chart/hdr-chart.tif",
+      "out": "test/hdr-chart/chart-uhdr.jpg"
+    }
+  ]
+}

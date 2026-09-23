@@ -149,6 +149,16 @@ jobs:
         shell: powershell
         run: .\scripts\test_windows_cmd_quote.ps1
 
+      - name: HDR chart encode snapshot
+        if: matrix.id == 'macos-arm64'
+        shell: bash
+        run: bash scripts/check_hdr_chart_snapshot.sh
+
+      - name: HDR chart encode snapshot
+        if: matrix.id == 'windows-x64'
+        shell: powershell
+        run: .\scripts\check_hdr_chart_snapshot.ps1
+
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4
         with:

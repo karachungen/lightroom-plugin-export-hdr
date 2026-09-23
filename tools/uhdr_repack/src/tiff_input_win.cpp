@@ -4,6 +4,7 @@
 
 #include "half_float.h"
 #include "resize_lanczos.h"
+#include "tiff_float.h"
 #include "wic_utils.h"
 
 #include <cstdio>
@@ -30,6 +31,10 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
     }
     return false;
   }
+
+  const int identity = probe_identity_rec2020_tiff(path, master_w, master_h, error);
+  if (identity < 0) return false;
+  if (identity > 0) return true;
 
   std::vector<float> rgba;
   unsigned w = 0;
@@ -61,6 +66,11 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
     }
     return false;
   }
+
+  const int identity =
+      load_identity_rec2020_tiff(path, out, error, master_w, master_h, crop, dst_w, dst_h);
+  if (identity < 0) return false;
+  if (identity > 0) return true;
   out->reset();
 
   std::vector<float> rgba;

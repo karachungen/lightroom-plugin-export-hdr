@@ -4,6 +4,9 @@
 
 #include "tiff_input.h"
 
+#include "resize_lanczos.h"
+#include "tiff_float.h"
+
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -40,6 +43,8 @@ void even_normalize(unsigned orig_w, unsigned orig_h, unsigned* w, unsigned* h) 
   }
 }
 
+
+
 bool open_hdr_ciimage(const std::string& path, CIImage** out_im, CGRect* out_extent,
                       std::string* error) {
   NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]];
@@ -50,6 +55,14 @@ bool open_hdr_ciimage(const std::string& path, CIImage** out_im, CGRect* out_ext
       *error = "Core Image could not read HDR file: " + path;
     }
     return false;
+  }
+  CGColorSpaceRef src = im.colorSpace;
+  if (src && !CGColorSpaceUsesExtendedRange(src)) {
+    CGColorSpaceRef extended = CGColorSpaceCreateExtended(src);
+    if (extended) {
+      im = [im imageBySettingProperties:@{kCIImageColorSpace : (__bridge id)extended}];
+      CGColorSpaceRelease(extended);
+    }
   }
   *out_im = im;
   *out_extent = [im extent];
@@ -66,6 +79,11 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
     }
     return false;
   }
+
+  const int identity = probe_identity_rec2020_tiff(path, master_w, master_h, error);
+  if (identity < 0) return false;
+  if (identity > 0) return true;
+
 
   @autoreleasepool {
     CIImage* im = nil;
@@ -101,7 +119,12 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
     }
     return false;
   }
+  const int identity =
+      load_identity_rec2020_tiff(path, out, error, master_w, master_h, crop, dst_w, dst_h);
+  if (identity < 0) return false;
+  if (identity > 0) return true;
   out->reset();
+
 
   @autoreleasepool {
     CIImage* im = nil;

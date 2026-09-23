@@ -169,3 +169,18 @@ Fixtures: **[../../test/README.md](../../test/README.md)** · repo root:
 ```
 
 Defaults → encode, **`--inspect`**, checks **`gainmap_size`** & **`primary_xmp`**
+
+## HDR stop / color chart
+
+Writes a labeled linear Rec.2020 TIFF (`+0`…`+5` stops, P3-safe and Rec.2020-only patches, sharpness band) plus a matching Display P3 SDR JPEG at **Instagram 3:4, 1440×1920**. `--check-hdr-chart` encodes with the Color map preset (boost 16 / 4 stops) and prints recovered level and hue per patch.
+
+```bash
+./scripts/run_hdr_chart_edit.sh
+# Windows: .\scripts\run_hdr_chart_edit.ps1
+# or:
+./build/uhdr_repack --write-hdr-chart ../../test/hdr-chart
+./build/uhdr_repack --check-hdr-chart ../../test/hdr-chart
+./build/uhdr_repack --edit --session ../../test/hdr-chart/session.json
+```
+
+The committed pair is **1440×1920** (Instagram 3:4) in `test/hdr-chart/`. The TIFF is float linear Rec.2020 with that profile embedded. Rebuild with `--write-hdr-chart` if the layout changes. Encode output `chart-uhdr.jpg` stays gitignored. P3-safe rows `+0`–`+5` must recover within 0.15 stop (hue 0.05). Rec.2020-only rows are reported, and **R2020 +4** must keep a chromatic gain map (red near full boost, green near none) so highlights do not wash out to the SDR hue. Sharpness is visual: 4px line pairs should still read as separate lines at `+0` and `+4` in HDR. The Color map preset advertises boost 16 / 4 stops; the checker still requires `+5` to survive, which current libultrahdr does.

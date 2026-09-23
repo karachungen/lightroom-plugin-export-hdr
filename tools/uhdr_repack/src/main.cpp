@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "hdr_chart.h"
 #include "session.h"
 
 #include <cstring>
@@ -45,6 +46,24 @@ static int run(int argc, char** argv) {
 
   if (std::strcmp(argv[1], "--inspect") == 0) {
     return cli_inspect_main(argc, argv);
+  }
+
+  if (std::strcmp(argv[1], "--write-hdr-chart") == 0) {
+    if (argc < 3) {
+      std::cerr << "--write-hdr-chart requires an output directory\n";
+      print_usage();
+      return 1;
+    }
+    return write_hdr_chart_main(argv[2]);
+  }
+
+  if (std::strcmp(argv[1], "--check-hdr-chart") == 0) {
+    if (argc < 3) {
+      std::cerr << "--check-hdr-chart requires a chart directory\n";
+      print_usage();
+      return 1;
+    }
+    return check_hdr_chart_main(argv[2]);
   }
 
   if (std::strcmp(argv[1], "--dump-gainmap") == 0) {

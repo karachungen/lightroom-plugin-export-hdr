@@ -61,14 +61,17 @@ vec3 toOutputPrimaries(vec3 linearSrgb)
     return view.w > 0.5 ? srgbToDisplayP3(linearSrgb) : linearSrgb;
 }
 
-vec3 decodedHdrToLinearSrgb(vec3 c)
+// One conversion into the swapchain primaries. No intermediate clamp, so a
+// Rec.2020 channel that is outside sRGB is not zeroed before Display P3.
+vec3 decodedToOutput(vec3 c)
 {
     int gamut = int(color.x + 0.5);
+    bool p3Out = view.w > 0.5;
     if (gamut == 2)
-        return rec2020ToSrgb(c);
+        return p3Out ? srgbToDisplayP3(rec2020ToSrgb(c)) : rec2020ToSrgb(c);
     if (gamut == 1)
-        return displayP3ToSrgb(c);
-    return c;
+        return p3Out ? c : displayP3ToSrgb(c);
+    return p3Out ? srgbToDisplayP3(c) : c;
 }
 
 vec3 toneMapSdr(vec3 c)
@@ -131,20 +134,22 @@ void main()
         return;
     }
 
-    vec3 hdrLinear;
-    if (mode == 3 && gain_range.w > 0.5)
-        hdrLinear = decodedHdrToLinearSrgb(texture(finalTexture, imageUv).rgb);
-    else {
-        float displayBoost = max(mode_boost.w, 1.0);
-        float strength = clamp(log(max(mode_boost.z, 1.01)) / log(1000.0), 0.0, 1.25);
-        float applied = mix(1.0, min(gainValue, displayBoost), strength);
-        hdrLinear = srgbToLinear(sdr) * applied;
+    // Decoded libultrahdr frame: linear values above 1 stay above 1.
+    if (mode == 3 && gain_range.w > 0.5) {
+        vec3 hdrLinear = decodedToOutput(texture(finalTexture, imageUv).rgb);
+        hdrLinear *= max(display.w, 1.0);
+        float cap = max(display.z, 1.0);
+        fragColor = vec4(clamp(hdrLinear, vec3(0.0), vec3(cap)), 1.0);
+        return;
     }
 
+    float displayBoost = max(mode_boost.w, 1.0);
+    float strength = clamp(log(max(mode_boost.z, 1.01)) / log(1000.0), 0.0, 1.25);
+    float applied = mix(1.0, min(gainValue, displayBoost), strength);
+    vec3 hdrLinear = srgbToLinear(sdr) * applied;
     hdrLinear = max(hdrLinear, vec3(0.0));
     hdrLinear = toOutputPrimaries(hdrLinear);
     if (gain_range.z > 0.5)
-        // Tone-map in linear space; QRhiSwapChain::sRGB handles encoding.
         hdrLinear = toneMapSdr(hdrLinear);
     else
         hdrLinear = min(hdrLinear, vec3(max(display.z, 1.0)));

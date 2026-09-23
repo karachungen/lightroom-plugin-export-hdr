@@ -445,6 +445,11 @@
         state.hdrDisplayWarning = msg.warning || (!msg.displayHdr
           ? "This display is not HDR. Previewing a brighter SDR simulation (gain map over SDR)."
           : "");
+        if (state.hdrCached && state.mode === "hdr" && state.hdrDisplayActive) {
+          document.body.classList.add("mode-hdr-ready");
+        } else if (!state.hdrDisplayActive) {
+          document.body.classList.remove("mode-hdr-ready");
+        }
         applyHdrDisplayWarning();
         drawPreview();
         break;
@@ -1509,6 +1514,8 @@
       if (state.heatmapImage) {
         ctx.drawImage(state.heatmapImage, s.offsetX, s.offsetY, s.dw, s.dh);
       }
+    } else if (state.mode === "hdr" && state.hdrDisplayActive) {
+      // The native swapchain shows the decoded linear HDR frame.
     } else if (state.mode === "hdr" && state.hdrEmulationImage &&
                state.hdrEmulationImage.naturalWidth > 0) {
       ctx.drawImage(state.hdrEmulationImage, s.offsetX, s.offsetY, s.dw, s.dh);
