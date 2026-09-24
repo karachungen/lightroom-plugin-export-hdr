@@ -386,4 +386,84 @@ if(UHDR_STATIC_QT AND UHDR_ENABLE_GUI)
   )
 endif()
 
+enable_testing()
+
+get_filename_component(UHDR_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(UHDR_TEST_OUT "${CMAKE_CURRENT_BINARY_DIR}/test-out")
+set(UHDR_BIN $<TARGET_FILE:uhdr_repack>)
+set(UHDR_CHART_DIR "${UHDR_TEST_OUT}/hdr-chart")
+set(UHDR_CHART_HDR "${UHDR_CHART_DIR}/hdr-chart.tif")
+set(UHDR_CHART_SDR "${UHDR_CHART_DIR}/sdr-chart.jpg")
+
+add_test(NAME chart.write COMMAND ${UHDR_BIN} --write-hdr-chart "${UHDR_CHART_DIR}")
+set_tests_properties(chart.write PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_SETUP chart)
+
+function(uhdr_chart_test name)
+  add_test(NAME ${name} COMMAND ${UHDR_BIN} ${ARGN})
+  set_tests_properties(${name} PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_REQUIRED chart)
+endfunction()
+
+uhdr_chart_test(chart.assets-current --check-hdr-chart-assets "${UHDR_REPO_ROOT}/test/hdr-chart" "${UHDR_CHART_DIR}")
+uhdr_chart_test(chart.input.hdr --describe-input "${UHDR_CHART_HDR}" --require-portable)
+uhdr_chart_test(chart.input.sdr --describe-input "${UHDR_CHART_SDR}" --require-portable)
+
+foreach(preset color mono)
+  uhdr_chart_test(chart.${preset}.original --check-hdr-chart "${UHDR_CHART_DIR}"
+    --out "${UHDR_TEST_OUT}/chart-${preset}-original.jpg" --preset ${preset})
+  foreach(aspect 1x1 4x5 3x4 191x100)
+    uhdr_chart_test(chart.${preset}.ig-${aspect}-1080 --check-hdr-chart "${UHDR_CHART_DIR}"
+      --out "${UHDR_TEST_OUT}/chart-${preset}-${aspect}-1080.jpg" --preset ${preset}
+      --slice-aspect ${aspect} --out-width 1080)
+    uhdr_chart_test(chart.${preset}.ig-${aspect}-native --check-hdr-chart "${UHDR_CHART_DIR}"
+      --out "${UHDR_TEST_OUT}/chart-${preset}-${aspect}-native.jpg" --preset ${preset}
+      --slice-aspect ${aspect})
+  endforeach()
+endforeach()
+
+function(uhdr_smoke_pair name verify_args)
+  add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})
+  add_test(NAME smoke.${name}.verify COMMAND ${UHDR_BIN} ${verify_args})
+  set_tests_properties(smoke.${name}.encode PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED chart FIXTURES_SETUP smoke-${name})
+  set_tests_properties(smoke.${name}.verify PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED smoke-${name})
+endfunction()
+
+uhdr_smoke_pair(cli.default
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-default.jpg;--expect-size;1440x1920"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-default.jpg")
+uhdr_smoke_pair(cli.slice-1x1
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-1x1.jpg;--expect-size;1440x1440;--expect-single;1x1"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-1x1.jpg"
+  --slice-aspect 1x1)
+uhdr_smoke_pair(cli.feed-4x5
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-4x5.jpg;--expect-size;1080x1350;--max-bytes;8388608"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-4x5.jpg"
+  --slice-aspect 4x5 --out-width 1080)
+
+add_test(NAME smoke.utf8-path COMMAND ${UHDR_BIN} --check-utf8-path
+  "${UHDR_CHART_HDR}" "${UHDR_CHART_SDR}" "${UHDR_TEST_OUT}")
+set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart)
+
+set(UHDR_FEED_HDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.tif")
+set(UHDR_FEED_SDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.jpg")
+add_test(NAME smoke.feed.describe COMMAND ${UHDR_BIN} --describe-input "${UHDR_FEED_HDR}"
+  --require-portable --skip-if-missing)
+add_test(NAME smoke.feed.encode COMMAND ${UHDR_BIN} --encode-or-skip
+  --hdr-tiff "${UHDR_FEED_HDR}" --base "${UHDR_FEED_SDR}" --out "${UHDR_TEST_OUT}/feed-1080.jpg"
+  --slice-aspect 4x5 --out-width 1080)
+add_test(NAME smoke.feed.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/feed-1080.jpg"
+  --expect-size 1080x1350 --max-bytes 8388608 --skip-if-missing)
+set_tests_properties(smoke.feed.describe smoke.feed.encode smoke.feed.verify PROPERTIES
+  LABELS smoke TIMEOUT 600 SKIP_RETURN_CODE 77)
+set_tests_properties(smoke.feed.encode PROPERTIES FIXTURES_SETUP smoke-feed)
+set_tests_properties(smoke.feed.verify PROPERTIES FIXTURES_REQUIRED smoke-feed)
+
+if(UHDR_ENABLE_GUI)
+  add_test(NAME smoke.probe-sdr COMMAND ${UHDR_BIN} --probe-sdr "${UHDR_CHART_SDR}")
+  add_test(NAME smoke.preview-jpeg COMMAND ${UHDR_BIN} --check-preview-jpeg "${UHDR_CHART_SDR}")
+  set_tests_properties(smoke.probe-sdr smoke.preview-jpeg PROPERTIES
+    LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart FAIL_REGULAR_EXPRESSION "Wrong JPEG library version")
+endif()
+
 install(TARGETS uhdr_repack RUNTIME DESTINATION bin)
