@@ -1,11 +1,14 @@
 #include "icc_profile.h"
 
 #include "color_primaries.h"
+#include "path_io.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 namespace uhdr_repack {
@@ -19,6 +22,9 @@ constexpr float kRec2020ToXyzD65[9] = {0.63695805f, 0.14461690f, 0.16888098f, 0.
 
 constexpr float kDisplayP3ToXyzD65[9] = {0.48657095f, 0.26566769f, 0.19821729f, 0.22897456f, 0.69173852f,
                                          0.07928691f, 0.00000000f, 0.04511338f, 1.04394437f};
+
+constexpr float kSrgbToXyzD65[9] = {0.41239080f, 0.35758434f, 0.18048079f, 0.21263901f, 0.71516868f,
+                                    0.07219232f, 0.01933082f, 0.11919478f, 0.95053215f};
 
 void append_be16(std::vector<uint8_t>& b, uint16_t v) {
   b.push_back(static_cast<uint8_t>(v >> 8));
@@ -112,7 +118,7 @@ std::vector<uint8_t> curv_srgb() {
   append_be32(b, 1024);
   for (int i = 0; i < 1024; ++i) {
     const float x = static_cast<float>(i) / 1023.0f;
-    const float y = std::clamp(srgb_oetf(x), 0.0f, 1.0f);
+    const float y = std::clamp(srgb_eotf(x), 0.0f, 1.0f);
     append_be16(b, static_cast<uint16_t>(std::lround(y * 65535.0f)));
   }
   return b;
@@ -362,7 +368,7 @@ bool validate_profile(const std::vector<uint8_t>& icc, const char* description, 
       return read_be16(icc.data() + trc_off + 12 + static_cast<uint32_t>(i) * 2u);
     };
     auto expect_e = [](int i) {
-      const float y = std::clamp(srgb_oetf(static_cast<float>(i) / 1023.0f), 0.0f, 1.0f);
+      const float y = std::clamp(srgb_eotf(static_cast<float>(i) / 1023.0f), 0.0f, 1.0f);
       return static_cast<int>(std::lround(y * 65535.0f));
     };
     if (entry(0) > 1 || std::abs(static_cast<int>(entry(1023)) - 65535) > 1 ||
@@ -370,6 +376,167 @@ bool validate_profile(const std::vector<uint8_t>& icc, const char* description, 
       return fail(error, "Display P3 TRC is not the sRGB curve");
     }
   }
+  return true;
+}
+
+struct TagRef {
+  const uint8_t* p = nullptr;
+  uint32_t n = 0;
+};
+
+TagRef find_tag(const std::vector<uint8_t>& icc, uint32_t sig) {
+  if (icc.size() < 132) return {};
+  const uint32_t ntags = read_be32(icc.data() + 128);
+  if (ntags > (icc.size() - 132) / 12) return {};
+  for (uint32_t i = 0; i < ntags; ++i) {
+    const uint8_t* e = icc.data() + 132 + static_cast<size_t>(i) * 12u;
+    if (read_be32(e) != sig) continue;
+    const uint32_t off = read_be32(e + 4);
+    const uint32_t n = read_be32(e + 8);
+    if (off > icc.size() || n > icc.size() - off) return {};
+    return {icc.data() + off, n};
+  }
+  return {};
+}
+
+bool colorant(const std::vector<uint8_t>& icc, uint32_t sig, float xyz[3]) {
+  const TagRef t = find_tag(icc, sig);
+  if (!t.p || t.n < 20 || std::memcmp(t.p, "XYZ ", 4) != 0) return false;
+  for (int i = 0; i < 3; ++i) xyz[i] = read_s15(t.p + 8 + 4 * i);
+  return true;
+}
+
+double para_eval(uint16_t type, const double* v, double x) {
+  const double g = v[0], a = v[1], b = v[2], c = v[3], d = v[4], e = v[5], f = v[6];
+  auto pw = [g](double base) { return base > 0.0 ? std::pow(base, g) : 0.0; };
+  switch (type) {
+    case 0: return pw(x);
+    case 1: return (a != 0.0 && x >= -b / a) ? pw(a * x + b) : 0.0;
+    case 2: return (a != 0.0 && x >= -b / a) ? pw(a * x + b) + c : c;
+    case 3: return x >= d ? pw(a * x + b) : c * x;
+    default: return x >= d ? pw(a * x + b) + e : c * x + f;
+  }
+}
+
+template <typename Curve>
+IccTransfer curve_verdict(Curve curve) {
+  bool srgb = true;
+  bool linear = true;
+  for (int k = 0; k <= 16; ++k) {
+    const double x = k / 16.0;
+    const double y = curve(x);
+    if (std::fabs(y - srgb_eotf(static_cast<float>(x))) > 0.002) srgb = false;
+    if (std::fabs(y - x) > 0.002) linear = false;
+  }
+  if (srgb) return IccTransfer::kSrgb;
+  if (linear) return IccTransfer::kLinear;
+  return IccTransfer::kUnknown;
+}
+
+IccTransfer classify_trc(const TagRef& t) {
+  if (!t.p || t.n < 12) return IccTransfer::kUnknown;
+  if (std::memcmp(t.p, "curv", 4) == 0) {
+    const uint32_t count = read_be32(t.p + 8);
+    if (count > (t.n - 12) / 2) return IccTransfer::kUnknown;
+    if (count == 0) return IccTransfer::kLinear;
+    if (count == 1) {
+      const double gamma = read_be16(t.p + 12) / 256.0;
+      return curve_verdict([gamma](double x) { return std::pow(x, gamma); });
+    }
+    return curve_verdict([&](double x) {
+      const double pos = x * (count - 1);
+      const uint32_t i0 = std::min(static_cast<uint32_t>(pos), count - 1);
+      const uint32_t i1 = std::min(i0 + 1, count - 1);
+      const double y0 = read_be16(t.p + 12 + 2 * i0) / 65535.0;
+      const double y1 = read_be16(t.p + 12 + 2 * i1) / 65535.0;
+      return y0 + (y1 - y0) * (pos - i0);
+    });
+  }
+  if (std::memcmp(t.p, "para", 4) == 0) {
+    static const int kParams[5] = {1, 3, 4, 5, 7};
+    const uint16_t type = read_be16(t.p + 8);
+    if (type > 4 || t.n < 12u + 4u * static_cast<uint32_t>(kParams[type])) return IccTransfer::kUnknown;
+    double v[7] = {1, 1, 0, 0, 0, 0, 0};
+    for (int i = 0; i < kParams[type]; ++i) v[i] = read_s15(t.p + 12 + 4 * i);
+    return curve_verdict([type, &v](double x) { return para_eval(type, v, x); });
+  }
+  return IccTransfer::kUnknown;
+}
+
+bool fail_read(std::string* error, const std::string& msg) {
+  if (error) *error = msg;
+  return false;
+}
+
+uint16_t tiff16(const uint8_t* p, bool le) {
+  return le ? static_cast<uint16_t>(p[0] | (p[1] << 8)) : read_be16(p);
+}
+
+uint32_t tiff32(const uint8_t* p, bool le) {
+  return le ? (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24)
+            : read_be32(p);
+}
+
+bool icc_from_tiff(const std::vector<uint8_t>& file, std::vector<uint8_t>* icc, std::string* error) {
+  const bool le = file[0] == 'I';
+  const uint32_t ifd = tiff32(file.data() + 4, le);
+  if (static_cast<size_t>(ifd) + 2 > file.size()) return fail_read(error, "TIFF IFD is past the end of the file");
+  const uint16_t ntags = tiff16(file.data() + ifd, le);
+  for (uint16_t i = 0; i < ntags; ++i) {
+    const size_t at = ifd + 2u + static_cast<size_t>(i) * 12u;
+    if (at + 12 > file.size()) return fail_read(error, "TIFF IFD entry is past the end of the file");
+    const uint8_t* e = file.data() + at;
+    if (tiff16(e, le) != 34675) continue;
+    const uint32_t count = tiff32(e + 4, le);
+    if (count < 128) return fail_read(error, "TIFF ICC tag is shorter than an ICC header");
+    const uint32_t off = tiff32(e + 8, le);
+    if (static_cast<size_t>(off) + count > file.size()) return fail_read(error, "TIFF ICC tag is past the end of the file");
+    icc->assign(file.begin() + off, file.begin() + off + count);
+    return true;
+  }
+  return fail_read(error, "TIFF has no ICC profile (tag 34675)");
+}
+
+bool icc_from_jpeg(const std::vector<uint8_t>& file, std::vector<uint8_t>* icc, std::string* error) {
+  struct Chunk {
+    int seq = 0;
+    std::vector<uint8_t> data;
+  };
+  std::vector<Chunk> chunks;
+  int total = -1;
+  size_t i = 2;
+  while (i + 1 < file.size()) {
+    if (file[i] != 0xff) return fail_read(error, "JPEG marker was not FF");
+    while (i < file.size() && file[i] == 0xff) ++i;
+    if (i >= file.size()) break;
+    const uint8_t marker = file[i++];
+    if (marker == 0xd9 || marker == 0xda) break;
+    if (marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (i + 2 > file.size()) return fail_read(error, "JPEG marker length is truncated");
+    const uint16_t seglen = read_be16(file.data() + i);
+    if (seglen < 2 || i + seglen > file.size()) return fail_read(error, "JPEG marker is past the end of the file");
+    if (marker == 0xe2 && seglen >= 16 && std::memcmp(file.data() + i + 2, "ICC_PROFILE", 12) == 0) {
+      const uint8_t* p = file.data() + i + 2;
+      const int seq = p[12];
+      const int count = p[13];
+      if (seq < 1 || count < 1 || seq > count) return fail_read(error, "JPEG ICC chunk sequence is invalid");
+      if (total < 0) total = count;
+      if (count != total) return fail_read(error, "JPEG ICC chunks disagree on the chunk count");
+      chunks.push_back(Chunk{seq, std::vector<uint8_t>(p + 14, file.data() + i + seglen)});
+    }
+    i += seglen;
+  }
+  if (chunks.empty() || static_cast<int>(chunks.size()) != total) {
+    return fail_read(error, "JPEG has no complete ICC_PROFILE sequence");
+  }
+  std::sort(chunks.begin(), chunks.end(), [](const Chunk& a, const Chunk& b) { return a.seq < b.seq; });
+  icc->clear();
+  for (int seq = 1; seq <= total; ++seq) {
+    const Chunk& c = chunks[static_cast<size_t>(seq - 1)];
+    if (c.seq != seq) return fail_read(error, "JPEG ICC chunk sequence has a gap");
+    icc->insert(icc->end(), c.data.begin(), c.data.end());
+  }
+  if (icc->size() < 128) return fail_read(error, "JPEG ICC profile is shorter than an ICC header");
   return true;
 }
 
@@ -385,6 +552,65 @@ bool validate_linear_rec2020_icc(const std::vector<uint8_t>& icc, std::string* e
 
 bool validate_display_p3_icc(const std::vector<uint8_t>& icc, std::string* error) {
   return validate_profile(icc, "Display P3", false, kDisplayP3ToXyzD65, error);
+}
+
+IccClass classify_icc(const std::vector<uint8_t>& icc) {
+  IccClass out;
+  if (icc.size() < 132 || std::memcmp(icc.data() + 16, "RGB ", 4) != 0 ||
+      std::memcmp(icc.data() + 20, "XYZ ", 4) != 0 || find_tag(icc, 0x41324230u).p) {
+    return out;
+  }
+  float r[3];
+  float g[3];
+  float b[3];
+  if (colorant(icc, 0x7258595Au, r) && colorant(icc, 0x6758595Au, g) && colorant(icc, 0x6258595Au, b)) {
+    const struct {
+      IccPrimaries id;
+      const float* m;
+    } cands[] = {{IccPrimaries::kRec2020, kRec2020ToXyzD65},
+                 {IccPrimaries::kDisplayP3, kDisplayP3ToXyzD65},
+                 {IccPrimaries::kSrgb, kSrgbToXyzD65}};
+    const float* got[3] = {r, g, b};
+    for (const auto& cand : cands) {
+      float m[9];
+      bradford_d65_to_d50(cand.m, m);
+      float worst = 0.0f;
+      for (int ch = 0; ch < 3; ++ch) {
+        for (int row = 0; row < 3; ++row) worst = std::max(worst, std::fabs(got[ch][row] - m[row * 3 + ch]));
+      }
+      if (worst <= 0.005f) {
+        out.primaries = cand.id;
+        break;
+      }
+    }
+  }
+  const IccTransfer tr = classify_trc(find_tag(icc, 0x72545243u));
+  if (tr == classify_trc(find_tag(icc, 0x67545243u)) && tr == classify_trc(find_tag(icc, 0x62545243u))) {
+    out.transfer = tr;
+  }
+  return out;
+}
+
+std::string icc_class_name(const IccClass& c) {
+  const char* p = c.primaries == IccPrimaries::kRec2020     ? "Rec.2020"
+                  : c.primaries == IccPrimaries::kDisplayP3 ? "Display P3"
+                  : c.primaries == IccPrimaries::kSrgb      ? "sRGB"
+                                                            : "unknown primaries";
+  const char* t = c.transfer == IccTransfer::kLinear ? "linear"
+                  : c.transfer == IccTransfer::kSrgb ? "sRGB curve"
+                                                     : "unknown curve";
+  return std::string(p) + " / " + t;
+}
+
+bool read_embedded_icc(const std::string& path, std::vector<uint8_t>* icc, std::string* error) {
+  if (!icc) return fail_read(error, "internal: null ICC output");
+  std::ifstream in = open_input_binary(path);
+  if (!in) return fail_read(error, "could not open " + path);
+  const std::vector<uint8_t> file((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  if (file.size() < 8) return fail_read(error, "file is too small to hold a color profile: " + path);
+  if ((file[0] == 'I' && file[1] == 'I') || (file[0] == 'M' && file[1] == 'M')) return icc_from_tiff(file, icc, error);
+  if (file[0] == 0xff && file[1] == 0xd8) return icc_from_jpeg(file, icc, error);
+  return fail_read(error, "not a TIFF or JPEG: " + path);
 }
 
 }  // namespace uhdr_repack

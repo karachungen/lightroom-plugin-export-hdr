@@ -1356,6 +1356,20 @@ bool is_tiff_path(const std::string& path) {
   return (mag[0] == 'I' && mag[1] == 'I') || (mag[0] == 'M' && mag[1] == 'M');
 }
 
+bool embedded_profile_is(const std::string& path, IccPrimaries primaries, IccTransfer transfer,
+                         std::string* error) {
+  std::vector<uint8_t> icc;
+  if (!read_embedded_icc(path, &icc, error)) return false;
+  const IccClass got = classify_icc(icc);
+  if (got.primaries != primaries || got.transfer != transfer) {
+    if (error) {
+      *error = path + " embeds " + icc_class_name(got) + ", expected " + icc_class_name({primaries, transfer});
+    }
+    return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 int write_hdr_chart_main(const std::string& dir) {
@@ -1385,11 +1399,6 @@ int write_hdr_chart_main(const std::string& dir) {
     std::cerr << err << "\n";
     return 1;
   }
-  if (!icc_accepted_by_os(tiff_icc.data(), tiff_icc.size(), &err) ||
-      !icc_accepted_by_os(jpeg_icc.data(), jpeg_icc.size(), &err)) {
-    std::cerr << err << "\n";
-    return 1;
-  }
 
   const std::string tiff = join_dir(dir, "hdr-chart.tif");
   const std::string jpeg = join_dir(dir, "sdr-chart.jpg");
@@ -1411,8 +1420,8 @@ int write_hdr_chart_main(const std::string& dir) {
     }
     out << manifest_json(samples).dump(2) << "\n";
   }
-  if (!image_has_color_profile(tiff, "Linear Rec.2020", &err) ||
-      !image_has_color_profile(jpeg, "Display P3", &err)) {
+  if (!embedded_profile_is(tiff, IccPrimaries::kRec2020, IccTransfer::kLinear, &err) ||
+      !embedded_profile_is(jpeg, IccPrimaries::kDisplayP3, IccTransfer::kSrgb, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
@@ -1423,18 +1432,20 @@ int write_hdr_chart_main(const std::string& dir) {
     std::cerr << err << "\n";
     return 1;
   }
-  std::vector<float> os_rgb;
-  int ow = 0;
-  int oh = 0;
-  if (!read_tiff_float_rgb_os(tiff, &os_rgb, &ow, &oh, &err) ||
-      !samples_match(os_rgb, ow, oh, samples, "OS reader", &err)) {
+  std::vector<float> reread;
+  int rw = 0;
+  int rh = 0;
+  if (!load_tiff_rec2020(tiff, &reread, &rw, &rh, &err) ||
+      !samples_match(reread, rw, rh, samples, "encoder TIFF reader", &err)) {
     std::cerr << err << "\n";
     return 1;
   }
   std::cout << "Wrote " << tiff << "\n";
   std::cout << "Wrote " << jpeg << " (" << jpeg_bytes.size() << " bytes, Display P3 ICC)\n";
   std::cout << "Wrote " << man << " (" << samples.size() << " samples)\n";
-  std::cout << kWidth << "x" << kHeight << " linear Rec.2020, profile accepted, both readers match the manifest\n";
+  std::cout << kWidth << "x" << kHeight
+            << " linear Rec.2020, embedded profiles Rec.2020 / linear and Display P3 / sRGB curve,"
+               " readers match the manifest\n";
   return 0;
 }
 

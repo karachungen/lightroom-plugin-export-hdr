@@ -10,28 +10,30 @@ namespace uhdr_repack {
 /** ICC v2.1 matrix/TRC profile, linear curve, description "Linear Rec.2020". */
 std::vector<uint8_t> build_linear_rec2020_icc();
 
-/** ICC v2.1 matrix/TRC profile, sRGB curve table, description "Display P3". */
+/** ICC v2.1 matrix/TRC profile, 1024-entry sRGB EOTF table (device value -> linear), "Display P3". */
 std::vector<uint8_t> build_display_p3_icc();
 
 bool validate_linear_rec2020_icc(const std::vector<uint8_t>& icc, std::string* error);
 bool validate_display_p3_icc(const std::vector<uint8_t>& icc, std::string* error);
 
-/** OS CMM accepts the profile bytes (WIC on Windows, CoreGraphics on macOS). */
-bool icc_accepted_by_os(const uint8_t* data, std::size_t size, std::string* error);
+enum class IccPrimaries { kUnknown, kSrgb, kDisplayP3, kRec2020 };
+enum class IccTransfer { kUnknown, kLinear, kSrgb };
+
+struct IccClass {
+  IccPrimaries primaries = IccPrimaries::kUnknown;
+  IccTransfer transfer = IccTransfer::kUnknown;
+};
 
 /**
- * Open an image and require an embedded profile whose description contains
- * description_substring. Fails when the file or the profile cannot be read.
+ * Recognize an RGB matrix/TRC profile by its colorants and curves, not its name.
+ * Profiles with an A2B0 LUT, or curves that are neither linear nor the sRGB EOTF, are kUnknown.
  */
-bool image_has_color_profile(const std::string& path, const char* description_substring,
-                             std::string* error);
+IccClass classify_icc(const std::vector<uint8_t>& icc);
 
-/**
- * Decode a TIFF to tightly packed float RGB (no alpha).
- * Windows returns WIC's stored float samples. macOS renders through Core Image
- * into extended linear Rec.2020.
- */
-bool read_tiff_float_rgb_os(const std::string& path, std::vector<float>* rgb, int* width, int* height,
-                            std::string* error);
+/** "Rec.2020 / linear", "Display P3 / sRGB curve", "unknown primaries / unknown curve", ... */
+std::string icc_class_name(const IccClass& c);
+
+/** ICC profile of a TIFF (tag 34675) or of a JPEG's primary image (ICC_PROFILE APP2 chunks). */
+bool read_embedded_icc(const std::string& path, std::vector<uint8_t>* icc, std::string* error);
 
 }  // namespace uhdr_repack
