@@ -395,12 +395,37 @@ set(UHDR_CHART_DIR "${UHDR_TEST_OUT}/hdr-chart")
 set(UHDR_CHART_HDR "${UHDR_CHART_DIR}/hdr-chart.tif")
 set(UHDR_CHART_SDR "${UHDR_CHART_DIR}/sdr-chart.jpg")
 
+# Windows CI builds shared Qt, then runs ctest in a new shell. PATH from the
+# build step does not carry over, so each test must find Qt6Core.dll itself.
+set(_uhdr_qt_test_env "")
+if(WIN32 AND NOT UHDR_STATIC_QT AND UHDR_ENABLE_GUI AND TARGET Qt6::Core)
+  set(_uhdr_qt_core_dll "")
+  if(CMAKE_BUILD_TYPE)
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _uhdr_qt_cfg)
+    get_target_property(_uhdr_qt_core_dll Qt6::Core "IMPORTED_LOCATION_${_uhdr_qt_cfg}")
+  endif()
+  if(NOT _uhdr_qt_core_dll OR _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+    foreach(_uhdr_qt_cfg IN ITEMS RELWITHDEBINFO RELEASE MINSIZEREL DEBUG)
+      if(NOT _uhdr_qt_core_dll OR _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+        get_target_property(_uhdr_qt_core_dll Qt6::Core "IMPORTED_LOCATION_${_uhdr_qt_cfg}")
+      endif()
+    endforeach()
+  endif()
+  if(_uhdr_qt_core_dll AND NOT _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+    get_filename_component(_uhdr_qt_bin "${_uhdr_qt_core_dll}" DIRECTORY)
+    if(_uhdr_qt_bin)
+      set(_uhdr_qt_test_env
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_uhdr_qt_bin}")
+    endif()
+  endif()
+endif()
+
 add_test(NAME chart.write COMMAND ${UHDR_BIN} --write-hdr-chart "${UHDR_CHART_DIR}")
-set_tests_properties(chart.write PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_SETUP chart)
+set_tests_properties(chart.write PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_SETUP chart ${_uhdr_qt_test_env})
 
 function(uhdr_chart_test name)
   add_test(NAME ${name} COMMAND ${UHDR_BIN} ${ARGN})
-  set_tests_properties(${name} PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_REQUIRED chart)
+  set_tests_properties(${name} PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
 endfunction()
 
 uhdr_chart_test(chart.assets-current --check-hdr-chart-assets "${UHDR_REPO_ROOT}/test/hdr-chart" "${UHDR_CHART_DIR}")
@@ -424,9 +449,9 @@ function(uhdr_smoke_pair name verify_args)
   add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})
   add_test(NAME smoke.${name}.verify COMMAND ${UHDR_BIN} ${verify_args})
   set_tests_properties(smoke.${name}.encode PROPERTIES LABELS smoke TIMEOUT 600
-    FIXTURES_REQUIRED chart FIXTURES_SETUP smoke-${name})
+    FIXTURES_REQUIRED chart FIXTURES_SETUP smoke-${name} ${_uhdr_qt_test_env})
   set_tests_properties(smoke.${name}.verify PROPERTIES LABELS smoke TIMEOUT 600
-    FIXTURES_REQUIRED smoke-${name})
+    FIXTURES_REQUIRED smoke-${name} ${_uhdr_qt_test_env})
 endfunction()
 
 uhdr_smoke_pair(cli.default
@@ -443,7 +468,7 @@ uhdr_smoke_pair(cli.feed-4x5
 
 add_test(NAME smoke.utf8-path COMMAND ${UHDR_BIN} --check-utf8-path
   "${UHDR_CHART_HDR}" "${UHDR_CHART_SDR}" "${UHDR_TEST_OUT}")
-set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart)
+set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
 
 set(UHDR_FEED_HDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.tif")
 set(UHDR_FEED_SDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.jpg")
@@ -455,15 +480,15 @@ add_test(NAME smoke.feed.encode COMMAND ${UHDR_BIN} --encode-or-skip
 add_test(NAME smoke.feed.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/feed-1080.jpg"
   --expect-size 1080x1350 --max-bytes 8388608 --skip-if-missing)
 set_tests_properties(smoke.feed.describe smoke.feed.encode smoke.feed.verify PROPERTIES
-  LABELS smoke TIMEOUT 600 SKIP_RETURN_CODE 77)
-set_tests_properties(smoke.feed.encode PROPERTIES FIXTURES_SETUP smoke-feed)
-set_tests_properties(smoke.feed.verify PROPERTIES FIXTURES_REQUIRED smoke-feed)
+  LABELS smoke TIMEOUT 600 SKIP_RETURN_CODE 77 ${_uhdr_qt_test_env})
+set_tests_properties(smoke.feed.encode PROPERTIES FIXTURES_SETUP smoke-feed ${_uhdr_qt_test_env})
+set_tests_properties(smoke.feed.verify PROPERTIES FIXTURES_REQUIRED smoke-feed ${_uhdr_qt_test_env})
 
 if(UHDR_ENABLE_GUI)
   add_test(NAME smoke.probe-sdr COMMAND ${UHDR_BIN} --probe-sdr "${UHDR_CHART_SDR}")
   add_test(NAME smoke.preview-jpeg COMMAND ${UHDR_BIN} --check-preview-jpeg "${UHDR_CHART_SDR}")
   set_tests_properties(smoke.probe-sdr smoke.preview-jpeg PROPERTIES
-    LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart FAIL_REGULAR_EXPRESSION "Wrong JPEG library version")
+    LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart FAIL_REGULAR_EXPRESSION "Wrong JPEG library version" ${_uhdr_qt_test_env})
 endif()
 
 install(TARGETS uhdr_repack RUNTIME DESTINATION bin)
