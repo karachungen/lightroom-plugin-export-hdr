@@ -3,7 +3,9 @@
 #include "color_primaries.h"
 #include "encode_engine.h"
 #include "half_float.h"
+#include "icc_profile.h"
 #include "path_io.h"
+#include "tiff_float.h"
 #include "tiff_input.h"
 
 #include <ultrahdr_api.h>
@@ -20,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -38,74 +41,341 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr int kPatch = 152;
-constexpr int kGap = 16;
-constexpr int kCols = 6;
-constexpr int kRows = 10;
-constexpr int kLeft = 120;
-constexpr int kTop = 40;
-constexpr int kRight = 328;
-constexpr int kBottom = 36;
-constexpr int kSharpGap = 20;
-constexpr int kSharpH = 160;
-constexpr int kSample = 48;
-constexpr float kLabelLin = 0.25f;
-constexpr float kBgLin = 0.06f;
-constexpr float kStopTol = 0.15f;
-constexpr float kHueTol = 0.05f;
-constexpr float kCeilingBoost = 16.0f;
+constexpr int kWidth = 1440;
+constexpr int kHeight = 1920;
+constexpr int kStripRows = 16;
+constexpr float kBoost = 16.0f;
+constexpr float kEncStop = 0.15f;
+constexpr float kEncHue = 0.05f;
+constexpr float kLrStop = 0.25f;
+constexpr float kLrHue = 0.08f;
+constexpr float kRamp0 = -6.4f;
+constexpr float kRamp1 = 5.4f;
 
-constexpr int kGridW = kCols * kPatch + (kCols - 1) * kGap;
-constexpr int kGridH = kRows * kPatch + (kRows - 1) * kGap;
-constexpr int kWidth = kLeft + kGridW + kRight;
-constexpr int kHeight = kTop + kGridH + kSharpGap + kSharpH + kBottom;
-static_assert(kWidth == 1440 && kHeight == 1920, "chart must be Instagram 3:4 at 1440 wide");
+constexpr int kAX = 80, kAY = 22, kAPatch = 88, kAGap = 6;
+constexpr int kBX = 80, kBY = 128, kBPatch = 80, kBGap = 6;
+constexpr int kCX = 544, kCY = 128, kCPatch = 72, kCGap = 6;
+constexpr int kEX = 1018, kEY = 128, kEPatch = 52, kEGap = 4;
+constexpr int kEGridW = 6 * kEPatch + 5 * kEGap;
+constexpr int kEGridH = 4 * kEPatch + 3 * kEGap;
+constexpr int kEY2 = kEY + kEGridH + 18;
+constexpr int kDX = 544, kDY = 612, kDPatch = 96, kDGap = 8;
+constexpr int kPX = 1176, kPY = 640, kPPatch = 80, kPGap = 10;
+constexpr int kFX = 96, kFW = 1248;
+constexpr int kFRampY = 1180, kFRampH = 110;
+constexpr int kFHue0Y = 1310, kFHueH = 78, kFHue3Y = 1408;
+constexpr int kSharpY = 1520, kSharpH = 210;
+constexpr int kSpecY = 1760, kSpecH = 100;
+
 static_assert(kWidth * 4 == kHeight * 3, "chart must be 3:4");
+static_assert(kHeight % kStripRows == 0, "TIFF strips must cover the height");
+static_assert(kFW % 24 == 0, "hue sweep must be an integer number of bands");
+static_assert(kAX + 14 * kAPatch + 13 * kAGap <= kWidth, "neutral row overflows");
+static_assert(kBY + 12 * kBPatch + 11 * kBGap <= kFRampY, "hue grid overlaps the ramp");
+static_assert(kCX + 6 * kCPatch + 5 * kCGap <= kEX, "gamut grid overlaps ColorChecker");
+static_assert(kEY2 + kEGridH <= kDY, "ColorChecker overlaps saturation");
+static_assert(kDX + 6 * kDPatch + 5 * kDGap <= kPX, "saturation overlaps Rec.2020 peaks");
+static_assert(kPX + kPPatch < kWidth, "Rec.2020 peaks overflow");
+static_assert(kPY + 3 * kPPatch + 2 * kPGap <= kFRampY, "peaks overlap the ramp");
+static_assert(kFX + kFW <= kWidth, "gradients overflow");
+static_assert(kFHue3Y + kFHueH <= kSharpY, "hue sweep overlaps sharpness");
+static_assert(kSharpY + kSharpH <= kSpecY, "sharpness overlaps speculars");
+static_assert(kSpecY + kSpecH <= kHeight, "speculars overflow");
 
-struct RowDef {
-  const char* name;
-  bool p3_safe;
-  LinearRgb unit;
+struct Rect {
+  int x = 0;
+  int y = 0;
+  int w = 0;
+  int h = 0;
 };
 
-LinearRgb unit_max(LinearRgb c) {
-  const float m = std::max(c.r, std::max(c.g, c.b));
-  if (m <= 1e-12f) return {0, 0, 0};
-  return {c.r / m, c.g / m, c.b / m};
-}
+struct ChartSample {
+  std::string id;
+  std::string group;
+  std::string series;
+  int series_index = -1;
+  bool monotonic = false;
+  bool exposure_ref = false;
+  int x = 0;
+  int y = 0;
+  int w = 0;
+  int h = 0;
+  int px = 0;
+  int py = 0;
+  int pw = 0;
+  int ph = 0;
+  LinearRgb expected{};
+  bool gate_encoder = true;
+  bool gate_lightroom = true;
+  char chromatic = 0;
+};
 
-LinearRgb scale_rgb(LinearRgb c, float s) { return {c.r * s, c.g * s, c.b * s}; }
+struct JpegErr {
+  jpeg_error_mgr pub;
+  jmp_buf jump;
+};
+
+void jpeg_fail(j_common_ptr cinfo) { longjmp(reinterpret_cast<JpegErr*>(cinfo->err)->jump, 1); }
 
 float max3(LinearRgb c) { return std::max(c.r, std::max(c.g, c.b)); }
 
-RowDef make_p3_row(const char* name, LinearRgb srgb) {
-  return {name, true, unit_max(linear_srgb_to_rec2020(srgb))};
+LinearRgb scale_rgb(LinearRgb c, float s) { return {c.r * s, c.g * s, c.b * s}; }
+
+LinearRgb unit_max(LinearRgb c) {
+  const float m = max3(c);
+  if (m <= 1e-12f) return {};
+  return scale_rgb(c, 1.0f / m);
 }
 
-const RowDef* rows() {
-  static const RowDef kRowsDef[] = {
-      make_p3_row("NEUTRAL", {1, 1, 1}),
-      make_p3_row("RED", {1, 0, 0}),
-      make_p3_row("GREEN", {0, 1, 0}),
-      make_p3_row("BLUE", {0, 0, 1}),
-      make_p3_row("YELLOW", {1, 1, 0}),
-      make_p3_row("CYAN", {0, 1, 1}),
-      make_p3_row("MAGENTA", {1, 0, 1}),
-      {"R2020", false, {1, 0, 0}},
-      {"G2020", false, {0, 1, 0}},
-      {"B2020", false, {0, 0, 1}},
-  };
-  return kRowsDef;
+bool rect_inside(Rect r) {
+  return r.w > 0 && r.h > 0 && r.x >= 0 && r.y >= 0 && r.x + r.w <= kWidth && r.y + r.h <= kHeight;
 }
 
-int patch_x(int col) { return kLeft + col * (kPatch + kGap); }
-int patch_y(int row) { return kTop + row * (kPatch + kGap); }
-
-LinearRgb expected_hdr(const RowDef& row, int stop) {
-  return scale_rgb(row.unit, std::ldexp(1.0f, stop));
+Rect sample_of(Rect patch) {
+  if (patch.w < 16 || patch.h < 16) return patch;
+  const int mx = std::max(4, patch.w / 4);
+  const int my = std::max(4, patch.h / 4);
+  return {patch.x + mx, patch.y + my, patch.w - 2 * mx, patch.h - 2 * my};
 }
 
-LinearRgb sdr_rec2020(const RowDef& row) { return row.unit; }
+LinearRgb p3_edge(int hue_deg) {
+  float h = std::fmod(static_cast<float>(hue_deg), 360.0f);
+  if (h < 0.0f) h += 360.0f;
+  const float sector = h / 60.0f;
+  int i = static_cast<int>(sector);
+  if (i > 5) i = 5;
+  const float f = sector - static_cast<float>(i);
+  const float q = 1.0f - f;
+  const float t = f;
+  LinearRgb p3{};
+  switch (i) {
+    case 0: p3 = {1, t, 0}; break;
+    case 1: p3 = {q, 1, 0}; break;
+    case 2: p3 = {0, 1, t}; break;
+    case 3: p3 = {0, q, 1}; break;
+    case 4: p3 = {t, 0, 1}; break;
+    default: p3 = {1, 0, q}; break;
+  }
+  return unit_max(display_p3_to_rec2020(p3));
+}
+
+LinearRgb gamut_unit(int gamut, int index) {
+  static const LinearRgb kNative[6] = {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}, {1, 0, 1}};
+  LinearRgb rec = kNative[index];
+  if (gamut == 0) rec = linear_srgb_to_rec2020(rec);
+  else if (gamut == 1) rec = display_p3_to_rec2020(rec);
+  return unit_max(rec);
+}
+
+LinearRgb at_stop(LinearRgb unit, int stop) { return scale_rgb(unit, std::ldexp(1.0f, stop)); }
+
+const int kCc[24][3] = {
+    {115, 82, 68},  {194, 150, 130}, {98, 122, 157}, {87, 108, 67},  {133, 128, 177}, {103, 189, 170},
+    {214, 126, 44}, {80, 91, 166},   {193, 90, 99},  {94, 60, 108},  {157, 188, 64},  {224, 163, 46},
+    {56, 61, 150},  {70, 148, 73},   {175, 54, 60},  {231, 199, 31}, {187, 86, 149},  {8, 133, 161},
+    {243, 243, 242},{200, 200, 200}, {160, 160, 160},{122, 122, 121},{85, 85, 85},    {52, 52, 52},
+};
+
+LinearRgb colorchecker(int index, int stop) {
+  const LinearRgb lin{srgb_eotf(kCc[index][0] / 255.0f), srgb_eotf(kCc[index][1] / 255.0f),
+                      srgb_eotf(kCc[index][2] / 255.0f)};
+  return at_stop(linear_srgb_to_rec2020(lin), stop);
+}
+
+LinearRgb ramp_pixel(int x) {
+  float t = (static_cast<float>(x) + 0.5f - static_cast<float>(kFX)) / static_cast<float>(kFW);
+  t = std::clamp(t, 0.0f, 1.0f);
+  const float stop = kRamp0 + t * (kRamp1 - kRamp0);
+  const float v = std::exp2(stop);
+  return {v, v, v};
+}
+
+LinearRgb mean_ramp(Rect r) {
+  LinearRgb acc{};
+  int n = 0;
+  for (int y = r.y; y < r.y + r.h; ++y) {
+    for (int x = r.x; x < r.x + r.w; ++x) {
+      const LinearRgb c = ramp_pixel(x);
+      acc.r += c.r;
+      acc.g += c.g;
+      acc.b += c.b;
+      ++n;
+    }
+  }
+  if (n == 0) return {};
+  return scale_rgb(acc, 1.0f / static_cast<float>(n));
+}
+
+std::string stop_tag(int stop) {
+  char buf[8];
+  std::snprintf(buf, sizeof(buf), "%+d", stop);
+  return buf;
+}
+
+void push_flat(std::vector<ChartSample>* out, ChartSample sample, Rect patch) {
+  const Rect s = sample_of(patch);
+  sample.x = s.x;
+  sample.y = s.y;
+  sample.w = s.w;
+  sample.h = s.h;
+  sample.px = patch.x;
+  sample.py = patch.y;
+  sample.pw = patch.w;
+  sample.ph = patch.h;
+  out->push_back(std::move(sample));
+}
+
+void push_window(std::vector<ChartSample>* out, ChartSample sample, Rect window) {
+  sample.x = window.x;
+  sample.y = window.y;
+  sample.w = window.w;
+  sample.h = window.h;
+  out->push_back(std::move(sample));
+}
+
+bool build_samples(std::vector<ChartSample>* out, std::string* error) {
+  const char* hue_labels[] = {"R", "OR", "Y", "YG", "G", "GC", "C", "CB", "B", "BM", "M", "MR"};
+  for (int stop = -8; stop <= 5; ++stop) {
+    ChartSample s;
+    s.id = "neutral/" + stop_tag(stop);
+    s.group = "neutral";
+    s.series = "neutral";
+    s.series_index = stop + 8;
+    s.monotonic = true;
+    s.exposure_ref = stop >= 0 && stop <= 2;
+    s.expected = {std::ldexp(1.0f, stop), std::ldexp(1.0f, stop), std::ldexp(1.0f, stop)};
+    s.gate_encoder = stop < 5;
+    s.gate_lightroom = stop < 5;
+    const int col = stop + 8;
+    push_flat(out, std::move(s), {kAX + col * (kAPatch + kAGap), kAY, kAPatch, kAPatch});
+  }
+
+  for (int row = 0; row < 12; ++row) {
+    const LinearRgb unit = p3_edge(row * 30);
+    for (int col = 0; col < 5; ++col) {
+      ChartSample s;
+      s.id = std::string("hue/") + hue_labels[row] + "/" + stop_tag(col);
+      s.group = "hue";
+      s.expected = at_stop(unit, col);
+      push_flat(out, std::move(s),
+                {kBX + col * (kBPatch + kBGap), kBY + row * (kBPatch + kBGap), kBPatch, kBPatch});
+    }
+  }
+
+  const char* grow[] = {"R", "Y", "G", "C", "B", "M"};
+  const char* gname[] = {"srgb", "p3", "2020"};
+  const int gstops[] = {0, 3};
+  for (int row = 0; row < 6; ++row) {
+    for (int gamut = 0; gamut < 3; ++gamut) {
+      for (int si = 0; si < 2; ++si) {
+        ChartSample s;
+        s.id = std::string("gamut/") + gname[gamut] + "/" + grow[row] + "/" + stop_tag(gstops[si]);
+        s.group = "gamut";
+        s.expected = at_stop(gamut_unit(gamut, row), gstops[si]);
+        const int col = gamut * 2 + si;
+        push_flat(out, std::move(s),
+                  {kCX + col * (kCPatch + kCGap), kCY + row * (kCPatch + kCGap), kCPatch, kCPatch});
+      }
+    }
+  }
+
+  const char* peak_ch[] = {"R", "G", "B"};
+  const int peak_row[] = {0, 2, 4};
+  for (int i = 0; i < 3; ++i) {
+    ChartSample s;
+    s.id = std::string("peak2020/") + peak_ch[i] + "/+4";
+    s.group = "peak2020";
+    s.expected = at_stop(gamut_unit(2, peak_row[i]), 4);
+    s.chromatic = peak_ch[i][0];
+    push_flat(out, std::move(s), {kPX, kPY + i * (kPPatch + kPGap), kPPatch, kPPatch});
+  }
+
+  const int sat_hue[] = {0, 60, 120, 180, 240, 300};
+  const int sat_pct[] = {25, 50, 75, 100};
+  for (int row = 0; row < 6; ++row) {
+    const LinearRgb unit = p3_edge(sat_hue[row]);
+    for (int col = 0; col < 4; ++col) {
+      const float sat = static_cast<float>(sat_pct[col]) / 100.0f;
+      const LinearRgb mixed{sat * unit.r + (1.0f - sat), sat * unit.g + (1.0f - sat),
+                            sat * unit.b + (1.0f - sat)};
+      ChartSample s;
+      s.id = std::string("sat/") + grow[row] + "/" + std::to_string(sat_pct[col]);
+      s.group = "sat";
+      s.expected = at_stop(mixed, 2);
+      push_flat(out, std::move(s),
+                {kDX + col * (kDPatch + kDGap), kDY + row * (kDPatch + kDGap), kDPatch, kDPatch});
+    }
+  }
+
+  for (int grid = 0; grid < 2; ++grid) {
+    const int stop = grid == 0 ? 0 : 2;
+    const int y0 = grid == 0 ? kEY : kEY2;
+    for (int i = 0; i < 24; ++i) {
+      char id[32];
+      std::snprintf(id, sizeof(id), "cc/%02d/%s", i + 1, stop_tag(stop).c_str());
+      ChartSample s;
+      s.id = id;
+      s.group = "cc";
+      s.expected = colorchecker(i, stop);
+      const int col = i % 6;
+      const int row = i / 6;
+      push_flat(out, std::move(s),
+                {kEX + col * (kEPatch + kEGap), y0 + row * (kEPatch + kEGap), kEPatch, kEPatch});
+    }
+  }
+
+  for (int stop = -6; stop <= 5; ++stop) {
+    const float t = (static_cast<float>(stop) - kRamp0) / (kRamp1 - kRamp0);
+    const int cx = static_cast<int>(std::lround(static_cast<float>(kFX) + t * static_cast<float>(kFW) - 0.5f));
+    Rect window{cx - 16, kFRampY + (kFRampH - 32) / 2, 32, 32};
+    ChartSample s;
+    s.id = "grad/neutral/" + stop_tag(stop);
+    s.group = "grad-neutral";
+    s.series = "grad-neutral";
+    s.series_index = stop + 6;
+    s.monotonic = true;
+    s.expected = mean_ramp(window);
+    push_window(out, std::move(s), window);
+  }
+
+  const int band = kFW / 24;
+  for (int pass = 0; pass < 2; ++pass) {
+    const int stop = pass == 0 ? 0 : 3;
+    const int y = pass == 0 ? kFHue0Y : kFHue3Y;
+    const char* group = pass == 0 ? "grad-hue0" : "grad-hue3";
+    for (int i = 0; i < 24; ++i) {
+      const int hue = i * 15;
+      char id[32];
+      std::snprintf(id, sizeof(id), "%s/%03d", group, hue);
+      ChartSample s;
+      s.id = id;
+      s.group = group;
+      s.expected = at_stop(p3_edge(hue), stop);
+      push_flat(out, std::move(s), {kFX + i * band, y, band, kFHueH});
+    }
+  }
+
+  const int spec_size[] = {4, 6, 8};
+  for (int i = 0; i < 3; ++i) {
+    ChartSample s;
+    s.id = "spec/" + std::to_string(spec_size[i]);
+    s.group = "specular";
+    s.expected = at_stop({1, 1, 1}, 4);
+    s.gate_encoder = false;
+    s.gate_lightroom = false;
+    const int x = kFX + 48 + i * 80;
+    const int y = kSpecY + 42;
+    push_flat(out, std::move(s), {x, y, spec_size[i], spec_size[i]});
+  }
+
+  for (const ChartSample& s : *out) {
+    if (!rect_inside({s.x, s.y, s.w, s.h}) || (s.pw > 0 && !rect_inside({s.px, s.py, s.pw, s.ph}))) {
+      if (error) *error = "chart sample is outside the canvas: " + s.id;
+      return false;
+    }
+  }
+  return true;
+}
 
 void put_hdr(std::vector<float>& rgb, int x, int y, LinearRgb c) {
   if (x < 0 || y < 0 || x >= kWidth || y >= kHeight) return;
@@ -115,40 +385,52 @@ void put_hdr(std::vector<float>& rgb, int x, int y, LinearRgb c) {
   rgb[i + 2] = c.b;
 }
 
-LinearRgb rec2020_to_sdr8(LinearRgb rec) {
+LinearRgb sdr_p3(LinearRgb rec) {
+  rec.r = std::max(0.0f, rec.r);
+  rec.g = std::max(0.0f, rec.g);
+  rec.b = std::max(0.0f, rec.b);
+  const float m = max3(rec);
+  if (m > 1.0f) rec = scale_rgb(rec, 1.0f / m);
   LinearRgb p3 = rec2020_to_display_p3(rec);
   p3.r = std::clamp(p3.r, 0.0f, 1.0f);
   p3.g = std::clamp(p3.g, 0.0f, 1.0f);
   p3.b = std::clamp(p3.b, 0.0f, 1.0f);
-  return {srgb_oetf(p3.r), srgb_oetf(p3.g), srgb_oetf(p3.b)};
+  return p3;
 }
 
 void put_sdr(std::vector<uint8_t>& rgba, int x, int y, LinearRgb rec) {
   if (x < 0 || y < 0 || x >= kWidth || y >= kHeight) return;
-  const LinearRgb e = rec2020_to_sdr8(rec);
+  const LinearRgb p3 = sdr_p3(rec);
   const size_t i = (static_cast<size_t>(y) * kWidth + static_cast<size_t>(x)) * 4u;
-  rgba[i] = static_cast<uint8_t>(std::lround(e.r * 255.0f));
-  rgba[i + 1] = static_cast<uint8_t>(std::lround(e.g * 255.0f));
-  rgba[i + 2] = static_cast<uint8_t>(std::lround(e.b * 255.0f));
+  rgba[i] = static_cast<uint8_t>(std::lround(srgb_oetf(p3.r) * 255.0f));
+  rgba[i + 1] = static_cast<uint8_t>(std::lround(srgb_oetf(p3.g) * 255.0f));
+  rgba[i + 2] = static_cast<uint8_t>(std::lround(srgb_oetf(p3.b) * 255.0f));
   rgba[i + 3] = 255;
 }
 
-void fill_rect_hdr(std::vector<float>& rgb, int x, int y, int w, int h, LinearRgb c) {
+void fill_rect(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h, LinearRgb c) {
   for (int yy = 0; yy < h; ++yy) {
-    for (int xx = 0; xx < w; ++xx) put_hdr(rgb, x + xx, y + yy, c);
+    for (int xx = 0; xx < w; ++xx) {
+      put_hdr(hdr, x + xx, y + yy, c);
+      put_sdr(sdr, x + xx, y + yy, c);
+    }
   }
 }
 
-void fill_rect_sdr(std::vector<uint8_t>& rgba, int x, int y, int w, int h, LinearRgb rec) {
-  for (int yy = 0; yy < h; ++yy) {
-    for (int xx = 0; xx < w; ++xx) put_sdr(rgba, x + xx, y + yy, rec);
+void fill_patch(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h, LinearRgb c) {
+  if (w < 16 || h < 16) {
+    fill_rect(hdr, sdr, x, y, w, h, c);
+    return;
   }
+  const LinearRgb frame{0.22f, 0.22f, 0.22f};
+  fill_rect(hdr, sdr, x, y, w, h, frame);
+  fill_rect(hdr, sdr, x + 2, y + 2, w - 4, h - 4, c);
 }
 
-// 5x7 glyphs, 5 columns, LSB = top row.
 const uint8_t* glyph(char ch) {
   static const uint8_t kEmpty[5] = {0, 0, 0, 0, 0};
   static const uint8_t kPlus[5] = {0x08, 0x08, 0x3E, 0x08, 0x08};
+  static const uint8_t kMinus[5] = {0x00, 0x00, 0x3E, 0x00, 0x00};
   static const uint8_t k0[5] = {0x3E, 0x51, 0x49, 0x45, 0x3E};
   static const uint8_t k1[5] = {0x00, 0x42, 0x7F, 0x40, 0x00};
   static const uint8_t k2[5] = {0x42, 0x61, 0x51, 0x49, 0x46};
@@ -164,92 +446,79 @@ const uint8_t* glyph(char ch) {
   static const uint8_t kC[5] = {0x3E, 0x41, 0x41, 0x41, 0x22};
   static const uint8_t kD[5] = {0x7F, 0x41, 0x41, 0x22, 0x1C};
   static const uint8_t kE[5] = {0x7F, 0x49, 0x49, 0x49, 0x41};
+  static const uint8_t kF[5] = {0x7F, 0x09, 0x09, 0x09, 0x01};
   static const uint8_t kG[5] = {0x3E, 0x41, 0x49, 0x49, 0x7A};
   static const uint8_t kH[5] = {0x7F, 0x08, 0x08, 0x08, 0x7F};
   static const uint8_t kI[5] = {0x00, 0x41, 0x7F, 0x41, 0x00};
+  static const uint8_t kJ[5] = {0x20, 0x40, 0x41, 0x3F, 0x01};
+  static const uint8_t kK[5] = {0x7F, 0x08, 0x14, 0x22, 0x41};
   static const uint8_t kL[5] = {0x7F, 0x40, 0x40, 0x40, 0x40};
   static const uint8_t kM[5] = {0x7F, 0x02, 0x0C, 0x02, 0x7F};
   static const uint8_t kN[5] = {0x7F, 0x04, 0x08, 0x10, 0x7F};
   static const uint8_t kO[5] = {0x3E, 0x41, 0x41, 0x41, 0x3E};
   static const uint8_t kP[5] = {0x7F, 0x09, 0x09, 0x09, 0x06};
+  static const uint8_t kQ[5] = {0x3E, 0x41, 0x51, 0x21, 0x5E};
   static const uint8_t kR[5] = {0x7F, 0x09, 0x19, 0x29, 0x46};
   static const uint8_t kS[5] = {0x26, 0x49, 0x49, 0x49, 0x32};
   static const uint8_t kT[5] = {0x01, 0x01, 0x7F, 0x01, 0x01};
   static const uint8_t kU[5] = {0x3F, 0x40, 0x40, 0x40, 0x3F};
+  static const uint8_t kV[5] = {0x1F, 0x20, 0x40, 0x20, 0x1F};
   static const uint8_t kW[5] = {0x7F, 0x20, 0x18, 0x20, 0x7F};
   static const uint8_t kX[5] = {0x63, 0x14, 0x08, 0x14, 0x63};
   static const uint8_t kY[5] = {0x03, 0x04, 0x78, 0x04, 0x03};
+  static const uint8_t kZ[5] = {0x61, 0x51, 0x49, 0x45, 0x43};
   if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 'a' + 'A');
   switch (ch) {
-    case '+':
-      return kPlus;
-    case '0':
-      return k0;
-    case '1':
-      return k1;
-    case '2':
-      return k2;
-    case '3':
-      return k3;
-    case '4':
-      return k4;
-    case '5':
-      return k5;
-    case '6':
-      return k6;
-    case '7':
-      return k7;
-    case '8':
-      return k8;
-    case '9':
-      return k9;
-    case 'A':
-      return kA;
-    case 'B':
-      return kB;
-    case 'C':
-      return kC;
-    case 'D':
-      return kD;
-    case 'E':
-      return kE;
-    case 'G':
-      return kG;
-    case 'H':
-      return kH;
-    case 'I':
-      return kI;
-    case 'L':
-      return kL;
-    case 'M':
-      return kM;
-    case 'N':
-      return kN;
-    case 'O':
-      return kO;
-    case 'P':
-      return kP;
-    case 'R':
-      return kR;
-    case 'S':
-      return kS;
-    case 'T':
-      return kT;
-    case 'U':
-      return kU;
-    case 'W':
-      return kW;
-    case 'X':
-      return kX;
-    case 'Y':
-      return kY;
-    default:
-      return kEmpty;
+    case '+': return kPlus;
+    case '-': return kMinus;
+    case '0': return k0;
+    case '1': return k1;
+    case '2': return k2;
+    case '3': return k3;
+    case '4': return k4;
+    case '5': return k5;
+    case '6': return k6;
+    case '7': return k7;
+    case '8': return k8;
+    case '9': return k9;
+    case 'A': return kA;
+    case 'B': return kB;
+    case 'C': return kC;
+    case 'D': return kD;
+    case 'E': return kE;
+    case 'F': return kF;
+    case 'G': return kG;
+    case 'H': return kH;
+    case 'I': return kI;
+    case 'J': return kJ;
+    case 'K': return kK;
+    case 'L': return kL;
+    case 'M': return kM;
+    case 'N': return kN;
+    case 'O': return kO;
+    case 'P': return kP;
+    case 'Q': return kQ;
+    case 'R': return kR;
+    case 'S': return kS;
+    case 'T': return kT;
+    case 'U': return kU;
+    case 'V': return kV;
+    case 'W': return kW;
+    case 'X': return kX;
+    case 'Y': return kY;
+    case 'Z': return kZ;
+    default: return kEmpty;
   }
 }
 
+int text_px(const char* text) {
+  int w = 0;
+  for (const char* p = text; *p; ++p) w += (*p == ' ') ? 8 : 12;
+  return w;
+}
+
 void draw_text(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, const char* text) {
-  const LinearRgb ink{kLabelLin, kLabelLin, kLabelLin};
+  const LinearRgb ink{0.72f, 0.72f, 0.72f};
   int cx = x;
   for (const char* p = text; *p; ++p) {
     if (*p == ' ') {
@@ -273,354 +542,309 @@ void draw_text(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y,
   }
 }
 
-void draw_line_pairs(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h,
-                     int period, LinearRgb hi_hdr, LinearRgb hi_sdr) {
-  const LinearRgb black{0, 0, 0};
+void draw_text_centered(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, const char* text) {
+  draw_text(hdr, sdr, x + std::max(0, (w - text_px(text)) / 2), y, text);
+}
+
+void draw_line_pairs(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h, int period,
+                     LinearRgb hi) {
+  const LinearRgb black{};
   const int half = std::max(1, period);
   for (int yy = 0; yy < h; ++yy) {
     for (int xx = 0; xx < w; ++xx) {
       const bool on = ((xx / half) % 2) == 0;
-      const LinearRgb hc = on ? hi_hdr : black;
-      const LinearRgb sc = on ? hi_sdr : black;
-      put_hdr(hdr, x + xx, y + yy, hc);
-      put_sdr(sdr, x + xx, y + yy, sc);
+      put_hdr(hdr, x + xx, y + yy, on ? hi : black);
+      put_sdr(sdr, x + xx, y + yy, on ? hi : black);
     }
   }
 }
 
-void draw_slant(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h,
-                LinearRgb hi_hdr, LinearRgb hi_sdr) {
-  const LinearRgb black{0, 0, 0};
+void draw_slant(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y, int w, int h, LinearRgb hi) {
+  const LinearRgb black{};
   for (int yy = 0; yy < h; ++yy) {
     const int edge = std::clamp(4 + yy / 4, 1, w - 2);
     for (int xx = 0; xx < w; ++xx) {
       const bool on = xx >= edge;
-      put_hdr(hdr, x + xx, y + yy, on ? hi_hdr : black);
-      put_sdr(sdr, x + xx, y + yy, on ? hi_sdr : black);
+      put_hdr(hdr, x + xx, y + yy, on ? hi : black);
+      put_sdr(sdr, x + xx, y + yy, on ? hi : black);
     }
   }
 }
 
-void render_chart(std::vector<float>& hdr, std::vector<uint8_t>& sdr) {
+void draw_labels(std::vector<float>& hdr, std::vector<uint8_t>& sdr) {
+  draw_text(hdr, sdr, 8, 4, "STOPS");
+  for (int stop = -8; stop <= 5; ++stop) {
+    const int col = stop + 8;
+    const int x = kAX + col * (kAPatch + kAGap);
+    draw_text_centered(hdr, sdr, x, 4, kAPatch, stop_tag(stop).c_str());
+  }
+  draw_text(hdr, sdr, 8, kBY - 16, "HUE");
+  for (int col = 0; col < 5; ++col) {
+    draw_text_centered(hdr, sdr, kBX + col * (kBPatch + kBGap), kBY - 16, kBPatch, stop_tag(col).c_str());
+  }
+  const char* hue_labels[] = {"R", "OR", "Y", "YG", "G", "GC", "C", "CB", "B", "BM", "M", "MR"};
+  for (int row = 0; row < 12; ++row) {
+    const int y = kBY + row * (kBPatch + kBGap) + kBPatch / 2 - 7;
+    draw_text(hdr, sdr, 8, y, hue_labels[row]);
+  }
+  draw_text(hdr, sdr, 8, kCY + 4, "GAMUT");
+  const char* glabels[] = {"S+0", "S+3", "P+0", "P+3", "2+0", "2+3"};
+  for (int col = 0; col < 6; ++col) {
+    draw_text_centered(hdr, sdr, kCX + col * (kCPatch + kCGap), kCY - 16, kCPatch, glabels[col]);
+  }
+  const char* grow[] = {"R", "Y", "G", "C", "B", "M"};
+  for (int row = 0; row < 6; ++row) {
+    const int y = kCY + row * (kCPatch + kCGap) + kCPatch / 2 - 7;
+    draw_text(hdr, sdr, kCX - 28, y, grow[row]);
+  }
+  draw_text(hdr, sdr, kEX, kEY - 16, "+0");
+  draw_text(hdr, sdr, kEX, kEY2 - 16, "+2");
+  draw_text(hdr, sdr, 8, kDY + 4, "SAT");
+  const char* slabs[] = {"25", "50", "75", "100"};
+  for (int col = 0; col < 4; ++col) {
+    draw_text_centered(hdr, sdr, kDX + col * (kDPatch + kDGap), kDY - 16, kDPatch, slabs[col]);
+  }
+  for (int row = 0; row < 6; ++row) {
+    const int y = kDY + row * (kDPatch + kDGap) + kDPatch / 2 - 7;
+    draw_text(hdr, sdr, kDX - 28, y, grow[row]);
+  }
+  const char* peaks[] = {"R", "G", "B"};
+  for (int i = 0; i < 3; ++i) {
+    const int y = kPY + i * (kPPatch + kPGap) + kPPatch / 2 - 7;
+    draw_text(hdr, sdr, kPX + kPPatch + 8, y, peaks[i]);
+  }
+  draw_text(hdr, sdr, kPX, kPY - 16, "+4");
+  draw_text(hdr, sdr, 8, kFRampY + 8, "RAMP");
+  draw_text(hdr, sdr, 8, kFHue0Y + 8, "H+0");
+  draw_text(hdr, sdr, 8, kFHue3Y + 8, "H+3");
+  const int panel = kFW / 3;
+  const char* sharp[] = {"+0", "+2", "+4"};
+  for (int p = 0; p < 3; ++p) draw_text(hdr, sdr, kFX + p * panel + 4, kSharpY, sharp[p]);
+  const char* spec[] = {"4", "6", "8"};
+  for (int i = 0; i < 3; ++i) draw_text(hdr, sdr, kFX + 40 + i * 80, kSpecY + 8, spec[i]);
+}
+
+void render_chart(std::vector<float>& hdr, std::vector<uint8_t>& sdr, const std::vector<ChartSample>& samples) {
   hdr.assign(static_cast<size_t>(kWidth) * kHeight * 3u, 0.0f);
   sdr.assign(static_cast<size_t>(kWidth) * kHeight * 4u, 0);
-  const LinearRgb bg{kBgLin, kBgLin, kBgLin};
-  fill_rect_hdr(hdr, 0, 0, kWidth, kHeight, bg);
-  fill_rect_sdr(sdr, 0, 0, kWidth, kHeight, bg);
-
-  const RowDef* rdefs = rows();
-  for (int row = 0; row < kRows; ++row) {
-    for (int col = 0; col < kCols; ++col) {
-      const int x = patch_x(col);
-      const int y = patch_y(row);
-      fill_rect_hdr(hdr, x, y, kPatch, kPatch, expected_hdr(rdefs[row], col));
-      fill_rect_sdr(sdr, x, y, kPatch, kPatch, sdr_rec2020(rdefs[row]));
+  const LinearRgb bg{0.03f, 0.03f, 0.03f};
+  fill_rect(hdr, sdr, 0, 0, kWidth, kHeight, bg);
+  fill_rect(hdr, sdr, kFX, kSpecY, 360, kSpecH, LinearRgb{0.01f, 0.01f, 0.01f});
+  for (const ChartSample& s : samples) {
+    if (s.pw > 0) fill_patch(hdr, sdr, s.px, s.py, s.pw, s.ph, s.expected);
+  }
+  for (int y = 0; y < kFRampH; ++y) {
+    for (int x = 0; x < kFW; ++x) {
+      const LinearRgb c = ramp_pixel(kFX + x);
+      put_hdr(hdr, kFX + x, kFRampY + y, c);
+      put_sdr(sdr, kFX + x, kFRampY + y, c);
     }
-    draw_text(hdr, sdr, 4, patch_y(row) + kPatch / 2 - 7, rdefs[row].name);
   }
-  for (int col = 0; col < kCols; ++col) {
-    const char* labels[] = {"+0", "+1", "+2", "+3", "+4", "+5"};
-    draw_text(hdr, sdr, patch_x(col) + 8, 6, labels[col]);
-  }
-
-  const int sharp_y = kTop + kGridH + kSharpGap;
-  const int panel_w = kGridW / 3;
-  const int stops[3] = {0, 2, 4};
-  const char* panel_names[3] = {"+0", "+2", "+4"};
-  const LinearRgb sdr_white = expected_hdr(rdefs[0], 0);
+  const int panel = kFW / 3;
+  const int stops[] = {0, 2, 4};
   for (int p = 0; p < 3; ++p) {
-    const int px = kLeft + p * panel_w;
-    const LinearRgb hi = expected_hdr(rdefs[0], stops[p]);
-    const int band_w = (panel_w - 16) / 4;
-    const int band_h = kSharpH - 18;
-    const int by = sharp_y + 16;
-    draw_text(hdr, sdr, px, sharp_y, panel_names[p]);
-    draw_line_pairs(hdr, sdr, px + 2, by, band_w, band_h, 1, hi, sdr_white);
-    draw_line_pairs(hdr, sdr, px + 4 + band_w, by, band_w, band_h, 2, hi, sdr_white);
-    draw_line_pairs(hdr, sdr, px + 6 + 2 * band_w, by, band_w, band_h, 4, hi, sdr_white);
-    draw_slant(hdr, sdr, px + 8 + 3 * band_w, by, band_w, band_h, hi, sdr_white);
+    const int px = kFX + p * panel;
+    const LinearRgb hi = at_stop({1, 1, 1}, stops[p]);
+    const int band_w = (panel - 16) / 4;
+    const int by = kSharpY + 20;
+    const int bh = kSharpH - 28;
+    draw_line_pairs(hdr, sdr, px + 2, by, band_w, bh, 1, hi);
+    draw_line_pairs(hdr, sdr, px + 4 + band_w, by, band_w, bh, 2, hi);
+    draw_line_pairs(hdr, sdr, px + 6 + 2 * band_w, by, band_w, bh, 4, hi);
+    draw_slant(hdr, sdr, px + 8 + 3 * band_w, by, band_w, bh, hi);
   }
+  draw_labels(hdr, sdr);
 }
 
-void put_be16(std::vector<uint8_t>& b, uint16_t v) {
-  b.push_back(static_cast<uint8_t>(v >> 8));
-  b.push_back(static_cast<uint8_t>(v));
+nlohmann::json manifest_json(const std::vector<ChartSample>& samples) {
+  nlohmann::json rows = nlohmann::json::array();
+  for (const ChartSample& s : samples) {
+    rows.push_back({{"id", s.id},
+                    {"group", s.group},
+                    {"series", s.series},
+                    {"series_index", s.series_index},
+                    {"monotonic", s.monotonic},
+                    {"exposure_ref", s.exposure_ref},
+                    {"rect", {s.x, s.y, s.w, s.h}},
+                    {"expected_rec2020", {s.expected.r, s.expected.g, s.expected.b}},
+                    {"gate", {{"encoder", s.gate_encoder ? "pass" : "report"},
+                              {"lightroom", s.gate_lightroom ? "pass" : "report"}}},
+                    {"chromatic", s.chromatic ? std::string(1, s.chromatic) : ""}});
+  }
+  return {{"version", 2},
+          {"width", kWidth},
+          {"height", kHeight},
+          {"max_content_boost", kBoost},
+          {"samples", rows}};
 }
 
-void put_be32(std::vector<uint8_t>& b, uint32_t v) {
-  b.push_back(static_cast<uint8_t>(v >> 24));
-  b.push_back(static_cast<uint8_t>(v >> 16));
-  b.push_back(static_cast<uint8_t>(v >> 8));
-  b.push_back(static_cast<uint8_t>(v));
-}
-
-void put_s15(std::vector<uint8_t>& b, float v) {
-  put_be32(b, static_cast<uint32_t>(static_cast<int32_t>(std::lround(v * 65536.0f))));
-}
-
-void put_xyz_d50(std::vector<uint8_t>& b, float x, float y, float z) {
-  const char t[] = {'X', 'Y', 'Z', ' '};
-  b.insert(b.end(), t, t + 4);
-  put_be32(b, 0);
-  put_s15(b, x);
-  put_s15(b, y);
-  put_s15(b, z);
-}
-
-void put_para_srgb(std::vector<uint8_t>& b) {
-  const char t[] = {'p', 'a', 'r', 'a'};
-  b.insert(b.end(), t, t + 4);
-  put_be32(b, 0);
-  put_be16(b, 4);
-  put_be16(b, 0);
-  put_s15(b, 2.4f);
-  put_s15(b, 1.0f / 1.055f);
-  put_s15(b, 0.055f / 1.055f);
-  put_s15(b, 1.0f / 12.92f);
-  put_s15(b, 0.04045f);
-  put_s15(b, 0.0f);
-  put_s15(b, 0.0f);
-}
-
-void put_desc(std::vector<uint8_t>& b, const char* ascii) {
-  const char t[] = {'d', 'e', 's', 'c'};
-  b.insert(b.end(), t, t + 4);
-  put_be32(b, 0);
-  const uint32_t n = static_cast<uint32_t>(std::strlen(ascii) + 1);
-  put_be32(b, n);
-  b.insert(b.end(), ascii, ascii + n);
-  b.insert(b.end(), 67, 0);  // Unicode / script code padding used by v2 desc
-}
-
-void mul3(const float a[9], const float b[9], float o[9]) {
-  for (int r = 0; r < 3; ++r) {
-    for (int c = 0; c < 3; ++c) {
-      o[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+bool load_manifest(const std::string& path, std::vector<ChartSample>* samples, int* width, int* height,
+                   float* boost, std::string* error) {
+  std::ifstream in = open_input_binary(path);
+  if (!in) {
+    if (error) *error = "could not open " + path;
+    return false;
+  }
+  nlohmann::json j;
+  try {
+    in >> j;
+  } catch (const std::exception& ex) {
+    if (error) *error = std::string("chart manifest is not JSON: ") + ex.what();
+    return false;
+  }
+  if (j.value("version", 0) != 2) {
+    if (error) *error = "chart manifest version is not 2; regenerate with --write-hdr-chart";
+    return false;
+  }
+  *width = j.value("width", 0);
+  *height = j.value("height", 0);
+  *boost = j.value("max_content_boost", kBoost);
+  if (*width < 2 || *height < 2 || !j.contains("samples")) {
+    if (error) *error = "chart manifest is missing samples";
+    return false;
+  }
+  samples->clear();
+  for (const auto& row : j["samples"]) {
+    ChartSample s;
+    s.id = row.value("id", "");
+    s.group = row.value("group", "");
+    s.series = row.value("series", "");
+    s.series_index = row.value("series_index", -1);
+    s.monotonic = row.value("monotonic", false);
+    s.exposure_ref = row.value("exposure_ref", false);
+    const auto& rect = row.at("rect");
+    s.x = rect.at(0).get<int>();
+    s.y = rect.at(1).get<int>();
+    s.w = rect.at(2).get<int>();
+    s.h = rect.at(3).get<int>();
+    const auto& exp = row.at("expected_rec2020");
+    s.expected = {exp.at(0).get<float>(), exp.at(1).get<float>(), exp.at(2).get<float>()};
+    const auto& gate = row.at("gate");
+    s.gate_encoder = gate.value("encoder", "pass") == "pass";
+    s.gate_lightroom = gate.value("lightroom", "pass") == "pass";
+    const std::string chromatic = row.value("chromatic", "");
+    s.chromatic = chromatic.empty() ? 0 : chromatic[0];
+    if (s.id.empty() || s.w < 1 || s.h < 1) {
+      if (error) *error = "chart manifest has an empty sample";
+      return false;
     }
+    samples->push_back(std::move(s));
   }
+  return !samples->empty();
 }
 
-std::vector<uint8_t> display_p3_icc() {
-  // Display P3 RGB→XYZ D65, then Bradford to D50 PCS.
-  const float rgb_to_xyz_d65[9] = {0.48657095f, 0.26566769f, 0.19821729f, 0.22897456f, 0.69173852f,
-                                   0.07928691f, 0.00000000f, 0.04511338f, 1.04394437f};
-  const float bradford[9] = {0.8951f, 0.2664f, -0.1614f, -0.7502f, 1.7135f, 0.0367f, 0.0389f,
-                             -0.0685f, 1.0296f};
-  const float bradford_inv[9] = {0.9869929f, -0.1470543f, 0.1599627f, 0.4323053f, 0.5183603f,
-                                 0.0492912f, -0.0085287f, 0.0400428f, 0.9684867f};
-  const float d65[3] = {0.95047f, 1.0f, 1.08883f};
-  const float d50[3] = {0.96422f, 1.0f, 0.82521f};
-  float src_lms[3] = {bradford[0] * d65[0] + bradford[1] * d65[1] + bradford[2] * d65[2],
-                      bradford[3] * d65[0] + bradford[4] * d65[1] + bradford[5] * d65[2],
-                      bradford[6] * d65[0] + bradford[7] * d65[1] + bradford[8] * d65[2]};
-  float dst_lms[3] = {bradford[0] * d50[0] + bradford[1] * d50[1] + bradford[2] * d50[2],
-                      bradford[3] * d50[0] + bradford[4] * d50[1] + bradford[5] * d50[2],
-                      bradford[6] * d50[0] + bradford[7] * d50[1] + bradford[8] * d50[2]};
-  float scale[9] = {dst_lms[0] / src_lms[0], 0, 0, 0, dst_lms[1] / src_lms[1], 0, 0, 0,
-                    dst_lms[2] / src_lms[2]};
-  float tmp[9];
-  float adapt[9];
-  mul3(scale, bradford, tmp);
-  mul3(bradford_inv, tmp, adapt);
-  float m[9];
-  mul3(adapt, rgb_to_xyz_d65, m);
-
-  const char* desc = "Display P3";
-  const char* cprt = "CC0";
-
-  std::vector<uint8_t> rxyz, gxyz, bxyz, wtpt, rtrc, descb, cprtb;
-  put_xyz_d50(rxyz, m[0], m[3], m[6]);
-  put_xyz_d50(gxyz, m[1], m[4], m[7]);
-  put_xyz_d50(bxyz, m[2], m[5], m[8]);
-  put_xyz_d50(wtpt, d50[0], d50[1], d50[2]);
-  put_para_srgb(rtrc);
-  put_desc(descb, desc);
-  put_desc(cprtb, cprt);
-
-  const int ntags = 9;
-  const uint32_t tag_table = 128;
-  const uint32_t data0 = tag_table + 4 + static_cast<uint32_t>(ntags) * 12;
-  struct Tag {
-    uint32_t sig;
-    std::vector<uint8_t>* data;
-  };
-  Tag tags[] = {
-      {0x63707274, &cprtb}, {0x64657363, &descb}, {0x77747074, &wtpt},
-      {0x7258595A, &rxyz},  {0x6758595A, &gxyz},  {0x6258595A, &bxyz},
-      {0x72545243, &rtrc},  {0x67545243, &rtrc},  {0x62545243, &rtrc},
-  };
-  uint32_t off = data0;
-  uint32_t offsets[9];
-  for (int i = 0; i < ntags; ++i) {
-    offsets[i] = off;
-    off += static_cast<uint32_t>(tags[i].data->size());
-    off = (off + 3u) & ~3u;
-  }
-  const uint32_t size = off;
-  std::vector<uint8_t> icc(size, 0);
-  auto w32 = [&](uint32_t at, uint32_t v) {
-    icc[at] = static_cast<uint8_t>(v >> 24);
-    icc[at + 1] = static_cast<uint8_t>(v >> 16);
-    icc[at + 2] = static_cast<uint8_t>(v >> 8);
-    icc[at + 3] = static_cast<uint8_t>(v);
-  };
-  w32(0, size);
-  icc[4] = 'a';
-  icc[5] = 'c';
-  icc[6] = 's';
-  icc[7] = 'p';
-  icc[8] = 'm';
-  icc[9] = 'n';
-  icc[10] = 't';
-  icc[11] = 'r';
-  icc[12] = 'R';
-  icc[13] = 'G';
-  icc[14] = 'B';
-  icc[15] = ' ';
-  icc[16] = 'X';
-  icc[17] = 'Y';
-  icc[18] = 'Z';
-  icc[19] = ' ';
-  icc[36] = 'a';
-  icc[37] = 'c';
-  icc[38] = 's';
-  icc[39] = 'p';
-  w32(68, 0x0000F6D6);
-  w32(72, 0x00010000);
-  w32(76, 0x0000D32D);
-  icc[80] = 'u';
-  icc[81] = 'h';
-  icc[82] = 'd';
-  icc[83] = 'r';
-  w32(128, static_cast<uint32_t>(ntags));
-  for (int i = 0; i < ntags; ++i) {
-    const uint32_t e = 132 + static_cast<uint32_t>(i) * 12;
-    w32(e, tags[i].sig);
-    w32(e + 4, offsets[i]);
-    w32(e + 8, static_cast<uint32_t>(tags[i].data->size()));
-    std::memcpy(icc.data() + offsets[i], tags[i].data->data(), tags[i].data->size());
-  }
-  return icc;
+void put_u16(std::vector<uint8_t>& b, size_t at, uint16_t v) {
+  b[at] = static_cast<uint8_t>(v);
+  b[at + 1] = static_cast<uint8_t>(v >> 8);
 }
 
-void put_curv_linear(std::vector<uint8_t>& b) {
-  const char t[] = {'c', 'u', 'r', 'v'};
-  b.insert(b.end(), t, t + 4);
-  put_be32(b, 0);
-  put_be32(b, 0);
+void put_u32(std::vector<uint8_t>& b, size_t at, uint32_t v) {
+  b[at] = static_cast<uint8_t>(v);
+  b[at + 1] = static_cast<uint8_t>(v >> 8);
+  b[at + 2] = static_cast<uint8_t>(v >> 16);
+  b[at + 3] = static_cast<uint8_t>(v >> 24);
 }
 
-std::vector<uint8_t> linear_rec2020_icc() {
-  const float rgb_to_xyz_d65[9] = {0.63695805f, 0.14461690f, 0.16888098f, 0.26270021f, 0.67799807f,
-                                   0.05930172f, 0.00000000f, 0.02807269f, 1.06098506f};
-  const float bradford[9] = {0.8951f, 0.2664f, -0.1614f, -0.7502f, 1.7135f, 0.0367f, 0.0389f,
-                             -0.0685f, 1.0296f};
-  const float bradford_inv[9] = {0.9869929f, -0.1470543f, 0.1599627f, 0.4323053f, 0.5183603f,
-                                 0.0492912f, -0.0085287f, 0.0400428f, 0.9684867f};
-  const float d65[3] = {0.95047f, 1.0f, 1.08883f};
-  const float d50[3] = {0.96422f, 1.0f, 0.82521f};
-  float src_lms[3] = {bradford[0] * d65[0] + bradford[1] * d65[1] + bradford[2] * d65[2],
-                      bradford[3] * d65[0] + bradford[4] * d65[1] + bradford[5] * d65[2],
-                      bradford[6] * d65[0] + bradford[7] * d65[1] + bradford[8] * d65[2]};
-  float dst_lms[3] = {bradford[0] * d50[0] + bradford[1] * d50[1] + bradford[2] * d50[2],
-                      bradford[3] * d50[0] + bradford[4] * d50[1] + bradford[5] * d50[2],
-                      bradford[6] * d50[0] + bradford[7] * d50[1] + bradford[8] * d50[2]};
-  float scale[9] = {dst_lms[0] / src_lms[0], 0, 0, 0, dst_lms[1] / src_lms[1], 0, 0, 0,
-                    dst_lms[2] / src_lms[2]};
-  float tmp[9];
-  float adapt[9];
-  mul3(scale, bradford, tmp);
-  mul3(bradford_inv, tmp, adapt);
-  float m[9];
-  mul3(adapt, rgb_to_xyz_d65, m);
-
-  const char* desc = "Linear Rec.2020";
-  const char* cprt = "CC0";
-  std::vector<uint8_t> rxyz, gxyz, bxyz, wtpt, rtrc, descb, cprtb;
-  put_xyz_d50(rxyz, m[0], m[3], m[6]);
-  put_xyz_d50(gxyz, m[1], m[4], m[7]);
-  put_xyz_d50(bxyz, m[2], m[5], m[8]);
-  put_xyz_d50(wtpt, d50[0], d50[1], d50[2]);
-  put_curv_linear(rtrc);
-  put_desc(descb, desc);
-  put_desc(cprtb, cprt);
-
-  const int ntags = 9;
-  const uint32_t tag_table = 128;
-  const uint32_t data0 = tag_table + 4 + static_cast<uint32_t>(ntags) * 12;
-  struct Tag {
-    uint32_t sig;
-    std::vector<uint8_t>* data;
-  };
-  Tag tags[] = {
-      {0x63707274, &cprtb}, {0x64657363, &descb}, {0x77747074, &wtpt},
-      {0x7258595A, &rxyz},  {0x6758595A, &gxyz},  {0x6258595A, &bxyz},
-      {0x72545243, &rtrc},  {0x67545243, &rtrc},  {0x62545243, &rtrc},
-  };
-  uint32_t off = data0;
-  uint32_t offsets[9];
-  for (int i = 0; i < ntags; ++i) {
-    offsets[i] = off;
-    off += static_cast<uint32_t>(tags[i].data->size());
-    off = (off + 3u) & ~3u;
+bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, const std::vector<uint8_t>& icc,
+                      std::string* error) {
+  constexpr uint32_t ntags = 17;
+  constexpr uint32_t ifd = 8;
+  constexpr uint32_t after = ifd + 2 + ntags * 12 + 4;
+  uint32_t cursor = (after + 3u) & ~3u;
+  const uint32_t bits_off = cursor;
+  cursor += 8;
+  const uint32_t fmt_off = cursor;
+  cursor += 8;
+  const uint32_t xres_off = cursor;
+  cursor += 8;
+  const uint32_t yres_off = cursor;
+  cursor += 8;
+  const char* software = "uhdr_repack";
+  const uint32_t software_len = static_cast<uint32_t>(std::strlen(software) + 1);
+  const uint32_t soft_off = cursor;
+  cursor += software_len;
+  cursor = (cursor + 3u) & ~3u;
+  const uint32_t nstrips = static_cast<uint32_t>(kHeight / kStripRows);
+  const uint32_t strips_off = cursor;
+  cursor += nstrips * 4u;
+  const uint32_t counts_off = cursor;
+  cursor += nstrips * 4u;
+  const uint32_t icc_off = cursor;
+  cursor += static_cast<uint32_t>(icc.size());
+  cursor = (cursor + 3u) & ~3u;
+  const uint32_t data_off = cursor;
+  const uint32_t strip_bytes = static_cast<uint32_t>(kStripRows) * static_cast<uint32_t>(kWidth) * 12u;
+  const uint32_t nbytes = nstrips * strip_bytes;
+  if (rgb.size() * sizeof(float) < nbytes) {
+    if (error) *error = "internal: HDR buffer does not cover the TIFF";
+    return false;
   }
-  const uint32_t size = off;
-  std::vector<uint8_t> icc(size, 0);
-  auto w32 = [&](uint32_t at, uint32_t v) {
-    icc[at] = static_cast<uint8_t>(v >> 24);
-    icc[at + 1] = static_cast<uint8_t>(v >> 16);
-    icc[at + 2] = static_cast<uint8_t>(v >> 8);
-    icc[at + 3] = static_cast<uint8_t>(v);
+
+  std::vector<uint8_t> file(static_cast<size_t>(data_off) + nbytes, 0);
+  file[0] = 'I';
+  file[1] = 'I';
+  put_u16(file, 2, 42);
+  put_u32(file, 4, ifd);
+  put_u16(file, ifd, static_cast<uint16_t>(ntags));
+  size_t e = ifd + 2;
+  auto entry = [&](uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
+    put_u16(file, e, tag);
+    put_u16(file, e + 2, type);
+    put_u32(file, e + 4, count);
+    put_u32(file, e + 8, value);
+    e += 12;
   };
-  w32(0, size);
-  icc[4] = 'a';
-  icc[5] = 'c';
-  icc[6] = 's';
-  icc[7] = 'p';
-  icc[8] = 'm';
-  icc[9] = 'n';
-  icc[10] = 't';
-  icc[11] = 'r';
-  icc[12] = 'R';
-  icc[13] = 'G';
-  icc[14] = 'B';
-  icc[15] = ' ';
-  icc[16] = 'X';
-  icc[17] = 'Y';
-  icc[18] = 'Z';
-  icc[19] = ' ';
-  icc[36] = 'a';
-  icc[37] = 'c';
-  icc[38] = 's';
-  icc[39] = 'p';
-  w32(68, 0x0000F6D6);
-  w32(72, 0x00010000);
-  w32(76, 0x0000D32D);
-  icc[80] = 'u';
-  icc[81] = 'h';
-  icc[82] = 'd';
-  icc[83] = 'r';
-  w32(128, static_cast<uint32_t>(ntags));
-  for (int i = 0; i < ntags; ++i) {
-    const uint32_t e = 132 + static_cast<uint32_t>(i) * 12;
-    w32(e, tags[i].sig);
-    w32(e + 4, offsets[i]);
-    w32(e + 8, static_cast<uint32_t>(tags[i].data->size()));
-    std::memcpy(icc.data() + offsets[i], tags[i].data->data(), tags[i].data->size());
+  entry(256, 3, 1, static_cast<uint32_t>(kWidth));
+  entry(257, 3, 1, static_cast<uint32_t>(kHeight));
+  entry(258, 3, 3, bits_off);
+  entry(259, 3, 1, 1);
+  entry(262, 3, 1, 2);
+  entry(273, 4, nstrips, strips_off);
+  entry(274, 3, 1, 1);
+  entry(277, 3, 1, 3);
+  entry(278, 3, 1, static_cast<uint32_t>(kStripRows));
+  entry(279, 4, nstrips, counts_off);
+  entry(282, 5, 1, xres_off);
+  entry(283, 5, 1, yres_off);
+  entry(284, 3, 1, 1);
+  entry(296, 3, 1, 2);
+  entry(305, 2, software_len, soft_off);
+  entry(339, 3, 3, fmt_off);
+  entry(34675, 7, static_cast<uint32_t>(icc.size()), icc_off);
+  put_u32(file, e, 0);
+  put_u16(file, bits_off, 32);
+  put_u16(file, bits_off + 2, 32);
+  put_u16(file, bits_off + 4, 32);
+  put_u16(file, fmt_off, 3);
+  put_u16(file, fmt_off + 2, 3);
+  put_u16(file, fmt_off + 4, 3);
+  put_u32(file, xres_off, 72);
+  put_u32(file, xres_off + 4, 1);
+  put_u32(file, yres_off, 72);
+  put_u32(file, yres_off + 4, 1);
+  std::memcpy(file.data() + soft_off, software, software_len);
+  for (uint32_t s = 0; s < nstrips; ++s) {
+    put_u32(file, strips_off + s * 4u, data_off + s * strip_bytes);
+    put_u32(file, counts_off + s * 4u, strip_bytes);
   }
-  return icc;
+  std::memcpy(file.data() + icc_off, icc.data(), icc.size());
+  std::memcpy(file.data() + data_off, rgb.data(), nbytes);
+
+  std::ofstream out = open_output_binary(path);
+  if (!out) {
+    if (error) *error = "could not write " + path;
+    return false;
+  }
+  out.write(reinterpret_cast<const char*>(file.data()), static_cast<std::streamsize>(file.size()));
+  if (!out) {
+    if (error) *error = "could not finish " + path;
+    return false;
+  }
+  return true;
 }
 
-struct JpegErr {
-  jpeg_error_mgr pub;
-  jmp_buf jump;
-};
-
-void jpeg_fail(j_common_ptr cinfo) {
-  longjmp(reinterpret_cast<JpegErr*>(cinfo->err)->jump, 1);
-}
-
-bool encode_p3_jpeg(const uint8_t* rgba, std::vector<uint8_t>* jpeg, std::string* error) {
+bool encode_p3_jpeg(const uint8_t* rgba, const std::vector<uint8_t>& icc, std::vector<uint8_t>* jpeg,
+                    std::string* error) {
   jpeg_compress_struct cinfo{};
   JpegErr jerr{};
   cinfo.err = jpeg_std_error(&jerr.pub);
@@ -630,7 +854,7 @@ bool encode_p3_jpeg(const uint8_t* rgba, std::vector<uint8_t>* jpeg, std::string
   if (setjmp(jerr.jump)) {
     jpeg_destroy_compress(&cinfo);
     if (outbuf) free(outbuf);
-    if (error) *error = "libjpeg failed to compress chart JPEG";
+    if (error) *error = "libjpeg failed to compress the chart JPEG";
     return false;
   }
   jpeg_create_compress(&cinfo);
@@ -642,7 +866,6 @@ bool encode_p3_jpeg(const uint8_t* rgba, std::vector<uint8_t>* jpeg, std::string
   jpeg_set_defaults(&cinfo);
   jpeg_set_quality(&cinfo, 95, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
-  const std::vector<uint8_t> icc = display_p3_icc();
   std::vector<uint8_t> marker;
   const char hdr[] = "ICC_PROFILE";
   marker.insert(marker.end(), hdr, hdr + 12);
@@ -672,86 +895,6 @@ bool encode_p3_jpeg(const uint8_t* rgba, std::vector<uint8_t>* jpeg, std::string
   return true;
 }
 
-void put_u16(std::vector<uint8_t>& b, uint16_t v) {
-  b.push_back(static_cast<uint8_t>(v));
-  b.push_back(static_cast<uint8_t>(v >> 8));
-}
-
-void put_u32(std::vector<uint8_t>& b, uint32_t v) {
-  b.push_back(static_cast<uint8_t>(v));
-  b.push_back(static_cast<uint8_t>(v >> 8));
-  b.push_back(static_cast<uint8_t>(v >> 16));
-  b.push_back(static_cast<uint8_t>(v >> 24));
-}
-
-void ifd_entry(std::vector<uint8_t>& b, uint16_t tag, uint16_t type, uint32_t count, uint32_t value) {
-  put_u16(b, tag);
-  put_u16(b, type);
-  put_u32(b, count);
-  put_u32(b, value);
-}
-
-bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, std::string* error) {
-  const std::vector<uint8_t> icc = linear_rec2020_icc();
-  const uint32_t ntags = 12;
-  const uint32_t ifd = 8;
-  const uint32_t extra = ifd + 2 + ntags * 12 + 4;
-  const uint32_t bits_off = extra;
-  const uint32_t fmt_off = extra + 8;
-  const uint32_t icc_off = extra + 16;
-  const uint32_t data_off = (icc_off + static_cast<uint32_t>(icc.size()) + 1u) & ~1u;
-  const uint32_t nbytes = static_cast<uint32_t>(kWidth) * static_cast<uint32_t>(kHeight) * 12u;
-
-  std::vector<uint8_t> file;
-  file.reserve(data_off + nbytes);
-  file.push_back('I');
-  file.push_back('I');
-  put_u16(file, 42);
-  put_u32(file, ifd);
-  put_u16(file, static_cast<uint16_t>(ntags));
-  ifd_entry(file, 256, 3, 1, static_cast<uint32_t>(kWidth));
-  ifd_entry(file, 257, 3, 1, static_cast<uint32_t>(kHeight));
-  ifd_entry(file, 258, 3, 3, bits_off);
-  ifd_entry(file, 259, 3, 1, 1);
-  ifd_entry(file, 262, 3, 1, 2);
-  ifd_entry(file, 273, 4, 1, data_off);
-  ifd_entry(file, 277, 3, 1, 3);
-  ifd_entry(file, 278, 3, 1, static_cast<uint32_t>(kHeight));
-  ifd_entry(file, 279, 4, 1, nbytes);
-  ifd_entry(file, 284, 3, 1, 1);
-  ifd_entry(file, 339, 3, 3, fmt_off);
-  ifd_entry(file, 34675, 7, static_cast<uint32_t>(icc.size()), icc_off);
-  put_u32(file, 0);
-  put_u16(file, 32);
-  put_u16(file, 32);
-  put_u16(file, 32);
-  put_u16(file, 0);
-  put_u16(file, 3);
-  put_u16(file, 3);
-  put_u16(file, 3);
-  put_u16(file, 0);
-  file.insert(file.end(), icc.begin(), icc.end());
-  if (file.size() > data_off) {
-    if (error) *error = "internal TIFF header size mismatch";
-    return false;
-  }
-  file.resize(data_off, 0);
-  if (file.size() != data_off) {
-    if (error) *error = "internal TIFF header size mismatch";
-    return false;
-  }
-  const uint8_t* raw = reinterpret_cast<const uint8_t*>(rgb.data());
-  file.insert(file.end(), raw, raw + nbytes);
-
-  std::ofstream out = open_output_binary(path);
-  if (!out) {
-    if (error) *error = "could not write " + path;
-    return false;
-  }
-  out.write(reinterpret_cast<const char*>(file.data()), static_cast<std::streamsize>(file.size()));
-  return static_cast<bool>(out);
-}
-
 bool write_bytes(const std::string& path, const std::vector<uint8_t>& bytes, std::string* error) {
   std::ofstream out = open_output_binary(path);
   if (!out) {
@@ -762,67 +905,85 @@ bool write_bytes(const std::string& path, const std::vector<uint8_t>& bytes, std
   return static_cast<bool>(out);
 }
 
-bool verify_tiff_plus4(const std::string& path, std::string* error) {
-  RawImageHolder hdr;
-  if (!load_hdr_tiff_raw(path, &hdr, error)) return false;
-  const uhdr_raw_image_t& r = hdr.ref();
-  if (r.w != static_cast<unsigned>(kWidth) || r.h != static_cast<unsigned>(kHeight) ||
-      !r.planes[UHDR_PLANE_PACKED]) {
-    if (error) *error = "reloaded TIFF size mismatch";
-    return false;
-  }
-  const int col = 4;
-  const int row = 0;
-  const int x = patch_x(col) + kPatch / 2;
-  const int y = patch_y(row) + kPatch / 2;
-  const auto* src = static_cast<const uint16_t*>(r.planes[UHDR_PLANE_PACKED]);
-  const size_t i = (static_cast<size_t>(y) * r.stride[UHDR_PLANE_PACKED] + static_cast<size_t>(x)) * 4u;
-  const float rv = half_to_float(src[i]);
-  const float gv = half_to_float(src[i + 1]);
-  const float bv = half_to_float(src[i + 2]);
-  const float recovered = std::max(rv, std::max(gv, bv));
-  if (std::fabs(recovered - 16.0f) > 0.5f) {
-    if (error) {
-      *error = "reloaded +4 NEUTRAL is " + std::to_string(recovered) + " (expected 16). The TIFF was not read as linear Rec.2020.";
+LinearRgb sample_mean(const std::vector<float>& rgb, int width, int height, int x0, int y0, int rw, int rh) {
+  const int x1 = std::min(width, x0 + rw);
+  const int y1 = std::min(height, y0 + rh);
+  LinearRgb acc{};
+  int n = 0;
+  for (int y = std::max(0, y0); y < y1; ++y) {
+    for (int x = std::max(0, x0); x < x1; ++x) {
+      const size_t i = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 3u;
+      acc.r += rgb[i];
+      acc.g += rgb[i + 1];
+      acc.b += rgb[i + 2];
+      ++n;
     }
-    return false;
   }
+  if (n == 0) return {};
+  return scale_rgb(acc, 1.0f / static_cast<float>(n));
+}
 
-  const int red_row = 7;
-  const int rx = patch_x(col) + kPatch / 2;
-  const int ry = patch_y(red_row) + kPatch / 2;
-  const size_t ri = (static_cast<size_t>(ry) * r.stride[UHDR_PLANE_PACKED] + static_cast<size_t>(rx)) * 4u;
-  const float rr = half_to_float(src[ri]);
-  const float rg = half_to_float(src[ri + 1]);
-  const float rb = half_to_float(src[ri + 2]);
-  if (std::fabs(rr - 16.0f) > 0.5f || std::fabs(rg) > 0.5f || std::fabs(rb) > 0.5f) {
+bool samples_match(const std::vector<float>& rgb, int width, int height, const std::vector<ChartSample>& samples,
+                   const char* reader, std::string* error) {
+  if (width != kWidth || height != kHeight) {
     if (error) {
-      *error = "reloaded +4 R2020 is (" + std::to_string(rr) + ", " + std::to_string(rg) + ", " +
-               std::to_string(rb) + ") expected (16, 0, 0). The TIFF was color-managed away from linear Rec.2020.";
+      *error = std::string(reader) + " size " + std::to_string(width) + "x" + std::to_string(height) +
+               " != chart";
     }
     return false;
+  }
+  for (const ChartSample& s : samples) {
+    const LinearRgb got = sample_mean(rgb, width, height, s.x, s.y, s.w, s.h);
+    for (int c = 0; c < 3; ++c) {
+      const float exp = c == 0 ? s.expected.r : c == 1 ? s.expected.g : s.expected.b;
+      const float g = c == 0 ? got.r : c == 1 ? got.g : got.b;
+      const float limit = 0.01f * std::max(1.0f, std::fabs(exp)) + 0.002f;
+      if (std::fabs(g - exp) > limit) {
+        if (error) {
+          *error = std::string(reader) + " mismatch at " + s.id + " expected (" +
+                   std::to_string(s.expected.r) + ", " + std::to_string(s.expected.g) + ", " +
+                   std::to_string(s.expected.b) + ") got (" + std::to_string(got.r) + ", " +
+                   std::to_string(got.g) + ", " + std::to_string(got.b) + ")";
+        }
+        return false;
+      }
+    }
   }
   return true;
 }
 
-nlohmann::json manifest_json() {
-  nlohmann::json rows_j = nlohmann::json::array();
-  const RowDef* rdefs = rows();
-  for (int row = 0; row < kRows; ++row) {
-    rows_j.push_back({{"name", rdefs[row].name},
-                      {"p3_safe", rdefs[row].p3_safe},
-                      {"x", patch_x(0)},
-                      {"y", patch_y(row)},
-                      {"unit", {rdefs[row].unit.r, rdefs[row].unit.g, rdefs[row].unit.b}}});
+bool half_image_to_rgb(const RawImageHolder& hdr, std::vector<float>* rgb, int* width, int* height,
+                       std::string* error) {
+  const uhdr_raw_image_t& image = hdr.ref();
+  if (!image.planes[UHDR_PLANE_PACKED]) {
+    if (error) *error = "fast TIFF reader returned no pixels";
+    return false;
   }
-  return {{"width", kWidth},
-          {"height", kHeight},
-          {"patch", kPatch},
-          {"gap", kGap},
-          {"sample", kSample},
-          {"stops", {0, 1, 2, 3, 4, 5}},
-          {"max_content_boost", kCeilingBoost},
-          {"rows", rows_j}};
+  *width = static_cast<int>(image.w);
+  *height = static_cast<int>(image.h);
+  rgb->assign(static_cast<size_t>(image.w) * image.h * 3u, 0.0f);
+  const auto* src = static_cast<const uint16_t*>(image.planes[UHDR_PLANE_PACKED]);
+  for (unsigned y = 0; y < image.h; ++y) {
+    for (unsigned x = 0; x < image.w; ++x) {
+      const size_t si = (static_cast<size_t>(y) * image.stride[UHDR_PLANE_PACKED] + x) * 4u;
+      const size_t di = (static_cast<size_t>(y) * image.w + x) * 3u;
+      (*rgb)[di] = half_to_float(src[si]);
+      (*rgb)[di + 1] = half_to_float(src[si + 1]);
+      (*rgb)[di + 2] = half_to_float(src[si + 2]);
+    }
+  }
+  return true;
+}
+
+bool reload_identity(const std::string& path, std::vector<float>* rgb, int* width, int* height, std::string* error) {
+  RawImageHolder hdr;
+  const int identity = load_identity_rec2020_tiff(path, &hdr, error);
+  if (identity < 0) return false;
+  if (identity == 0) {
+    if (error) *error = "TIFF was not read as uncompressed linear Rec.2020";
+    return false;
+  }
+  return half_image_to_rgb(hdr, rgb, width, height, error);
 }
 
 std::string join_dir(const std::string& dir, const char* name) {
@@ -835,8 +996,8 @@ LinearRgb to_rec2020(LinearRgb c, int cg) {
   return linear_srgb_to_rec2020(c);
 }
 
-bool decode_uhdr_linear(const std::string& path, float display_boost, std::vector<float>* rgba,
-                        int* width, int* height, int* cg, std::string* error) {
+bool decode_uhdr_rec2020(const std::string& path, float display_boost, std::vector<float>* rgb, int* width,
+                         int* height, std::string* error) {
   std::ifstream input = open_input_binary(path);
   if (!input) {
     if (error) *error = "could not open " + path;
@@ -888,50 +1049,32 @@ bool decode_uhdr_linear(const std::string& path, float display_boost, std::vecto
   }
   *width = static_cast<int>(image->w);
   *height = static_cast<int>(image->h);
-  *cg = static_cast<int>(image->cg);
-  rgba->assign(static_cast<size_t>(image->w) * image->h * 4u, 0.0f);
+  const int cg = static_cast<int>(image->cg);
+  rgb->assign(static_cast<size_t>(image->w) * image->h * 3u, 0.0f);
   const auto* src = static_cast<const uint16_t*>(image->planes[UHDR_PLANE_PACKED]);
   for (unsigned y = 0; y < image->h; ++y) {
     for (unsigned x = 0; x < image->w; ++x) {
       const size_t si = (static_cast<size_t>(y) * image->stride[UHDR_PLANE_PACKED] + x) * 4u;
-      const size_t di = (static_cast<size_t>(y) * image->w + x) * 4u;
-      (*rgba)[di] = half_to_float(src[si]);
-      (*rgba)[di + 1] = half_to_float(src[si + 1]);
-      (*rgba)[di + 2] = half_to_float(src[si + 2]);
-      (*rgba)[di + 3] = half_to_float(src[si + 3]);
+      const size_t di = (static_cast<size_t>(y) * image->w + x) * 3u;
+      const LinearRgb rec = to_rec2020({half_to_float(src[si]), half_to_float(src[si + 1]), half_to_float(src[si + 2])}, cg);
+      (*rgb)[di] = rec.r;
+      (*rgb)[di + 1] = rec.g;
+      (*rgb)[di + 2] = rec.b;
     }
   }
   uhdr_release_decoder(decoder);
   return true;
 }
 
-LinearRgb sample_mean(const std::vector<float>& rgba, int width, int height, int x0, int y0, int cg) {
-  const int x1 = x0 + kSample;
-  const int y1 = y0 + kSample;
-  LinearRgb acc{};
-  int n = 0;
-  for (int y = y0; y < y1 && y < height; ++y) {
-    for (int x = x0; x < x1 && x < width; ++x) {
-      const size_t i = (static_cast<size_t>(y) * width + static_cast<size_t>(x)) * 4u;
-      const LinearRgb rec = to_rec2020({rgba[i], rgba[i + 1], rgba[i + 2]}, cg);
-      acc.r += rec.r;
-      acc.g += rec.g;
-      acc.b += rec.b;
-      ++n;
-    }
-  }
-  if (n == 0) return {};
-  return {acc.r / n, acc.g / n, acc.b / n};
+bool load_tiff_rec2020(const std::string& path, std::vector<float>* rgb, int* width, int* height,
+                       std::string* error) {
+  RawImageHolder hdr;
+  if (!load_hdr_tiff_raw(path, &hdr, error)) return false;
+  return half_image_to_rgb(hdr, rgb, width, height, error);
 }
 
-float hue_err(LinearRgb a, LinearRgb b) {
-  const LinearRgb na = unit_max(a);
-  const LinearRgb nb = unit_max(b);
-  return std::max(std::fabs(na.r - nb.r), std::max(std::fabs(na.g - nb.g), std::fabs(na.b - nb.b)));
-}
-
-bool decode_jpeg_rgb(const uint8_t* data, unsigned long size, std::vector<uint8_t>* rgb, int* width,
-                     int* height, std::string* error) {
+bool decode_jpeg_rgb(const uint8_t* data, unsigned long size, std::vector<uint8_t>* rgb, int* width, int* height,
+                     std::string* error) {
   jpeg_decompress_struct cinfo{};
   JpegErr jerr{};
   cinfo.err = jpeg_std_error(&jerr.pub);
@@ -963,8 +1106,8 @@ bool decode_jpeg_rgb(const uint8_t* data, unsigned long size, std::vector<uint8_
   return true;
 }
 
-bool r2020_plus4_gain_chromatic(const std::string& path, float* red, float* green, float* blue,
-                                std::string* error) {
+bool gain_rgb(const std::string& path, int chart_w, int chart_h, const ChartSample& sample, float* r, float* g,
+              float* b, std::string* error) {
   std::ifstream input = open_input_binary(path);
   if (!input) {
     if (error) *error = "could not open " + path;
@@ -991,27 +1134,19 @@ bool r2020_plus4_gain_chromatic(const std::string& path, float* red, float* gree
     if (error) *error = "encoded chart has no gain-map image";
     return false;
   }
-  std::vector<uint8_t> rgb;
+  std::vector<uint8_t> map;
   int gw = 0;
   int gh = 0;
-  const bool decoded =
-      decode_jpeg_rgb(static_cast<const uint8_t*>(gain->data), static_cast<unsigned long>(gain->data_sz),
-                      &rgb, &gw, &gh, error);
+  const bool decoded = decode_jpeg_rgb(static_cast<const uint8_t*>(gain->data),
+                                       static_cast<unsigned long>(gain->data_sz), &map, &gw, &gh, error);
   uhdr_release_decoder(decoder);
   if (!decoded) return false;
-  if (gw < 2 || gh < 2) {
-    if (error) *error = "gain map is empty";
-    return false;
-  }
-
-  const int col = 4;
-  const int row = 7;
-  const int sx = patch_x(col) + (kPatch - kSample) / 2;
-  const int sy = patch_y(row) + (kPatch - kSample) / 2;
-  const int x0 = std::clamp(sx * gw / kWidth, 0, gw - 1);
-  const int y0 = std::clamp(sy * gh / kHeight, 0, gh - 1);
-  const int x1 = std::clamp(x0 + std::max(1, kSample * gw / kWidth), x0 + 1, gw);
-  const int y1 = std::clamp(y0 + std::max(1, kSample * gh / kHeight), y0 + 1, gh);
+  const int x0 = std::clamp(static_cast<int>(std::floor(sample.x * static_cast<double>(gw) / chart_w)), 0, gw - 1);
+  const int y0 = std::clamp(static_cast<int>(std::floor(sample.y * static_cast<double>(gh) / chart_h)), 0, gh - 1);
+  const int x1 = std::clamp(static_cast<int>(std::ceil((sample.x + sample.w) * static_cast<double>(gw) / chart_w)),
+                            x0 + 1, gw);
+  const int y1 = std::clamp(static_cast<int>(std::ceil((sample.y + sample.h) * static_cast<double>(gh) / chart_h)),
+                            y0 + 1, gh);
   double ar = 0;
   double ag = 0;
   double ab = 0;
@@ -1019,9 +1154,9 @@ bool r2020_plus4_gain_chromatic(const std::string& path, float* red, float* gree
   for (int y = y0; y < y1; ++y) {
     for (int x = x0; x < x1; ++x) {
       const size_t i = (static_cast<size_t>(y) * static_cast<size_t>(gw) + static_cast<size_t>(x)) * 3u;
-      ar += rgb[i];
-      ag += rgb[i + 1];
-      ab += rgb[i + 2];
+      ar += map[i];
+      ag += map[i + 1];
+      ab += map[i + 2];
       ++n;
     }
   }
@@ -1029,10 +1164,196 @@ bool r2020_plus4_gain_chromatic(const std::string& path, float* red, float* gree
     if (error) *error = "gain map sample was empty";
     return false;
   }
-  *red = static_cast<float>(ar / n / 255.0);
-  *green = static_cast<float>(ag / n / 255.0);
-  *blue = static_cast<float>(ab / n / 255.0);
+  *r = static_cast<float>(ar / n / 255.0);
+  *g = static_cast<float>(ag / n / 255.0);
+  *b = static_cast<float>(ab / n / 255.0);
   return true;
+}
+
+float hue_err(LinearRgb a, LinearRgb b) {
+  const LinearRgb na = unit_max(a);
+  const LinearRgb nb = unit_max(b);
+  return std::max(std::fabs(na.r - nb.r), std::max(std::fabs(na.g - nb.g), std::fabs(na.b - nb.b)));
+}
+
+bool chromatic_pass(char channel, float r, float g, float b) {
+  float dominant = b;
+  float other1 = r;
+  float other2 = g;
+  if (channel == 'R') {
+    dominant = r;
+    other1 = g;
+    other2 = b;
+  } else if (channel == 'G') {
+    dominant = g;
+    other1 = r;
+    other2 = b;
+  }
+  return dominant >= 0.50f && other1 <= 0.10f && other2 <= 0.10f &&
+         (dominant - std::max(other1, other2)) >= 0.50f;
+}
+
+bool aspect_ok(int width, int height, std::string* error) {
+  const double aspect = static_cast<double>(width) / static_cast<double>(height);
+  const double expect = 3.0 / 4.0;
+  if (std::fabs(aspect - expect) / expect > 0.02) {
+    if (error) {
+      *error = "image is " + std::to_string(width) + "x" + std::to_string(height) +
+               ", not 3:4. Export without a crop.";
+    }
+    return false;
+  }
+  return true;
+}
+
+int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb, int width, int height,
+          int chart_w, int chart_h, bool lightroom, const std::string& gain_path, float* exposure_out) {
+  const float stop_tol = lightroom ? kLrStop : kEncStop;
+  const float hue_tol = lightroom ? kLrHue : kEncHue;
+  const double sx = static_cast<double>(width) / static_cast<double>(chart_w);
+  const double sy = static_cast<double>(height) / static_cast<double>(chart_h);
+  struct Row {
+    std::string group;
+    std::string id;
+    float exp_m = 0;
+    float got_m = 0;
+    float d_stop = 0;
+    float d_hue = 0;
+    bool gated = false;
+    bool ok = false;
+    bool monotonic = false;
+    std::string series;
+    int series_index = -1;
+    bool exposure_ref = false;
+  };
+  std::vector<Row> rows;
+  rows.reserve(samples.size());
+  std::vector<std::string> groups;
+  for (const ChartSample& s : samples) {
+    const int x0 = static_cast<int>(std::floor(s.x * sx));
+    const int y0 = static_cast<int>(std::floor(s.y * sy));
+    const int x1 = static_cast<int>(std::ceil((s.x + s.w) * sx));
+    const int y1 = static_cast<int>(std::ceil((s.y + s.h) * sy));
+    const LinearRgb got = sample_mean(rgb, width, height, x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0));
+    const float exp_m = max3(s.expected);
+    const float got_m = max3(got);
+    float d_stop = 99.0f;
+    if (exp_m > 1e-8f && got_m > 1e-8f) d_stop = std::fabs(std::log2(got_m / exp_m));
+    else if (exp_m <= 1e-8f && got_m <= 1e-8f) d_stop = 0.0f;
+    const bool hue_on = exp_m >= 0.01f;
+    const float d_hue = hue_on ? hue_err(s.expected, got) : 0.0f;
+    const bool gated = lightroom ? s.gate_lightroom : s.gate_encoder;
+    const bool ok = d_stop <= stop_tol && (!hue_on || d_hue <= hue_tol);
+    if (std::find(groups.begin(), groups.end(), s.group) == groups.end()) groups.push_back(s.group);
+    rows.push_back({s.group, s.id, exp_m, got_m, d_stop, d_hue, gated, ok, s.monotonic, s.series, s.series_index,
+                    s.exposure_ref});
+  }
+
+  std::printf("%-14s %-18s %10s %10s %7s %7s %s\n", "group", "id", "expected", "recovered", "d_stop", "d_hue",
+              "result");
+  int npass = 0;
+  int nfail = 0;
+  int nreport = 0;
+  for (const Row& row : rows) {
+    const char* result = !row.gated ? "REPORT" : (row.ok ? "PASS" : "FAIL");
+    if (!row.gated) ++nreport;
+    else if (row.ok) ++npass;
+    else ++nfail;
+    std::printf("%-14s %-18s %10.4f %10.4f %7.3f %7.3f %s\n", row.group.c_str(), row.id.c_str(), row.exp_m,
+                row.got_m, row.d_stop, row.d_hue, result);
+  }
+  for (const std::string& group : groups) {
+    int pass = 0;
+    int fail = 0;
+    int report = 0;
+    float worst = -1.0f;
+    std::string worst_id;
+    for (const Row& row : rows) {
+      if (row.group != group) continue;
+      if (!row.gated) ++report;
+      else if (row.ok) ++pass;
+      else ++fail;
+      if (row.d_stop > worst) {
+        worst = row.d_stop;
+        worst_id = row.id;
+      }
+    }
+    std::printf("group %-14s pass=%d fail=%d report=%d worst=%s dstop=%.3f\n", group.c_str(), pass, fail, report,
+                worst_id.c_str(), worst);
+  }
+
+  std::map<std::string, std::vector<size_t>> series;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    if (rows[i].monotonic && !rows[i].series.empty() && rows[i].series_index >= 0) series[rows[i].series].push_back(i);
+  }
+  for (auto& item : series) {
+    auto& idx = item.second;
+    std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) { return rows[a].series_index < rows[b].series_index; });
+    bool ok = true;
+    std::string where;
+    for (size_t i = 1; i < idx.size(); ++i) {
+      const Row& prev = rows[idx[i - 1]];
+      const Row& cur = rows[idx[i]];
+      if (!prev.gated || !cur.gated) continue;
+      if (cur.got_m + 1e-8f < prev.got_m * std::exp2(-0.20f)) {
+        ok = false;
+        where = cur.id;
+        break;
+      }
+    }
+    std::printf("monotonic %s %s\n", item.first.c_str(), ok ? "PASS" : "FAIL");
+    if (!ok) {
+      std::cerr << "monotonic drop at " << where << "\n";
+      ++nfail;
+    }
+  }
+
+  std::vector<float> offsets;
+  for (const Row& row : rows) {
+    if (!row.exposure_ref || row.exp_m <= 1e-8f || row.got_m <= 1e-8f) continue;
+    offsets.push_back(std::log2(row.got_m / row.exp_m));
+  }
+  if (offsets.empty()) {
+    std::printf("exposure_offset_stops n/a\n");
+    if (exposure_out) *exposure_out = 0.0f;
+  } else {
+    std::sort(offsets.begin(), offsets.end());
+    const float med = offsets[offsets.size() / 2];
+    std::printf("exposure_offset_stops %.3f\n", med);
+    if (exposure_out) *exposure_out = med;
+  }
+
+  if (!gain_path.empty()) {
+    for (const ChartSample& s : samples) {
+      if (!s.chromatic) continue;
+      float r = 0;
+      float g = 0;
+      float b = 0;
+      std::string err;
+      const bool read = gain_rgb(gain_path, chart_w, chart_h, s, &r, &g, &b, &err);
+      const bool ok = read && chromatic_pass(s.chromatic, r, g, b);
+      const char* name = s.chromatic == 'R' ? "R2020" : s.chromatic == 'G' ? "G2020" : "B2020";
+      std::printf("%s +4 gain RGB %.3f %.3f %.3f %s\n", name, r, g, b, ok ? "PASS" : "FAIL");
+      if (!ok) {
+        if (!read) std::cerr << err << "\n";
+        else std::cerr << name << " +4 gain map is washed. The named channel must stay well above the others.\n";
+        ++nfail;
+      }
+    }
+  }
+
+  const char* mode = lightroom ? "lightroom" : "encoder";
+  const int gated = npass + nfail;
+  std::printf("HDR_CHART %s %s gated=%d failed=%d\n", mode, nfail ? "FAIL" : "PASS", gated, nfail);
+  std::fflush(stdout);
+  return nfail ? 1 : 0;
+}
+
+bool is_tiff_path(const std::string& path) {
+  std::ifstream in = open_input_binary(path);
+  char mag[4] = {};
+  in.read(mag, 4);
+  return (mag[0] == 'I' && mag[1] == 'I') || (mag[0] == 'M' && mag[1] == 'M');
 }
 
 }  // namespace
@@ -1048,21 +1369,37 @@ int write_hdr_chart_main(const std::string& dir) {
     std::cerr << "could not create " << dir << ": " << ec.message() << "\n";
     return 1;
   }
-
+  std::vector<ChartSample> samples;
+  std::string err;
+  if (!build_samples(&samples, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
   std::vector<float> hdr;
   std::vector<uint8_t> sdr;
-  render_chart(hdr, sdr);
+  render_chart(hdr, sdr, samples);
 
-  std::string err;
+  const std::vector<uint8_t> tiff_icc = build_linear_rec2020_icc();
+  const std::vector<uint8_t> jpeg_icc = build_display_p3_icc();
+  if (!validate_linear_rec2020_icc(tiff_icc, &err) || !validate_display_p3_icc(jpeg_icc, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  if (!icc_accepted_by_os(tiff_icc.data(), tiff_icc.size(), &err) ||
+      !icc_accepted_by_os(jpeg_icc.data(), jpeg_icc.size(), &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+
   const std::string tiff = join_dir(dir, "hdr-chart.tif");
   const std::string jpeg = join_dir(dir, "sdr-chart.jpg");
   const std::string man = join_dir(dir, "chart-manifest.json");
-  if (!write_float_tiff(tiff, hdr, &err)) {
+  if (!write_float_tiff(tiff, hdr, tiff_icc, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
   std::vector<uint8_t> jpeg_bytes;
-  if (!encode_p3_jpeg(sdr.data(), &jpeg_bytes, &err) || !write_bytes(jpeg, jpeg_bytes, &err)) {
+  if (!encode_p3_jpeg(sdr.data(), jpeg_icc, &jpeg_bytes, &err) || !write_bytes(jpeg, jpeg_bytes, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
@@ -1072,17 +1409,32 @@ int write_hdr_chart_main(const std::string& dir) {
       std::cerr << "could not write " << man << "\n";
       return 1;
     }
-    out << manifest_json().dump(2) << "\n";
+    out << manifest_json(samples).dump(2) << "\n";
   }
-  if (!verify_tiff_plus4(tiff, &err)) {
+  if (!image_has_color_profile(tiff, "Linear Rec.2020", &err) ||
+      !image_has_color_profile(jpeg, "Display P3", &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  std::vector<float> fast;
+  int fw = 0;
+  int fh = 0;
+  if (!reload_identity(tiff, &fast, &fw, &fh, &err) || !samples_match(fast, fw, fh, samples, "fast reader", &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  std::vector<float> os_rgb;
+  int ow = 0;
+  int oh = 0;
+  if (!read_tiff_float_rgb_os(tiff, &os_rgb, &ow, &oh, &err) ||
+      !samples_match(os_rgb, ow, oh, samples, "OS reader", &err)) {
     std::cerr << err << "\n";
     return 1;
   }
   std::cout << "Wrote " << tiff << "\n";
   std::cout << "Wrote " << jpeg << " (" << jpeg_bytes.size() << " bytes, Display P3 ICC)\n";
-  std::cout << "Wrote " << man << "\n";
-  std::cout << kWidth << "x" << kHeight
-            << " linear Rec.2020, +4 NEUTRAL reloaded as 16, +4 R2020 reloaded as (16, 0, 0)\n";
+  std::cout << "Wrote " << man << " (" << samples.size() << " samples)\n";
+  std::cout << kWidth << "x" << kHeight << " linear Rec.2020, profile accepted, both readers match the manifest\n";
   return 0;
 }
 
@@ -1093,12 +1445,21 @@ int check_hdr_chart_main(const std::string& dir) {
   }
   const std::string tiff = join_dir(dir, "hdr-chart.tif");
   const std::string jpeg = join_dir(dir, "sdr-chart.jpg");
+  const std::string man = join_dir(dir, "chart-manifest.json");
   const std::string out = join_dir(dir, "chart-uhdr.jpg");
-  if (!fs::exists(path_from_utf8(tiff)) || !fs::exists(path_from_utf8(jpeg))) {
+  if (!fs::exists(path_from_utf8(tiff)) || !fs::exists(path_from_utf8(jpeg)) || !fs::exists(path_from_utf8(man))) {
     std::cerr << "missing chart files; run --write-hdr-chart " << dir << " first\n";
     return 1;
   }
-
+  std::vector<ChartSample> samples;
+  int chart_w = 0;
+  int chart_h = 0;
+  float boost = kBoost;
+  std::string err;
+  if (!load_manifest(man, &samples, &chart_w, &chart_h, &boost, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
   EncodeRequest req;
   req.hdr_tiff = tiff;
   req.base_path = jpeg;
@@ -1107,95 +1468,66 @@ int check_hdr_chart_main(const std::string& dir) {
   req.options.gainmap_quality = 95;
   req.options.gainmap_scale = 1;
   req.options.min_content_boost = 1.0f;
-  req.options.max_content_boost = kCeilingBoost;
+  req.options.max_content_boost = boost;
   req.options.target_display_peak_nits = 3250.0f;
   req.options.monochrome_gainmap = false;
-
-  std::string err;
   const int enc = encode_from_paths(req, &err);
   if (enc != 0) {
     std::cerr << "encode failed: " << err << "\n";
-    return enc;
+    return enc == 0 ? 1 : enc;
   }
-
   std::vector<float> decoded;
   int dw = 0;
   int dh = 0;
-  int cg = 0;
-  if (!decode_uhdr_linear(out, kCeilingBoost, &decoded, &dw, &dh, &cg, &err)) {
+  if (!decode_uhdr_rec2020(out, boost, &decoded, &dw, &dh, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
-  if (dw != kWidth || dh != kHeight) {
-    std::cerr << "decoded size " << dw << "x" << dh << " != chart " << kWidth << "x" << kHeight
-              << "\n";
+  if (!aspect_ok(dw, dh, &err)) {
+    std::cerr << err << "\n";
     return 1;
   }
+  return grade(samples, decoded, dw, dh, chart_w, chart_h, false, out, nullptr);
+}
 
-  const RowDef* rdefs = rows();
-  int failures = 0;
-  std::printf("%-8s %4s %10s %10s %8s %8s %s\n", "row", "stop", "expected", "recovered", "d_stop",
-              "d_hue", "result");
-  for (int row = 0; row < kRows; ++row) {
-    for (int col = 0; col < kCols; ++col) {
-      // Compare to the written HDR. Color map metadata is boost 16 / +4, but
-      // libultrahdr still reconstructs +5 from the gain map in current builds.
-      const LinearRgb want = expected_hdr(rdefs[row], col);
-      const int sx = patch_x(col) + (kPatch - kSample) / 2;
-      const int sy = patch_y(row) + (kPatch - kSample) / 2;
-      const LinearRgb got = sample_mean(decoded, dw, dh, sx, sy, cg);
-      const float exp_m = max3(want);
-      const float got_m = max3(got);
-      float d_stop = 99.0f;
-      if (exp_m > 1e-8f && got_m > 1e-8f) {
-        d_stop = std::fabs(std::log2(got_m / exp_m));
-      } else if (exp_m <= 1e-8f && got_m <= 1e-8f) {
-        d_stop = 0.0f;
-      }
-      const float d_hue = hue_err(want, got);
-      const float ceiling = max3(scale_rgb(rdefs[row].unit, kCeilingBoost));
-      const bool collapsed = got_m < 0.01f * ceiling;
-      const bool stop_ok = d_stop <= kStopTol;
-      const bool hue_ok = d_hue <= kHueTol;
-      const char* result = "REPORT";
-      if (rdefs[row].p3_safe) {
-        const bool ok = stop_ok && hue_ok;
-        result = ok ? "PASS" : "FAIL";
-        if (!ok) ++failures;
-      } else if (collapsed) {
-        result = "FAIL";
-        ++failures;
-      }
-      std::printf("%-8s %+4d %10.4f %10.4f %8.3f %8.3f %s\n", rdefs[row].name, col, exp_m, got_m,
-                  d_stop, d_hue, result);
+int check_hdr_chart_file_main(const std::string& path, const std::string& manifest_path) {
+  if (path.empty()) {
+    std::cerr << "--check-hdr-chart-file requires an image path\n";
+    return 1;
+  }
+  std::string manifest = manifest_path;
+  if (manifest.empty()) manifest = (path_from_utf8(path).parent_path() / "chart-manifest.json").u8string();
+  if (!fs::exists(path_from_utf8(manifest))) {
+    std::cerr << "chart manifest not found: " << manifest << "\nPass --manifest test/hdr-chart/chart-manifest.json\n";
+    return 1;
+  }
+  std::vector<ChartSample> samples;
+  int chart_w = 0;
+  int chart_h = 0;
+  float boost = kBoost;
+  std::string err;
+  if (!load_manifest(manifest, &samples, &chart_w, &chart_h, &boost, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  std::vector<float> rgb;
+  int w = 0;
+  int h = 0;
+  const bool tiff = is_tiff_path(path);
+  if (tiff) {
+    if (!load_tiff_rec2020(path, &rgb, &w, &h, &err)) {
+      std::cerr << err << "\n";
+      return 1;
     }
-  }
-  std::fflush(stdout);
-
-  float gain_r = 0;
-  float gain_g = 0;
-  float gain_b = 0;
-  if (!r2020_plus4_gain_chromatic(out, &gain_r, &gain_g, &gain_b, &err)) {
+  } else if (!decode_uhdr_rec2020(path, boost, &rgb, &w, &h, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
-  // Code 1 is the map's own peak (here past +4, because +5 is in the chart). A washed
-  // map boosts every channel together; a chromatic map leaves green near zero.
-  const bool chromatic = gain_r >= 0.50f && gain_g <= 0.10f && (gain_r - gain_g) >= 0.50f;
-  std::printf("R2020 +4 gain RGB %.3f %.3f %.3f %s\n", gain_r, gain_g, gain_b,
-              chromatic ? "PASS" : "FAIL");
-  if (!chromatic) {
-    std::cerr << "R2020 +4 gain map is gray (washed). Red must stay well above green, and green near none.\n";
-    ++failures;
-  }
-
-  if (failures) {
-    std::cerr << failures << " gated patch(es) failed\n";
+  if (!aspect_ok(w, h, &err)) {
+    std::cerr << err << "\n";
     return 1;
   }
-  std::cout << "All gated P3-safe patches recovered within " << kStopTol << " stop and " << kHueTol
-            << " hue. R2020 +4 gain stayed chromatic.\n";
-  return 0;
+  return grade(samples, rgb, w, h, chart_w, chart_h, true, "", nullptr);
 }
 
 }  // namespace uhdr_repack

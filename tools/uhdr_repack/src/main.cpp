@@ -66,6 +66,25 @@ static int run(int argc, char** argv) {
     return check_hdr_chart_main(argv[2]);
   }
 
+  if (std::strcmp(argv[1], "--check-hdr-chart-file") == 0) {
+    if (argc < 3) {
+      std::cerr << "--check-hdr-chart-file requires an image path\n";
+      print_usage();
+      return 1;
+    }
+    std::string manifest;
+    for (int i = 3; i < argc; ++i) {
+      if (std::strcmp(argv[i], "--manifest") == 0 && i + 1 < argc) {
+        manifest = argv[++i];
+      } else {
+        std::cerr << "unknown --check-hdr-chart-file argument: " << argv[i] << "\n";
+        print_usage();
+        return 1;
+      }
+    }
+    return check_hdr_chart_file_main(argv[2], manifest);
+  }
+
   if (std::strcmp(argv[1], "--dump-gainmap") == 0) {
     return cli_dump_gainmap_main(argc, argv);
   }

@@ -126,6 +126,7 @@ set(_UHDR_CORE_SOURCES
   src/verify.cpp
   src/half_float.cpp
   src/tiff_float.cpp
+  src/icc_profile.cpp
   src/hdr_chart.cpp
   src/yuv_convert.cpp
 )
@@ -146,12 +147,14 @@ set(_UHDR_GUI_SOURCES
 
 if(APPLE)
   list(APPEND _UHDR_CORE_SOURCES
+    src/icc_os_mac.mm
     src/gainmap_compute.mm
     src/tiff_input.mm
     src/sdr_input.mm
   )
 elseif(WIN32)
   list(APPEND _UHDR_CORE_SOURCES
+    src/icc_os_win.cpp
     src/gainmap_compute_win.cpp
     src/tiff_input_win.cpp
     src/sdr_input_win.cpp

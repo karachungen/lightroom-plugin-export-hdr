@@ -1,128 +1,5960 @@
 {
-  "gap": 16,
   "height": 1920,
   "max_content_boost": 16.0,
-  "patch": 152,
-  "rows": [
+  "samples": [
     {
-      "name": "NEUTRAL",
-      "p3_safe": true,
-      "unit": [
-        0.9999009370803833,
-        1.0,
-        0.9998999834060669
+      "chromatic": "",
+      "expected_rec2020": [
+        0.00390625,
+        0.00390625,
+        0.00390625
       ],
-      "x": 120,
-      "y": 40
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-8",
+      "monotonic": true,
+      "rect": [
+        102,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 0
     },
     {
-      "name": "RED",
-      "p3_safe": true,
-      "unit": [
-        1.0,
-        0.1106097623705864,
-        0.026125112548470497
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0078125,
+        0.0078125,
+        0.0078125
       ],
-      "x": 120,
-      "y": 208
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-7",
+      "monotonic": true,
+      "rect": [
+        196,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 1
     },
     {
-      "name": "GREEN",
-      "p3_safe": true,
-      "unit": [
-        0.35809534788131714,
-        1.0,
-        0.09571416676044464
+      "chromatic": "",
+      "expected_rec2020": [
+        0.015625,
+        0.015625,
+        0.015625
       ],
-      "x": 120,
-      "y": 376
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-6",
+      "monotonic": true,
+      "rect": [
+        290,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 2
     },
     {
-      "name": "BLUE",
-      "p3_safe": true,
-      "unit": [
-        0.048362262547016144,
-        0.01246322225779295,
+      "chromatic": "",
+      "expected_rec2020": [
+        0.03125,
+        0.03125,
+        0.03125
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-5",
+      "monotonic": true,
+      "rect": [
+        384,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 3
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0625,
+        0.0625,
+        0.0625
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-4",
+      "monotonic": true,
+      "rect": [
+        478,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 4
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.125,
+        0.125,
+        0.125
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-3",
+      "monotonic": true,
+      "rect": [
+        572,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 5
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-2",
+      "monotonic": true,
+      "rect": [
+        666,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 6
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/-1",
+      "monotonic": true,
+      "rect": [
+        760,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 7
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        1.0,
         1.0
       ],
-      "x": 120,
-      "y": 544
+      "exposure_ref": true,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/+0",
+      "monotonic": true,
+      "rect": [
+        854,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 8
     },
     {
-      "name": "YELLOW",
-      "p3_safe": true,
-      "unit": [
+      "chromatic": "",
+      "expected_rec2020": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "exposure_ref": true,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/+1",
+      "monotonic": true,
+      "rect": [
+        948,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 9
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "exposure_ref": true,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/+2",
+      "monotonic": true,
+      "rect": [
+        1042,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 10
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/+3",
+      "monotonic": true,
+      "rect": [
+        1136,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 11
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "neutral",
+      "id": "neutral/+4",
+      "monotonic": true,
+      "rect": [
+        1230,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 12
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        32.0,
+        32.0,
+        32.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "report",
+        "lightroom": "report"
+      },
+      "group": "neutral",
+      "id": "neutral/+5",
+      "monotonic": true,
+      "rect": [
+        1324,
+        44,
+        44,
+        44
+      ],
+      "series": "neutral",
+      "series_index": 13
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.061173856258392334,
+        -0.001606810837984085
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        148,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.0,
+        0.12234771251678467,
+        -0.00321362167596817
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        148,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        0.24469542503356934,
+        -0.00642724335193634
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        148,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.48939085006713867,
+        -0.01285448670387268
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        148,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        0.9787817001342773,
+        -0.02570897340774536
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        148,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.6059761643409729,
+        0.00889606587588787
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        234,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.0,
+        1.2119523286819458,
+        0.01779213175177574
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        234,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        2.4239046573638916,
+        0.03558426350355148
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        234,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        4.847809314727783,
+        0.07116852700710297
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        234,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        9.695618629455566,
+        0.14233705401420593
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        234,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9641544818878174,
+        1.0,
+        0.016592061147093773
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        320,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9283089637756348,
+        2.0,
+        0.033184122294187546
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        320,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.8566179275512695,
+        4.0,
+        0.06636824458837509
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        320,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        7.713235855102539,
+        8.0,
+        0.13273648917675018
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        320,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        15.426471710205078,
+        16.0,
+        0.26547297835350037
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        320,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.59652179479599,
+        0.9999999403953552,
+        0.017616329714655876
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        406,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.19304358959198,
+        1.9999998807907104,
+        0.03523265942931175
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        406,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.38608717918396,
+        3.999999761581421,
+        0.0704653188586235
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        406,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.77217435836792,
+        7.999999523162842,
+        0.140930637717247
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        406,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        9.54434871673584,
+        15.999999046325684,
+        0.281861275434494
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        406,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2108868509531021,
+        1.0,
+        0.018690766766667366
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        492,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.4217737019062042,
+        2.0,
+        0.03738153353333473
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        492,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.8435474038124084,
+        4.0,
+        0.07476306706666946
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        492,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.687094807624817,
+        8.0,
+        0.14952613413333893
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        492,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.374189615249634,
+        16.0,
+        0.29905226826667786
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        492,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.23461638391017914,
+        1.0,
+        0.537430465221405
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        578,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.4692327678203583,
+        2.0,
+        1.07486093044281
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        578,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9384655356407166,
+        4.0,
+        2.14972186088562
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        578,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.876931071281433,
+        8.0,
+        4.29944372177124
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        578,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.753862142562866,
+        16.0,
+        8.59888744354248
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        578,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24586942791938782,
+        0.9528310298919678,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        664,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.49173885583877563,
+        1.9056620597839355,
+        2.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        664,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9834777116775513,
+        3.811324119567871,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        664,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9669554233551025,
+        7.622648239135742,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        664,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.933910846710205,
+        15.245296478271484,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        664,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.1479915976524353,
+        0.48681673407554626,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2959831953048706,
+        0.9736334681510925,
+        2.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5919663906097412,
+        1.947266936302185,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.1839327812194824,
+        3.89453387260437,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.367865562438965,
+        7.78906774520874,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.048362258821725845,
+        0.012463221326470375,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        836,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.09672451764345169,
+        0.02492644265294075,
+        1.9999998807907104
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        836,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.19344903528690338,
+        0.0498528853058815,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        836,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.38689807057380676,
+        0.099705770611763,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        836,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.7737961411476135,
+        0.199411541223526,
+        15.999999046325684
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        836,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.43182575702667236,
+        0.03592702001333237,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        922,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.8636515140533447,
+        0.07185404002666473,
+        1.9999998807907104
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        922,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.7273030281066895,
+        0.14370808005332947,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        922,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.454606056213379,
+        0.28741616010665894,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        922,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        6.909212112426758,
+        0.5748323202133179,
+        15.999999046325684
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        922,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.815761923789978,
+        0.05941973999142647,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        1008,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.631523847579956,
+        0.11883947998285294,
+        1.9999998807907104
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        1008,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.263047695159912,
+        0.23767895996570587,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        1008,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        6.526095390319824,
+        0.47535791993141174,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        1008,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        13.052190780639648,
+        0.9507158398628235,
+        15.999999046325684
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        1008,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.06718511134386063,
+        0.6308923959732056
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/+0",
+      "monotonic": false,
+      "rect": [
+        100,
+        1094,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.0,
+        0.13437022268772125,
+        1.2617847919464111
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/+1",
+      "monotonic": false,
+      "rect": [
+        186,
+        1094,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        0.2687404453754425,
+        2.5235695838928223
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/+2",
+      "monotonic": false,
+      "rect": [
+        272,
+        1094,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.537480890750885,
+        5.0471391677856445
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/+3",
+      "monotonic": false,
+      "rect": [
+        358,
+        1094,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        1.07496178150177,
+        10.094278335571289
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/+4",
+      "monotonic": false,
+      "rect": [
+        444,
+        1094,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.1106097623705864,
+        0.026125114411115646
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/R/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.8848780989646912,
+        0.20900091528892517
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/R/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.061173856258392334,
+        -0.001606810837984085
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/R/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.48939085006713867,
+        -0.01285448670387268
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/R/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/R/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/R/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        146,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
         0.9673891663551331,
         1.0,
         0.1055719405412674
       ],
-      "x": 120,
-      "y": 712
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/Y/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
-      "name": "CYAN",
-      "p3_safe": true,
-      "unit": [
-        0.37880536913871765,
-        0.9462122917175293,
+      "chromatic": "",
+      "expected_rec2020": [
+        7.7391133308410645,
+        8.0,
+        0.8445755243301392
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/Y/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9641544818878174,
+        1.0,
+        0.016592061147093773
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/Y/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        7.713235855102539,
+        8.0,
+        0.13273648917675018
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/Y/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/Y/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        8.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/Y/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        224,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3580953776836395,
+        1.0,
+        0.09571416676044464
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/G/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.864763021469116,
+        8.0,
+        0.7657133340835571
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/G/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2108868509531021,
+        1.0,
+        0.018690766766667366
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/G/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.687094807624817,
+        8.0,
+        0.14952613413333893
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/G/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/G/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        8.0,
+        0.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/G/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        302,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.37880539894104004,
+        0.9462123513221741,
         1.0
       ],
-      "x": 120,
-      "y": 880
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/C/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
-      "name": "MAGENTA",
-      "p3_safe": true,
-      "unit": [
-        0.7354466319084167,
+      "chromatic": "",
+      "expected_rec2020": [
+        3.0304431915283203,
+        7.569698810577393,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/C/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24586942791938782,
+        0.9528310298919678,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/C/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9669554233551025,
+        7.622648239135742,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/C/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        1.0,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/C/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        8.0,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/C/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        380,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.048362258821725845,
+        0.01246322225779295,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/B/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.38689807057380676,
+        0.0997057780623436,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/B/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.048362258821725845,
+        0.012463221326470375,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/B/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.38689807057380676,
+        0.099705770611763,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/B/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/B/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0,
+        0.0,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/B/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        458,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.735446572303772,
         0.08833359181880951,
-        1.0
+        0.9999999403953552
       ],
-      "x": 120,
-      "y": 1048
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/M/+0",
+      "monotonic": false,
+      "rect": [
+        562,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
-      "name": "R2020",
-      "p3_safe": false,
-      "unit": [
+      "chromatic": "",
+      "expected_rec2020": [
+        5.883572578430176,
+        0.7066687345504761,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/srgb/M/+3",
+      "monotonic": false,
+      "rect": [
+        640,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.815761923789978,
+        0.05941973999142647,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/M/+0",
+      "monotonic": false,
+      "rect": [
+        718,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        6.526095390319824,
+        0.47535791993141174,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/p3/M/+3",
+      "monotonic": false,
+      "rect": [
+        796,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
         1.0,
+        0.0,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/M/+0",
+      "monotonic": false,
+      "rect": [
+        874,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.0,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "gamut",
+      "id": "gamut/2020/M/+3",
+      "monotonic": false,
+      "rect": [
+        952,
+        536,
+        36,
+        36
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "R",
+      "expected_rec2020": [
+        16.0,
         0.0,
         0.0
       ],
-      "x": 120,
-      "y": 1216
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "peak2020",
+      "id": "peak2020/R/+4",
+      "monotonic": false,
+      "rect": [
+        1196,
+        660,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
-      "name": "G2020",
-      "p3_safe": false,
-      "unit": [
+      "chromatic": "G",
+      "expected_rec2020": [
         0.0,
-        1.0,
+        16.0,
         0.0
       ],
-      "x": 120,
-      "y": 1384
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "peak2020",
+      "id": "peak2020/G/+4",
+      "monotonic": false,
+      "rect": [
+        1196,
+        750,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
-      "name": "B2020",
-      "p3_safe": false,
-      "unit": [
+      "chromatic": "B",
+      "expected_rec2020": [
         0.0,
         0.0,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "peak2020",
+      "id": "peak2020/B/+4",
+      "monotonic": false,
+      "rect": [
+        1196,
+        840,
+        40,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        3.061173915863037,
+        2.9983932971954346
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/R/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        636,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        2.122347831726074,
+        1.99678635597229
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/R/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        636,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        1.1835215091705322,
+        0.9951795935630798
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/R/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        636,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.0,
+        0.24469542503356934,
+        -0.00642724335193634
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/R/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        636,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.9641544818878174,
+        4.0,
+        3.016592025756836
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/Y/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        740,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.9283089637756348,
+        4.0,
+        2.033184051513672
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/Y/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        740,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.892463445663452,
+        4.0,
+        1.0497761964797974
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/Y/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        740,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.8566179275512695,
+        4.0,
+        0.06636824458837509
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/Y/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        740,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.2108869552612305,
+        4.0,
+        3.018690824508667
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/G/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        844,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.421773672103882,
+        4.0,
+        2.037381649017334
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/G/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        844,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.6326606273651123,
+        4.0,
+        1.0560723543167114
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/G/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        844,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.8435474038124084,
+        4.0,
+        0.07476306706666946
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/G/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        844,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.2458693981170654,
+        3.9528310298919678,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/C/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        948,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.491738796234131,
+        3.9056620597839355,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/C/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        948,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.7376083135604858,
+        3.8584930896759033,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/C/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        948,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9834777116775513,
+        3.811324119567871,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/C/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        948,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.0483622550964355,
+        3.012463331222534,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/B/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        1052,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.096724510192871,
+        2.0249264240264893,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/B/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        1052,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.1450867652893066,
+        1.0373896360397339,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/B/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        1052,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.19344903528690338,
+        0.0498528853058815,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/B/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        1052,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.8157620429992676,
+        3.059419631958008,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/M/25",
+      "monotonic": false,
+      "rect": [
+        568,
+        1156,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.631523847579956,
+        2.1188395023345947,
+        4.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/M/50",
+      "monotonic": false,
+      "rect": [
+        672,
+        1156,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.4472856521606445,
+        1.178259253501892,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/M/75",
+      "monotonic": false,
+      "rect": [
+        776,
+        1156,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.263047695159912,
+        0.23767895996570587,
+        3.999999761581421
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "sat",
+      "id": "sat/M/100",
+      "monotonic": false,
+      "rect": [
+        880,
+        1156,
+        48,
+        48
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.13785019516944885,
+        0.0901300311088562,
+        0.06200655549764633
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/01/+0",
+      "monotonic": false,
+      "rect": [
+        1031,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.4485674798488617,
+        0.32037803530693054,
+        0.2356073260307312
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/02/+0",
+      "monotonic": false,
+      "rect": [
+        1087,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.1553182750940323,
+        0.19119834899902344,
+        0.32109296321868896
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/03/+0",
+      "monotonic": false,
+      "rect": [
+        1143,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.11160660535097122,
+        0.1451345980167389,
+        0.06502899527549744
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/04/+0",
+      "monotonic": false,
+      "rect": [
+        1199,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.23728010058403015,
+        0.21967697143554688,
+        0.4165979027748108
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/05/+0",
+      "monotonic": false,
+      "rect": [
+        1255,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.270073801279068,
+        0.4818362891674042,
+        0.4070207178592682
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/06/+0",
+      "monotonic": false,
+      "rect": [
+        1311,
+        141,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.49168500304222107,
+        0.23879660665988922,
+        0.051941994577646255
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/07/+0",
+      "monotonic": false,
+      "rect": [
+        1031,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.10129505395889282,
+        0.1060224249958992,
+        0.3520362377166748
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/08/+0",
+      "monotonic": false,
+      "rect": [
+        1087,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3736504912376404,
+        0.13241587579250336,
+        0.12948457896709442
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/09/+0",
+      "monotonic": false,
+      "rect": [
+        1143,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.09160111099481583,
+        0.050992146134376526,
+        0.1401149183511734
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/10/+0",
+      "monotonic": false,
+      "rect": [
+        1199,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3793504536151886,
+        0.4863947629928589,
+        0.09570369124412537
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/11/+0",
+      "monotonic": false,
+      "rect": [
+        1255,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5894537568092346,
+        0.38881781697273254,
+        0.06892137229442596
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/12/+0",
+      "monotonic": false,
+      "rect": [
+        1311,
+        197,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.05338740348815918,
+        0.04905907064676285,
+        0.2779005169868469
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/13/+0",
+      "monotonic": false,
+      "rect": [
+        1031,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.13882510364055634,
+        0.277305006980896,
+        0.08673777431249619
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/14/+0",
+      "monotonic": false,
+      "rect": [
+        1087,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.28306636214256287,
+        0.06417552381753922,
+        0.050741955637931824
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/15/+0",
+      "monotonic": false,
+      "rect": [
+        1143,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.6900154948234558,
+        0.5807804465293884,
+        0.07563602924346924
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/16/+0",
+      "monotonic": false,
+      "rect": [
+        1199,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3554379642009735,
+        0.12341178953647614,
+        0.2855012118816376
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/17/+0",
+      "monotonic": false,
+      "rect": [
+        1255,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.09419377893209457,
+        0.2198253571987152,
+        0.33987361192703247
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/18/+0",
+      "monotonic": false,
+      "rect": [
+        1311,
+        253,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.8959078788757324,
+        0.896264910697937,
+        0.8887937068939209
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/19/+0",
+      "monotonic": false,
+      "rect": [
+        1031,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.577580451965332,
+        0.5776376724243164,
+        0.5775799751281738
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/20/+0",
+      "monotonic": false,
+      "rect": [
+        1087,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3515326976776123,
+        0.35156750679016113,
+        0.35153234004974365
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/21/+0",
+      "monotonic": false,
+      "rect": [
+        1143,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.19446983933448792,
+        0.1945989429950714,
+        0.1915581375360489
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/22/+0",
+      "monotonic": false,
+      "rect": [
+        1199,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.09084173291921616,
+        0.09085072576999664,
+        0.09084164351224899
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/23/+0",
+      "monotonic": false,
+      "rect": [
+        1255,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.03433980792760849,
+        0.034343209117650986,
+        0.034339774399995804
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/24/+0",
+      "monotonic": false,
+      "rect": [
+        1311,
+        309,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5514007806777954,
+        0.3605201244354248,
+        0.24802622199058533
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/01/+2",
+      "monotonic": false,
+      "rect": [
+        1031,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.7942699193954468,
+        1.2815121412277222,
+        0.9424293041229248
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/02/+2",
+      "monotonic": false,
+      "rect": [
+        1087,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.6212731003761292,
+        0.7647933959960938,
+        1.2843718528747559
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/03/+2",
+      "monotonic": false,
+      "rect": [
+        1143,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.4464264214038849,
+        0.5805383920669556,
+        0.26011598110198975
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/04/+2",
+      "monotonic": false,
+      "rect": [
+        1199,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9491204023361206,
+        0.8787078857421875,
+        1.6663916110992432
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/05/+2",
+      "monotonic": false,
+      "rect": [
+        1255,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.080295205116272,
+        1.9273451566696167,
+        1.6280828714370728
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/06/+2",
+      "monotonic": false,
+      "rect": [
+        1311,
+        379,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9667400121688843,
+        0.9551864266395569,
+        0.20776797831058502
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/07/+2",
+      "monotonic": false,
+      "rect": [
+        1031,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.4051802158355713,
+        0.4240896999835968,
+        1.4081449508666992
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/08/+2",
+      "monotonic": false,
+      "rect": [
+        1087,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.4946019649505615,
+        0.5296635031700134,
+        0.5179383158683777
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/09/+2",
+      "monotonic": false,
+      "rect": [
+        1143,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3664044439792633,
+        0.2039685845375061,
+        0.5604596734046936
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/10/+2",
+      "monotonic": false,
+      "rect": [
+        1199,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.5174018144607544,
+        1.9455790519714355,
+        0.38281476497650146
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/11/+2",
+      "monotonic": false,
+      "rect": [
+        1255,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.3578150272369385,
+        1.5552712678909302,
+        0.27568548917770386
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/12/+2",
+      "monotonic": false,
+      "rect": [
+        1311,
+        435,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.21354961395263672,
+        0.1962362825870514,
+        1.1116020679473877
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/13/+2",
+      "monotonic": false,
+      "rect": [
+        1031,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5553004145622253,
+        1.109220027923584,
+        0.34695109724998474
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/14/+2",
+      "monotonic": false,
+      "rect": [
+        1087,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.1322654485702515,
+        0.25670209527015686,
+        0.2029678225517273
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/15/+2",
+      "monotonic": false,
+      "rect": [
+        1143,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.7600619792938232,
+        2.3231217861175537,
+        0.30254411697387695
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/16/+2",
+      "monotonic": false,
+      "rect": [
+        1199,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.421751856803894,
+        0.49364715814590454,
+        1.1420048475265503
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/17/+2",
+      "monotonic": false,
+      "rect": [
+        1255,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3767751157283783,
+        0.8793014287948608,
+        1.3594944477081299
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/18/+2",
+      "monotonic": false,
+      "rect": [
+        1311,
+        491,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.5836315155029297,
+        3.585059642791748,
+        3.5551748275756836
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/19/+2",
+      "monotonic": false,
+      "rect": [
+        1031,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        2.310321807861328,
+        2.3105506896972656,
+        2.3103199005126953
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/20/+2",
+      "monotonic": false,
+      "rect": [
+        1087,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.4061307907104492,
+        1.4062700271606445,
+        1.4061293601989746
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/21/+2",
+      "monotonic": false,
+      "rect": [
+        1143,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.7778793573379517,
+        0.7783957719802856,
+        0.7662325501441956
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/22/+2",
+      "monotonic": false,
+      "rect": [
+        1199,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.3633669316768646,
+        0.36340290307998657,
+        0.36336657404899597
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/23/+2",
+      "monotonic": false,
+      "rect": [
+        1255,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.13735923171043396,
+        0.13737283647060394,
+        0.13735909759998322
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "cc",
+      "id": "cc/24/+2",
+      "monotonic": false,
+      "rect": [
+        1311,
+        547,
+        26,
+        26
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.015622342005372047,
+        0.015622342005372047,
+        0.015622342005372047
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-6",
+      "monotonic": true,
+      "rect": [
+        122,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 0
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.03129340708255768,
+        0.03129340708255768,
+        0.03129340708255768
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-5",
+      "monotonic": true,
+      "rect": [
+        228,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.06227452680468559,
+        0.06227452680468559,
+        0.06227452680468559
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-4",
+      "monotonic": true,
+      "rect": [
+        333,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 2
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.12474296987056732,
+        0.12474296987056732,
+        0.12474296987056732
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-3",
+      "monotonic": true,
+      "rect": [
+        439,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 3
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2498738020658493,
+        0.2498738020658493,
+        0.2498738020658493
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-2",
+      "monotonic": true,
+      "rect": [
+        545,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 4
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.5005269646644592,
+        0.5005269646644592,
+        0.5005269646644592
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/-1",
+      "monotonic": true,
+      "rect": [
+        651,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 5
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9960606694221497,
+        0.9960606694221497,
+        0.9960606694221497
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+0",
+      "monotonic": true,
+      "rect": [
+        756,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 6
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9952259063720703,
+        1.9952259063720703,
+        1.9952259063720703
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+1",
+      "monotonic": true,
+      "rect": [
+        862,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 7
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.996666193008423,
+        3.996666193008423,
+        3.996666193008423
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+2",
+      "monotonic": true,
+      "rect": [
+        968,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 8
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.005753517150879,
+        8.005753517150879,
+        8.005753517150879
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+3",
+      "monotonic": true,
+      "rect": [
+        1074,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 9
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        15.931676864624023,
+        15.931676864624023,
+        15.931676864624023
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+4",
+      "monotonic": true,
+      "rect": [
+        1179,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 10
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        31.912931442260742,
+        31.912931442260742,
+        31.912931442260742
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-neutral",
+      "id": "grad/neutral/+5",
+      "monotonic": true,
+      "rect": [
+        1285,
+        1219,
+        32,
+        32
+      ],
+      "series": "grad-neutral",
+      "series_index": 11
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.061173856258392334,
+        -0.001606810837984085
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/000",
+      "monotonic": false,
+      "rect": [
+        109,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.3504074215888977,
+        0.003969127777963877
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/015",
+      "monotonic": false,
+      "rect": [
+        161,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.6059761643409729,
+        0.00889606587588787
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/030",
+      "monotonic": false,
+      "rect": [
+        213,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.8334344625473022,
+        0.013281087391078472
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/045",
+      "monotonic": false,
+      "rect": [
+        265,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.9641544818878174,
+        1.0,
+        0.016592061147093773
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/060",
+      "monotonic": false,
+      "rect": [
+        317,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.7825087904930115,
+        1.0,
+        0.01709814742207527
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/075",
+      "monotonic": false,
+      "rect": [
+        369,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.59652179479599,
+        0.9999999403953552,
+        0.017616329714655876
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/090",
+      "monotonic": false,
+      "rect": [
+        421,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.40603628754615784,
+        1.0,
+        0.018147053197026253
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/105",
+      "monotonic": false,
+      "rect": [
+        473,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2108868509531021,
+        1.0,
+        0.018690766766667366
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/120",
+      "monotonic": false,
+      "rect": [
+        525,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.22279006242752075,
+        0.9999999403953552,
+        0.27890193462371826
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/135",
+      "monotonic": false,
+      "rect": [
+        577,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.23461638391017914,
+        1.0,
+        0.537430465221405
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/150",
+      "monotonic": false,
+      "rect": [
+        629,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24636639654636383,
+        0.9999999403953552,
+        0.7942925095558167
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/165",
+      "monotonic": false,
+      "rect": [
+        681,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24586942791938782,
+        0.9528310298919678,
         1.0
       ],
-      "x": 120,
-      "y": 1552
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/180",
+      "monotonic": false,
+      "rect": [
+        733,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.19714654982089996,
+        0.7208524942398071,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/195",
+      "monotonic": false,
+      "rect": [
+        785,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.1479915976524353,
+        0.48681673407554626,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/210",
+      "monotonic": false,
+      "rect": [
+        837,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.09839879721403122,
+        0.2506963014602661,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/225",
+      "monotonic": false,
+      "rect": [
+        889,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.048362258821725845,
+        0.012463221326470375,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/240",
+      "monotonic": false,
+      "rect": [
+        941,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24003495275974274,
+        0.024191508069634438,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/255",
+      "monotonic": false,
+      "rect": [
+        993,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.43182575702667236,
+        0.03592702001333237,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/270",
+      "monotonic": false,
+      "rect": [
+        1045,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.6237347722053528,
+        0.04766976460814476,
+        1.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/285",
+      "monotonic": false,
+      "rect": [
+        1097,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.815761923789978,
+        0.05941973999142647,
+        0.9999999403953552
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/300",
+      "monotonic": false,
+      "rect": [
+        1149,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.07005492597818375,
+        0.9328509569168091
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/315",
+      "monotonic": false,
+      "rect": [
+        1201,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.06718511134386063,
+        0.6308923959732056
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/330",
+      "monotonic": false,
+      "rect": [
+        1253,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.0,
+        0.0642261654138565,
+        0.3195543885231018
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue0",
+      "id": "grad-hue0/345",
+      "monotonic": false,
+      "rect": [
+        1305,
+        1329,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.48939085006713867,
+        -0.01285448670387268
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/000",
+      "monotonic": false,
+      "rect": [
+        109,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        2.8032593727111816,
+        0.031753022223711014
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/015",
+      "monotonic": false,
+      "rect": [
+        161,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        4.847809314727783,
+        0.07116852700710297
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/030",
+      "monotonic": false,
+      "rect": [
+        213,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        6.667475700378418,
+        0.10624869912862778
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/045",
+      "monotonic": false,
+      "rect": [
+        265,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        7.713235855102539,
+        8.0,
+        0.13273648917675018
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/060",
+      "monotonic": false,
+      "rect": [
+        317,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        6.260070323944092,
+        8.0,
+        0.13678517937660217
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/075",
+      "monotonic": false,
+      "rect": [
+        369,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.77217435836792,
+        7.999999523162842,
+        0.140930637717247
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/090",
+      "monotonic": false,
+      "rect": [
+        421,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.2482903003692627,
+        8.0,
+        0.14517642557621002
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/105",
+      "monotonic": false,
+      "rect": [
+        473,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.687094807624817,
+        8.0,
+        0.14952613413333893
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/120",
+      "monotonic": false,
+      "rect": [
+        525,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.782320499420166,
+        7.999999523162842,
+        2.231215476989746
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/135",
+      "monotonic": false,
+      "rect": [
+        577,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.876931071281433,
+        8.0,
+        4.29944372177124
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/150",
+      "monotonic": false,
+      "rect": [
+        629,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9709311723709106,
+        7.999999523162842,
+        6.354340076446533
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/165",
+      "monotonic": false,
+      "rect": [
+        681,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.9669554233551025,
+        7.622648239135742,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/180",
+      "monotonic": false,
+      "rect": [
+        733,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.5771723985671997,
+        5.766819953918457,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/195",
+      "monotonic": false,
+      "rect": [
+        785,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.1839327812194824,
+        3.89453387260437,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/210",
+      "monotonic": false,
+      "rect": [
+        837,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.7871903777122498,
+        2.005570411682129,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/225",
+      "monotonic": false,
+      "rect": [
+        889,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.38689807057380676,
+        0.099705770611763,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/240",
+      "monotonic": false,
+      "rect": [
+        941,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        1.920279622077942,
+        0.1935320645570755,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/255",
+      "monotonic": false,
+      "rect": [
+        993,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        3.454606056213379,
+        0.28741616010665894,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/270",
+      "monotonic": false,
+      "rect": [
+        1045,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        4.989878177642822,
+        0.3813581168651581,
+        8.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/285",
+      "monotonic": false,
+      "rect": [
+        1097,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        6.526095390319824,
+        0.47535791993141174,
+        7.999999523162842
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/300",
+      "monotonic": false,
+      "rect": [
+        1149,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.56043940782547,
+        7.462807655334473
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/315",
+      "monotonic": false,
+      "rect": [
+        1201,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.537480890750885,
+        5.0471391677856445
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/330",
+      "monotonic": false,
+      "rect": [
+        1253,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        8.0,
+        0.513809323310852,
+        2.5564351081848145
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "grad-hue3",
+      "id": "grad-hue3/345",
+      "monotonic": false,
+      "rect": [
+        1305,
+        1427,
+        26,
+        40
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "report",
+        "lightroom": "report"
+      },
+      "group": "specular",
+      "id": "spec/4",
+      "monotonic": false,
+      "rect": [
+        144,
+        1802,
+        4,
+        4
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "report",
+        "lightroom": "report"
+      },
+      "group": "specular",
+      "id": "spec/6",
+      "monotonic": false,
+      "rect": [
+        224,
+        1802,
+        6,
+        6
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "report",
+        "lightroom": "report"
+      },
+      "group": "specular",
+      "id": "spec/8",
+      "monotonic": false,
+      "rect": [
+        304,
+        1802,
+        8,
+        8
+      ],
+      "series": "",
+      "series_index": -1
     }
   ],
-  "sample": 48,
-  "stops": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5
-  ],
+  "version": 2,
   "width": 1440
 }
