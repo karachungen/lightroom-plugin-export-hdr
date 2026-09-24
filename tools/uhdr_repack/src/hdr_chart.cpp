@@ -1,11 +1,14 @@
 #include "hdr_chart.h"
 
+#include "cli.h"
 #include "color_primaries.h"
+#include "delivery_check.h"
 #include "encode_engine.h"
 #include "half_float.h"
 #include "icc_profile.h"
 #include "path_io.h"
 #include "sdr_jpeg.h"
+#include "session.h"
 #include "slice_plan.h"
 #include "tiff_float.h"
 #include "tiff_input.h"
@@ -21,6 +24,7 @@
 #include <csetjmp>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -397,8 +401,9 @@ LinearRgb sdr_p3(LinearRgb rec) {
   rec.r = std::max(0.0f, rec.r);
   rec.g = std::max(0.0f, rec.g);
   rec.b = std::max(0.0f, rec.b);
-  const float m = max3(rec);
-  if (m > 1.0f) rec = scale_rgb(rec, 1.0f / m);
+  // Clip after the gamut conversion. Scaling the Rec.2020 vector down first shrinks the small
+  // positive P3 channel of an out-of-gamut primary (Rec.2020 red's P3 blue) while the HDR value
+  // does not, so that channel's gain hits the boost ceiling and the gain map is no longer a primary.
   LinearRgb p3 = rec2020_to_display_p3(rec);
   p3.r = std::clamp(p3.r, 0.0f, 1.0f);
   p3.g = std::clamp(p3.g, 0.0f, 1.0f);
@@ -1134,7 +1139,7 @@ bool decode_jpeg_rgb(const uint8_t* data, unsigned long size, std::vector<uint8_
   return true;
 }
 
-bool gain_rgb(const std::string& path, int chart_w, int chart_h, const ChartSample& sample, float* r, float* g,
+bool gain_rgb(const std::string& path, const Rect& frame, const ChartSample& sample, float* r, float* g,
               float* b, std::string* error) {
   std::ifstream input = open_input_binary(path);
   if (!input) {
@@ -1169,12 +1174,12 @@ bool gain_rgb(const std::string& path, int chart_w, int chart_h, const ChartSamp
                                        static_cast<unsigned long>(gain->data_sz), &map, &gw, &gh, error);
   uhdr_release_decoder(decoder);
   if (!decoded) return false;
-  const int x0 = std::clamp(static_cast<int>(std::floor(sample.x * static_cast<double>(gw) / chart_w)), 0, gw - 1);
-  const int y0 = std::clamp(static_cast<int>(std::floor(sample.y * static_cast<double>(gh) / chart_h)), 0, gh - 1);
-  const int x1 = std::clamp(static_cast<int>(std::ceil((sample.x + sample.w) * static_cast<double>(gw) / chart_w)),
-                            x0 + 1, gw);
-  const int y1 = std::clamp(static_cast<int>(std::ceil((sample.y + sample.h) * static_cast<double>(gh) / chart_h)),
-                            y0 + 1, gh);
+  const double fx = static_cast<double>(gw) / frame.w;
+  const double fy = static_cast<double>(gh) / frame.h;
+  const int x0 = std::clamp(static_cast<int>(std::floor((sample.x - frame.x) * fx)), 0, gw - 1);
+  const int y0 = std::clamp(static_cast<int>(std::floor((sample.y - frame.y) * fy)), 0, gh - 1);
+  const int x1 = std::clamp(static_cast<int>(std::ceil((sample.x + sample.w - frame.x) * fx)), x0 + 1, gw);
+  const int y1 = std::clamp(static_cast<int>(std::ceil((sample.y + sample.h - frame.y) * fy)), y0 + 1, gh);
   double ar = 0;
   double ag = 0;
   double ab = 0;
@@ -1221,25 +1226,37 @@ bool chromatic_pass(char channel, float r, float g, float b) {
          (dominant - std::max(other1, other2)) >= 0.50f;
 }
 
-bool aspect_ok(int width, int height, std::string* error) {
-  const double aspect = static_cast<double>(width) / static_cast<double>(height);
-  const double expect = 3.0 / 4.0;
-  if (std::fabs(aspect - expect) / expect > 0.02) {
+bool frame_aspect_ok(int width, int height, const Rect& frame, std::string* error) {
+  const double got = static_cast<double>(width) / height;
+  const double want = static_cast<double>(frame.w) / frame.h;
+  if (std::fabs(got - want) / want > 0.02) {
     if (error) {
-      *error = "image is " + std::to_string(width) + "x" + std::to_string(height) +
-               ", not 3:4. Export without a crop.";
+      *error = "image is " + std::to_string(width) + "x" + std::to_string(height) + " but the frame is " +
+               std::to_string(frame.w) + "x" + std::to_string(frame.h) +
+               ". Pass the --slice-aspect the export used, or export without a crop.";
     }
     return false;
   }
   return true;
 }
 
+bool inside(const ChartSample& s, const Rect& f);
+
+struct GradeView {
+  Rect frame{0, 0, kWidth, kHeight};
+  bool lightroom = false;
+  std::string pass = "boost=full";
+  std::string gain_path;
+};
+
 int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb, int width, int height,
-          int chart_w, int chart_h, bool lightroom, const std::string& gain_path, float* exposure_out) {
-  const float stop_tol = lightroom ? kLrStop : kEncStop;
-  const float hue_tol = lightroom ? kLrHue : kEncHue;
-  const double sx = static_cast<double>(width) / static_cast<double>(chart_w);
-  const double sy = static_cast<double>(height) / static_cast<double>(chart_h);
+          const GradeView& view, float* exposure_out) {
+  const float stop_tol = view.lightroom ? kLrStop : kEncStop;
+  const float hue_tol = view.lightroom ? kLrHue : kEncHue;
+  const Rect& f = view.frame;
+  const double sx = static_cast<double>(width) / static_cast<double>(f.w);
+  const double sy = static_cast<double>(height) / static_cast<double>(f.h);
+  int outside = 0;
   struct Row {
     std::string group;
     std::string id;
@@ -1258,10 +1275,14 @@ int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb
   rows.reserve(samples.size());
   std::vector<std::string> groups;
   for (const ChartSample& s : samples) {
-    const int x0 = static_cast<int>(std::floor(s.x * sx));
-    const int y0 = static_cast<int>(std::floor(s.y * sy));
-    const int x1 = static_cast<int>(std::ceil((s.x + s.w) * sx));
-    const int y1 = static_cast<int>(std::ceil((s.y + s.h) * sy));
+    if (!inside(s, f)) {
+      ++outside;
+      continue;
+    }
+    const int x0 = static_cast<int>(std::floor((s.x - f.x) * sx));
+    const int y0 = static_cast<int>(std::floor((s.y - f.y) * sy));
+    const int x1 = static_cast<int>(std::ceil((s.x + s.w - f.x) * sx));
+    const int y1 = static_cast<int>(std::ceil((s.y + s.h - f.y) * sy));
     const LinearRgb got = sample_mean(rgb, width, height, x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0));
     const float exp_m = max3(s.expected);
     const float got_m = max3(got);
@@ -1270,7 +1291,7 @@ int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb
     else if (exp_m <= 1e-8f && got_m <= 1e-8f) d_stop = 0.0f;
     const bool hue_on = exp_m >= 0.01f;
     const float d_hue = hue_on ? hue_err(s.expected, got) : 0.0f;
-    const bool gated = lightroom ? s.gate_lightroom : s.gate_encoder;
+    const bool gated = view.lightroom ? s.gate_lightroom : s.gate_encoder;
     const bool ok = d_stop <= stop_tol && (!hue_on || d_hue <= hue_tol);
     if (std::find(groups.begin(), groups.end(), s.group) == groups.end()) groups.push_back(s.group);
     rows.push_back({s.group, s.id, exp_m, got_m, d_stop, d_hue, gated, ok, s.monotonic, s.series, s.series_index,
@@ -1351,14 +1372,14 @@ int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb
     if (exposure_out) *exposure_out = med;
   }
 
-  if (!gain_path.empty()) {
+  if (!view.gain_path.empty()) {
     for (const ChartSample& s : samples) {
-      if (!s.chromatic) continue;
+      if (!s.chromatic || !inside(s, f)) continue;
       float r = 0;
       float g = 0;
       float b = 0;
       std::string err;
-      const bool read = gain_rgb(gain_path, chart_w, chart_h, s, &r, &g, &b, &err);
+      const bool read = gain_rgb(view.gain_path, f, s, &r, &g, &b, &err);
       const bool ok = read && chromatic_pass(s.chromatic, r, g, b);
       const char* name = s.chromatic == 'R' ? "R2020" : s.chromatic == 'G' ? "G2020" : "B2020";
       std::printf("%s +4 gain RGB %.3f %.3f %.3f %s\n", name, r, g, b, ok ? "PASS" : "FAIL");
@@ -1370,9 +1391,10 @@ int grade(const std::vector<ChartSample>& samples, const std::vector<float>& rgb
     }
   }
 
-  const char* mode = lightroom ? "lightroom" : "encoder";
+  const char* mode = view.lightroom ? "lightroom" : "encoder";
   const int gated = npass + nfail;
-  std::printf("HDR_CHART %s %s gated=%d failed=%d\n", mode, nfail ? "FAIL" : "PASS", gated, nfail);
+  std::printf("HDR_CHART %s %s %s gated=%d failed=%d outside=%d\n", mode, view.pass.c_str(),
+              nfail ? "FAIL" : "PASS", gated, nfail, outside);
   std::fflush(stdout);
   return nfail ? 1 : 0;
 }
@@ -1431,6 +1453,172 @@ bool same_bytes(const std::string& a, const std::string& b, std::string* error) 
     return false;
   }
   return true;
+}
+
+struct GainMeta {
+  float min_boost[3] = {1, 1, 1};
+  float max_boost[3] = {16, 16, 16};
+  float offset_sdr[3] = {0, 0, 0};
+  float offset_hdr[3] = {0, 0, 0};
+  float cap_min = 1.0f;
+  float cap_max = 16.0f;
+  bool use_base_cg = true;
+  bool luma = false;
+};
+
+int jpeg_components(const uint8_t* data, size_t size) {
+  jpeg_decompress_struct cinfo{};
+  JpegErr jerr{};
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = jpeg_fail;
+  if (setjmp(jerr.jump)) {
+    jpeg_destroy_decompress(&cinfo);
+    return 0;
+  }
+  jpeg_create_decompress(&cinfo);
+  jpeg_mem_src(&cinfo, const_cast<unsigned char*>(data), static_cast<unsigned long>(size));
+  const int n = jpeg_read_header(&cinfo, TRUE) == JPEG_HEADER_OK ? cinfo.num_components : 0;
+  jpeg_destroy_decompress(&cinfo);
+  return n;
+}
+
+bool read_gain_meta(const std::string& path, GainMeta* out, std::string* error) {
+  std::ifstream input = open_input_binary(path);
+  if (!input) {
+    if (error) *error = "could not open " + path;
+    return false;
+  }
+  std::vector<char> bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  uhdr_codec_private_t* decoder = uhdr_create_decoder();
+  if (!decoder) {
+    if (error) *error = "uhdr_create_decoder failed";
+    return false;
+  }
+  uhdr_compressed_image_t compressed{};
+  compressed.data = bytes.data();
+  compressed.data_sz = bytes.size();
+  compressed.capacity = bytes.size();
+  compressed.cg = UHDR_CG_UNSPECIFIED;
+  compressed.ct = UHDR_CT_UNSPECIFIED;
+  compressed.range = UHDR_CR_UNSPECIFIED;
+  uhdr_error_info_t st = uhdr_dec_set_image(decoder, &compressed);
+  if (st.error_code == UHDR_CODEC_OK) st = uhdr_dec_probe(decoder);
+  uhdr_gainmap_metadata_t* m = st.error_code == UHDR_CODEC_OK ? uhdr_dec_get_gainmap_metadata(decoder) : nullptr;
+  uhdr_mem_block_t* gain = st.error_code == UHDR_CODEC_OK ? uhdr_dec_get_gainmap_image(decoder) : nullptr;
+  if (!m || !gain || !gain->data) {
+    uhdr_release_decoder(decoder);
+    if (error) *error = "could not read gain-map metadata from " + path;
+    return false;
+  }
+  for (int c = 0; c < 3; ++c) {
+    out->min_boost[c] = m->min_content_boost[c];
+    out->max_boost[c] = m->max_content_boost[c];
+    out->offset_sdr[c] = m->offset_sdr[c];
+    out->offset_hdr[c] = m->offset_hdr[c];
+  }
+  out->cap_min = m->hdr_capacity_min;
+  out->cap_max = m->hdr_capacity_max;
+  out->use_base_cg = m->use_base_cg != 0;
+  out->luma = jpeg_components(static_cast<const uint8_t*>(gain->data), gain->data_sz) == 1;
+  uhdr_release_decoder(decoder);
+  return true;
+}
+
+float gain_weight(const GainMeta& m, float boost) {
+  const float lo = std::log2(std::max(1e-6f, m.cap_min));
+  const float hi = std::log2(std::max(1e-6f, m.cap_max));
+  if (hi <= lo) return boost >= m.cap_max ? 1.0f : 0.0f;
+  return std::clamp((std::log2(std::max(1.0f, boost)) - lo) / (hi - lo), 0.0f, 1.0f);
+}
+
+bool inside_p3(LinearRgb rec) {
+  const LinearRgb p3 = rec2020_to_display_p3(rec);
+  const float tol = -1e-4f * std::max(1.0f, max3(rec));
+  return p3.r >= tol && p3.g >= tol && p3.b >= tol;
+}
+
+float luma_of(LinearRgb c, bool p3) {
+  return p3 ? luminance_display_p3(c.r, c.g, c.b) : 0.2627f * c.r + 0.6780f * c.g + 0.0593f * c.b;
+}
+
+LinearRgb blended(LinearRgb hdr_rec, const GainMeta& m, float w) {
+  const LinearRgb base_p3 = sdr_p3(hdr_rec);
+  const LinearRgb s = m.use_base_cg ? base_p3 : display_p3_to_rec2020(base_p3);
+  const LinearRgb h = m.use_base_cg ? rec2020_to_display_p3(hdr_rec) : hdr_rec;
+  const float sv[3] = {s.r, s.g, s.b};
+  const float hv[3] = {h.r, h.g, h.b};
+  float o[3];
+  for (int c = 0; c < 3; ++c) {
+    const float ks = m.offset_sdr[c];
+    const float kh = m.offset_hdr[c];
+    float g = m.luma ? (luma_of(h, m.use_base_cg) + kh) / (luma_of(s, m.use_base_cg) + ks) : (hv[c] + kh) / (sv[c] + ks);
+    g = std::clamp(g, m.min_boost[c], m.max_boost[c]);
+    o[c] = (sv[c] + ks) * std::pow(g, w) - kh;
+  }
+  const LinearRgb out{o[0], o[1], o[2]};
+  return m.use_base_cg ? display_p3_to_rec2020(out) : out;
+}
+
+std::vector<ChartSample> expected_at_boost(std::vector<ChartSample> samples, const GainMeta& m, float boost, bool gate) {
+  const float w = gain_weight(m, boost);
+  for (ChartSample& s : samples) {
+    if (!gate) {
+      s.gate_encoder = false;
+      s.gate_lightroom = false;
+    }
+    if (w <= 0.0f) {
+      s.expected = display_p3_to_rec2020(sdr_p3(s.expected));
+    } else if ((w < 1.0f || m.luma) && !inside_p3(s.expected)) {
+      // Partial headroom and luma maps decide out-of-P3 clipping in the blend space.
+      s.gate_encoder = false;
+      s.gate_lightroom = false;
+    } else {
+      // Full headroom still clamps to max_content_boost; blended applies that ceiling.
+      s.expected = blended(s.expected, m, w);
+    }
+  }
+  return samples;
+}
+
+std::vector<float> grade_boosts(const GainMeta& m) {
+  std::vector<float> out{1.0f};
+  if (m.cap_max > 4.0f * 1.01f) out.push_back(4.0f);
+  if (m.cap_max > 1.01f) out.push_back(m.cap_max);
+  return out;
+}
+
+int grade_uhdr_passes(const std::vector<ChartSample>& samples, const std::string& path, const Rect& frame,
+                      bool lightroom) {
+  GainMeta meta;
+  std::string err;
+  if (!read_gain_meta(path, &meta, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  std::printf("gain map %s, content boost %.3f-%.3f, capacity %.3f-%.3f, %s color space\n",
+              meta.luma ? "luma" : "RGB", meta.min_boost[0], meta.max_boost[0], meta.cap_min, meta.cap_max,
+              meta.use_base_cg ? "base" : "alternate");
+  int failed = 0;
+  for (const float boost : grade_boosts(meta)) {
+    const bool full = boost >= meta.cap_max * 0.999f;
+    std::vector<float> rgb;
+    int w = 0;
+    int h = 0;
+    if (!decode_uhdr_rec2020(path, boost, &rgb, &w, &h, &err) || !frame_aspect_ok(w, h, frame, &err)) {
+      std::cerr << err << "\n";
+      return 1;
+    }
+    char label[32];
+    std::snprintf(label, sizeof(label), "boost=%.2f", boost);
+    GradeView view;
+    view.frame = frame;
+    view.lightroom = lightroom;
+    view.pass = label;
+    if (full && !meta.luma) view.gain_path = path;
+    if (full && meta.luma) std::printf("peak2020 chromatic gain check skipped: luma gain map\n");
+    failed |= grade(expected_at_boost(samples, meta, boost, !lightroom || full), rgb, w, h, view, nullptr);
+  }
+  return failed ? 1 : 0;
 }
 
 }  // namespace
@@ -1530,15 +1718,34 @@ int write_hdr_chart_main(const std::string& dir) {
   return 0;
 }
 
-int check_hdr_chart_main(const std::string& dir) {
-  if (dir.empty()) {
+int check_hdr_chart_main(int argc, char** argv) {
+  if (argc < 3) {
     std::cerr << "--check-hdr-chart requires a chart directory\n";
     return 1;
   }
+  const std::string dir = argv[2];
   const std::string tiff = join_dir(dir, "hdr-chart.tif");
   const std::string jpeg = join_dir(dir, "sdr-chart.jpg");
   const std::string man = join_dir(dir, "chart-manifest.json");
-  const std::string out = join_dir(dir, "chart-uhdr.jpg");
+  EncodeRequest req;
+  req.out_path = join_dir(dir, "chart-uhdr.jpg");
+  for (int i = 3; i < argc; ++i) {
+    const std::string a = argv[i];
+    if (a == "--out" && i + 1 < argc) {
+      req.out_path = argv[++i];
+      continue;
+    }
+    const int used = parse_encode_flag(argc, argv, &i, &req);
+    if (used < 0) return 1;
+    if (used == 0) {
+      std::cerr << "unknown --check-hdr-chart argument: " << a << "\n";
+      return 1;
+    }
+  }
+  if (!req.gainmap_in.empty() || !req.watermark_config.empty() || req.slice_count != 1) {
+    std::cerr << "--check-hdr-chart grades one default Apply: no --gainmap-in, no --watermark-config, slice count 1\n";
+    return 1;
+  }
   if (!fs::exists(path_from_utf8(tiff)) || !fs::exists(path_from_utf8(jpeg)) || !fs::exists(path_from_utf8(man))) {
     std::cerr << "missing chart files; run --write-hdr-chart " << dir << " first\n";
     return 1;
@@ -1552,42 +1759,75 @@ int check_hdr_chart_main(const std::string& dir) {
     std::cerr << err << "\n";
     return 1;
   }
-  EncodeRequest req;
-  req.hdr_tiff = tiff;
-  req.base_path = jpeg;
-  req.out_path = out;
-  req.options.base_quality = 95;
-  req.options.gainmap_quality = 95;
-  req.options.gainmap_scale = 1;
-  req.options.min_content_boost = 1.0f;
-  req.options.max_content_boost = boost;
-  req.options.target_display_peak_nits = 3250.0f;
-  req.options.monochrome_gainmap = false;
-  const int enc = encode_from_paths(req, &err);
-  if (enc != 0) {
-    std::cerr << "encode failed: " << err << "\n";
-    return enc == 0 ? 1 : enc;
-  }
-  std::vector<float> decoded;
-  int dw = 0;
-  int dh = 0;
-  if (!decode_uhdr_rec2020(out, boost, &decoded, &dw, &dh, &err)) {
-    std::cerr << err << "\n";
+
+  // The editor's Apply button calls encode_session_item; grading anything else would test a different path.
+  PreviewSession session;
+  session.default_encode_options = req.options;
+  session.default_slice_aspect = req.slice_aspect;
+  SessionItem item;
+  item.id = "hdr-chart";
+  item.sdr = jpeg;
+  item.hdr_tiff = tiff;
+  item.out = req.out_path;
+  item.encode_options = req.options;
+  item.has_encode_override = true;
+  item.slice_aspect = req.slice_aspect;
+  item.has_slice_override = true;
+  item.crop_offset = req.crop_offset;
+  item.slice_count = 1;
+  item.output_width = req.output_width;
+  item.output_height = req.output_height;
+  item.metadata_patch = req.metadata_patch;
+  ItemEncodeResult ir;
+  if (encode_session_item(session, item, &ir, &err) != 0) {
+    std::cerr << "encode failed: " << (ir.error.empty() ? err : ir.error) << "\n";
     return 1;
   }
-  if (!aspect_ok(dw, dh, &err)) {
-    std::cerr << err << "\n";
+
+  Rect frame;
+  unsigned expect_w = 0;
+  unsigned expect_h = 0;
+  if (!frame_for(chart_w, chart_h, req.slice_aspect, req.crop_offset, &frame, &err) ||
+      !resolve_item_export_size(static_cast<unsigned>(chart_w), static_cast<unsigned>(chart_h), req.slice_aspect,
+                                req.output_width, req.output_height, &expect_w, &expect_h)) {
+    std::cerr << (err.empty() ? "could not resolve the export size" : err) << "\n";
     return 1;
   }
-  return grade(samples, decoded, dw, dh, chart_w, chart_h, false, out, nullptr);
+  UhdrExpect expect;
+  expect.width = static_cast<int>(expect_w);
+  expect.height = static_cast<int>(expect_h);
+  expect.gainmap_scale = req.options.gainmap_scale;
+  expect.max_bytes = kInstagramMaxBytes;
+  expect.single_aspect = req.slice_aspect == SliceAspect::kNone ? "" : slice_aspect_label(req.slice_aspect);
+  if (verify_uhdr_file(req.out_path, expect) != 0) return 1;
+  return grade_uhdr_passes(samples, req.out_path, frame, false);
 }
 
-int check_hdr_chart_file_main(const std::string& path, const std::string& manifest_path) {
-  if (path.empty()) {
+int check_hdr_chart_file_main(int argc, char** argv) {
+  if (argc < 3) {
     std::cerr << "--check-hdr-chart-file requires an image path\n";
     return 1;
   }
-  std::string manifest = manifest_path;
+  const std::string path = argv[2];
+  std::string manifest;
+  SliceAspect aspect = SliceAspect::kNone;
+  float crop_offset = 0.5f;
+  for (int i = 3; i < argc; ++i) {
+    const std::string a = argv[i];
+    if (a == "--manifest" && i + 1 < argc) {
+      manifest = argv[++i];
+    } else if (a == "--slice-aspect" && i + 1 < argc) {
+      if (!parse_slice_aspect(argv[++i], &aspect)) {
+        std::cerr << "bad --slice-aspect (use none, 1x1, 4x5, 3x4, or 191x100)\n";
+        return 1;
+      }
+    } else if (a == "--crop-offset" && i + 1 < argc) {
+      crop_offset = std::strtof(argv[++i], nullptr);
+    } else {
+      std::cerr << "unknown --check-hdr-chart-file argument: " << a << "\n";
+      return 1;
+    }
+  }
   if (manifest.empty()) manifest = (path_from_utf8(path).parent_path() / "chart-manifest.json").u8string();
   if (!fs::exists(path_from_utf8(manifest))) {
     std::cerr << "chart manifest not found: " << manifest << "\nPass --manifest test/hdr-chart/chart-manifest.json\n";
@@ -1598,28 +1838,25 @@ int check_hdr_chart_file_main(const std::string& path, const std::string& manife
   int chart_h = 0;
   float boost = kBoost;
   std::string err;
-  if (!load_manifest(manifest, &samples, &chart_w, &chart_h, &boost, &err)) {
+  Rect frame;
+  if (!load_manifest(manifest, &samples, &chart_w, &chart_h, &boost, &err) ||
+      !frame_for(chart_w, chart_h, aspect, crop_offset, &frame, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
+  if (!is_tiff_path(path)) return grade_uhdr_passes(samples, path, frame, true);
   std::vector<float> rgb;
   int w = 0;
   int h = 0;
-  const bool tiff = is_tiff_path(path);
-  if (tiff) {
-    if (!load_tiff_rec2020(path, &rgb, &w, &h, &err)) {
-      std::cerr << err << "\n";
-      return 1;
-    }
-  } else if (!decode_uhdr_rec2020(path, boost, &rgb, &w, &h, &err)) {
+  if (!load_tiff_rec2020(path, &rgb, &w, &h, &err) || !frame_aspect_ok(w, h, frame, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
-  if (!aspect_ok(w, h, &err)) {
-    std::cerr << err << "\n";
-    return 1;
-  }
-  return grade(samples, rgb, w, h, chart_w, chart_h, true, "", nullptr);
+  GradeView view;
+  view.frame = frame;
+  view.lightroom = true;
+  view.pass = "tiff";
+  return grade(samples, rgb, w, h, view, nullptr);
 }
 
 int check_hdr_chart_assets_main(const std::string& committed_dir, const std::string& fresh_dir) {

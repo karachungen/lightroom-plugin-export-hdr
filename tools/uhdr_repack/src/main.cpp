@@ -62,33 +62,8 @@ static int run(int argc, char** argv) {
     return write_hdr_chart_main(argv[2]);
   }
 
-  if (std::strcmp(argv[1], "--check-hdr-chart") == 0) {
-    if (argc < 3) {
-      std::cerr << "--check-hdr-chart requires a chart directory\n";
-      print_usage();
-      return 1;
-    }
-    return check_hdr_chart_main(argv[2]);
-  }
-
-  if (std::strcmp(argv[1], "--check-hdr-chart-file") == 0) {
-    if (argc < 3) {
-      std::cerr << "--check-hdr-chart-file requires an image path\n";
-      print_usage();
-      return 1;
-    }
-    std::string manifest;
-    for (int i = 3; i < argc; ++i) {
-      if (std::strcmp(argv[i], "--manifest") == 0 && i + 1 < argc) {
-        manifest = argv[++i];
-      } else {
-        std::cerr << "unknown --check-hdr-chart-file argument: " << argv[i] << "\n";
-        print_usage();
-        return 1;
-      }
-    }
-    return check_hdr_chart_file_main(argv[2], manifest);
-  }
+  if (std::strcmp(argv[1], "--check-hdr-chart") == 0) return check_hdr_chart_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-hdr-chart-file") == 0) return check_hdr_chart_file_main(argc, argv);
 
   if (std::strcmp(argv[1], "--check-hdr-chart-assets") == 0) {
     if (argc < 4) {
