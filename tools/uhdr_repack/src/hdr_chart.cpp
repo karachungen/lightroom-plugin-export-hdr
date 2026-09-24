@@ -978,10 +978,10 @@ bool half_image_to_rgb(const RawImageHolder& hdr, std::vector<float>* rgb, int* 
 
 bool reload_identity(const std::string& path, std::vector<float>* rgb, int* width, int* height, std::string* error) {
   RawImageHolder hdr;
-  const int identity = load_identity_rec2020_tiff(path, &hdr, error);
+  const int identity = load_float_tiff_portable(path, &hdr, error);
   if (identity < 0) return false;
   if (identity == 0) {
-    if (error) *error = "TIFF was not read as uncompressed linear Rec.2020";
+    if (error) *error = "TIFF was not read by the portable reader";
     return false;
   }
   return half_image_to_rgb(hdr, rgb, width, height, error);

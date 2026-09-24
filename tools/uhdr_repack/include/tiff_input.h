@@ -13,9 +13,8 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
 
 /**
  * Load an HDR TIFF into linear Rec.2020 RGBA half-float.
- * Untagged float RGB, and float RGB tagged Linear Rec.2020, are copied as raw samples
- * on both platforms. Any other embedded profile is read with Core Image on Mac or WIC
- * on Windows and rendered into extended linear Rec.2020 without clipping the source to 0–1.
+ * load_float_tiff_portable reads float TIFFs (uncompressed or Deflate, linear profile) on both
+ * platforms. Anything else is read with Core Image on Mac or WIC on Windows, after one stderr line.
  * When crop is non-null, master_w/master_h must be the even-normalized full frame size.
  */
 bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string* error,

@@ -80,9 +80,10 @@ bool probe_hdr_tiff_even_size(const std::string& path, unsigned* master_w, unsig
     return false;
   }
 
-  const int identity = probe_identity_rec2020_tiff(path, master_w, master_h, error);
+  const int identity = probe_float_tiff_portable(path, master_w, master_h, error);
   if (identity < 0) return false;
   if (identity > 0) return true;
+  log_float_tiff_fallback(path);
 
 
   @autoreleasepool {
@@ -120,7 +121,7 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
     return false;
   }
   const int identity =
-      load_identity_rec2020_tiff(path, out, error, master_w, master_h, crop, dst_w, dst_h);
+      load_float_tiff_portable(path, out, error, master_w, master_h, crop, dst_w, dst_h);
   if (identity < 0) return false;
   if (identity > 0) return true;
   out->reset();

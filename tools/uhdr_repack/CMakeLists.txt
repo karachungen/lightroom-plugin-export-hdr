@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.23)
 
 if(APPLE)
-  project(uhdr_repack LANGUAGES CXX OBJCXX)
+  project(uhdr_repack LANGUAGES C CXX OBJCXX)
 else()
-  project(uhdr_repack LANGUAGES CXX)
+  project(uhdr_repack LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -108,6 +108,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+FetchContent_Declare(
+  miniz
+  URL https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip
+  URL_HASH SHA256=ada38db0b703a56d3dd6d57bf84a9c5d664921d870d8fea4db153979fb5332c5
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  SOURCE_SUBDIR no-cmake-project
+)
+FetchContent_MakeAvailable(miniz)
+
 set(_UHDR_CORE_SOURCES
   src/main.cpp
   src/cli_encode.cpp
@@ -129,6 +138,9 @@ set(_UHDR_CORE_SOURCES
   src/icc_profile.cpp
   src/hdr_chart.cpp
   src/yuv_convert.cpp
+  src/sdr_jpeg.cpp
+  src/cli_describe.cpp
+  "${miniz_SOURCE_DIR}/miniz.c"
 )
 
 set(_UHDR_GUI_SOURCES
@@ -268,6 +280,9 @@ else()
 endif()
 
 target_link_libraries(uhdr_repack PRIVATE nlohmann_json::nlohmann_json)
+target_include_directories(uhdr_repack PRIVATE "${miniz_SOURCE_DIR}")
+target_compile_definitions(uhdr_repack PRIVATE
+  MINIZ_NO_ZLIB_COMPATIBLE_NAMES MINIZ_NO_ARCHIVE_APIS MINIZ_NO_STDIO)
 
 if(UHDR_ENABLE_GUI)
   target_compile_definitions(uhdr_repack PRIVATE UHDR_ENABLE_GUI=1)

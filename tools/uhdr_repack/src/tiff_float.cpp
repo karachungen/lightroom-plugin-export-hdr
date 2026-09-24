@@ -1,8 +1,11 @@
 #include "tiff_float.h"
 
+#include "color_primaries.h"
 #include "half_float.h"
 #include "path_io.h"
 #include "resize_lanczos.h"
+
+#include <miniz.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -67,41 +70,65 @@ struct RawFloatTiff {
 
 enum class FloatRead { kFallback, kRaw, kError };
 
-FloatRead read_identity_rec2020_float(const std::string& path, bool load_pixels, RawFloatTiff* out,
-                                      std::string* error) {
+FloatRead pass_on(FloatTiffInfo* info, const char* why) {
+  info->supported = false;
+  info->why = why;
+  return FloatRead::kFallback;
+}
+
+uint32_t tiff_at(const uint8_t* p, uint16_t type, uint32_t i, bool le) {
+  return type == 3 ? tiff_u16(p + i * 2u, le) : tiff_u32(p + i * 4u, le);
+}
+
+void undo_float_predictor(uint8_t* row, size_t values, uint32_t stride) {
+  const size_t bytes = values * 4u;
+  for (size_t i = stride; i < bytes; ++i) row[i] = static_cast<uint8_t>(row[i] + row[i - stride]);
+  const std::vector<uint8_t> planes(row, row + bytes);
+  for (size_t v = 0; v < values; ++v) {
+    for (size_t b = 0; b < 4; ++b) row[v * 4u + b] = planes[(3 - b) * values + v];
+  }
+}
+
+void swap_float_bytes(uint8_t* p, size_t values) {
+  for (size_t v = 0; v < values; ++v, p += 4) {
+    std::swap(p[0], p[3]);
+    std::swap(p[1], p[2]);
+  }
+}
+
+FloatRead read_float_tiff(const std::string& path, bool load_pixels, RawFloatTiff* out, FloatTiffInfo* info,
+                          std::string* error) {
+  *info = FloatTiffInfo{};
   std::ifstream input = open_input_binary(path);
   if (!input) {
     if (error) *error = "Could not open HDR file: " + path;
     return FloatRead::kError;
   }
   std::vector<uint8_t> file((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-  if (file.size() < 8) return FloatRead::kFallback;
+  if (file.size() < 8) return pass_on(info, "file is too small for a TIFF");
   bool le = false;
-  if (file[0] == 'I' && file[1] == 'I') {
-    le = true;
-  } else if (file[0] == 'M' && file[1] == 'M') {
-    le = false;
-  } else {
-    return FloatRead::kFallback;
-  }
-  if (tiff_u16(file.data() + 2, le) != 42) return FloatRead::kFallback;
+  if (file[0] == 'I' && file[1] == 'I') le = true;
+  else if (!(file[0] == 'M' && file[1] == 'M')) return pass_on(info, "not a TIFF");
+  if (tiff_u16(file.data() + 2, le) != 42) return pass_on(info, "not a classic TIFF");
+  info->is_tiff = true;
+  info->big_endian = !le;
   const uint32_t ifd = tiff_u32(file.data() + 4, le);
-  if (static_cast<size_t>(ifd) + 2 > file.size()) return FloatRead::kFallback;
+  if (static_cast<size_t>(ifd) + 2 > file.size()) return pass_on(info, "TIFF IFD is past the end of the file");
   const uint16_t ntags = tiff_u16(file.data() + ifd, le);
   if (static_cast<size_t>(ifd) + 2u + static_cast<size_t>(ntags) * 12u > file.size()) {
-    return FloatRead::kFallback;
+    return pass_on(info, "TIFF IFD is truncated");
   }
 
   uint32_t width = 0;
   uint32_t height = 0;
   uint16_t compression = 1;
+  uint16_t predictor = 1;
   uint16_t photometric = 2;
   uint16_t samples = 1;
   uint16_t planar = 1;
   uint16_t orientation = 1;
   uint32_t rows_per_strip = 0;
-  bool has_icc = false;
-  bool linear_rec2020 = false;
+  bool icc_broken = false;
   const uint8_t* bits = nullptr;
   uint32_t bits_count = 0;
   const uint8_t* sample_fmt = nullptr;
@@ -142,57 +169,110 @@ FloatRead read_identity_rec2020_float(const std::string& path, bool load_pixels,
       strip_bytes_count = count;
       strip_bytes_type = type;
     } else if (tag == 284) planar = static_cast<uint16_t>(tiff_scalar(entry, le));
+    else if (tag == 317) predictor = static_cast<uint16_t>(tiff_scalar(entry, le));
     else if (tag == 322) tiled = true;
     else if (tag == 339) {
       sample_fmt = tiff_values(file, entry, le, type, count);
       sample_fmt_count = count;
     } else if (tag == 34675 && count > 4) {
-      has_icc = true;
       const uint8_t* icc = tiff_values(file, entry, le, 7, count);
-      if (icc) {
-        const std::string hay(reinterpret_cast<const char*>(icc), count);
-        linear_rec2020 = hay.find("Linear Rec.2020") != std::string::npos;
+      if (!icc) {
+        icc_broken = true;
+      } else {
+        info->has_icc = true;
+        info->icc = classify_icc(std::vector<uint8_t>(icc, icc + count));
       }
     }
   }
+  info->width = width;
+  info->height = height;
+  info->compression = compression;
+  info->predictor = predictor;
 
-  const bool float32 = bits && bits_count >= 3 && tiff_u16(bits, le) == 32 &&
-                       tiff_u16(bits + 2, le) == 32 && tiff_u16(bits + 4, le) == 32;
-  const bool ieee = sample_fmt && sample_fmt_count >= 3 && tiff_u16(sample_fmt, le) == 3 &&
-                    tiff_u16(sample_fmt + 2, le) == 3 && tiff_u16(sample_fmt + 4, le) == 3;
-  const bool identity = !tiled && compression == 1 && photometric == 2 && samples == 3 &&
-                        planar == 1 && orientation <= 1 && float32 && ieee &&
-                        (!has_icc || linear_rec2020);
-  if (!identity || width < 2 || height < 2 || !strip_off || strip_off_count < 1) {
-    return FloatRead::kFallback;
+  auto every = [&](const uint8_t* p, uint32_t n, uint16_t want) {
+    if (!p || n < samples) return false;
+    for (uint32_t s = 0; s < samples; ++s) {
+      if (tiff_u16(p + s * 2u, le) != want) return false;
+    }
+    return true;
+  };
+  if (tiled) return pass_on(info, "tiled TIFF");
+  if (photometric != 2) return pass_on(info, "not RGB");
+  if (samples != 3 && samples != 4) return pass_on(info, "not 3 or 4 samples per pixel");
+  if (planar != 1) return pass_on(info, "planar TIFF");
+  if (orientation > 1) return pass_on(info, "Orientation tag rotates the image");
+  if (!every(bits, bits_count, 32) || !every(sample_fmt, sample_fmt_count, 3)) {
+    return pass_on(info, "not 32-bit IEEE float samples");
   }
+  if (compression != 1 && compression != 8 && compression != 32946) {
+    return pass_on(info, "compression is not none or Deflate");
+  }
+  if (predictor != 1 && predictor != 3) return pass_on(info, "predictor is not 1 or 3");
+  if (icc_broken) return pass_on(info, "ICC tag is past the end of the file");
+  if (info->has_icc && info->icc.transfer != IccTransfer::kLinear) return pass_on(info, "ICC curve is not linear");
+  if (info->has_icc && info->icc.primaries == IccPrimaries::kUnknown) {
+    return pass_on(info, "ICC primaries are not Rec.2020, Display P3, or sRGB");
+  }
+  if (width < 2 || height < 2 || !strip_off || strip_off_count < 1) return pass_on(info, "missing size or strips");
+  if (compression != 1 && (!strip_bytes || strip_bytes_count < strip_off_count)) {
+    return pass_on(info, "compressed TIFF has no strip byte counts");
+  }
+  info->supported = true;
 
   out->width = width;
   out->height = height;
   if (!load_pixels) return FloatRead::kRaw;
-  if (rows_per_strip == 0) rows_per_strip = height;
+  if (rows_per_strip == 0 || rows_per_strip > height) rows_per_strip = height;
 
+  const size_t row_values = static_cast<size_t>(width) * samples;
+  const size_t row_bytes = row_values * 4u;
   out->rgb.assign(static_cast<size_t>(width) * height * 3u, 0.f);
+  std::vector<uint8_t> strip;
   uint32_t row = 0;
   for (uint32_t s = 0; s < strip_off_count && row < height; ++s) {
-    const uint32_t off = strip_off_type == 3 ? tiff_u16(strip_off + s * 2u, le)
-                                             : tiff_u32(strip_off + s * 4u, le);
-    const uint32_t nbytes = (strip_bytes && s < strip_bytes_count)
-                                ? (strip_bytes_type == 3 ? tiff_u16(strip_bytes + s * 2u, le)
-                                                         : tiff_u32(strip_bytes + s * 4u, le))
-                                : rows_per_strip * width * 12u;
+    const uint32_t off = tiff_at(strip_off, strip_off_type, s, le);
     const uint32_t rows = std::min(rows_per_strip, height - row);
-    const size_t need = static_cast<size_t>(rows) * width * 12u;
-    if (static_cast<size_t>(off) + need > file.size() || nbytes < need) {
-      if (error) *error = "HDR TIFF float strips are truncated: " + path;
+    const size_t need = static_cast<size_t>(rows) * row_bytes;
+    const size_t nbytes = (strip_bytes && s < strip_bytes_count) ? tiff_at(strip_bytes, strip_bytes_type, s, le) : need;
+    if (static_cast<size_t>(off) + nbytes > file.size() || (compression == 1 && nbytes < need)) {
+      if (error) *error = "HDR TIFF strips are truncated: " + path;
       return FloatRead::kError;
     }
-    std::memcpy(out->rgb.data() + static_cast<size_t>(row) * width * 3u, file.data() + off, need);
+    if (compression == 1) {
+      strip.assign(file.begin() + off, file.begin() + off + need);
+    } else {
+      strip.assign(need, 0);
+      mz_ulong len = static_cast<mz_ulong>(need);
+      if (mz_uncompress(strip.data(), &len, file.data() + off, static_cast<mz_ulong>(nbytes)) != MZ_OK ||
+          len != need) {
+        if (error) *error = "HDR TIFF Deflate strip is corrupt: " + path;
+        return FloatRead::kError;
+      }
+    }
+    for (uint32_t r = 0; r < rows; ++r) {
+      uint8_t* p = strip.data() + static_cast<size_t>(r) * row_bytes;
+      if (predictor == 3) undo_float_predictor(p, row_values, samples);
+      else if (!le) swap_float_bytes(p, row_values);
+      float* dst = out->rgb.data() + static_cast<size_t>(row + r) * width * 3u;
+      for (uint32_t x = 0; x < width; ++x) {
+        std::memcpy(dst + static_cast<size_t>(x) * 3u, p + static_cast<size_t>(x) * samples * 4u, 12);
+      }
+    }
     row += rows;
   }
   if (row < height) {
     if (error) *error = "HDR TIFF float strips do not cover the image: " + path;
     return FloatRead::kError;
+  }
+  if (info->has_icc && info->icc.primaries != IccPrimaries::kRec2020) {
+    const bool p3 = info->icc.primaries == IccPrimaries::kDisplayP3;
+    for (size_t i = 0; i < out->rgb.size(); i += 3) {
+      const LinearRgb src{out->rgb[i], out->rgb[i + 1], out->rgb[i + 2]};
+      const LinearRgb rec = p3 ? display_p3_to_rec2020(src) : linear_srgb_to_rec2020(src);
+      out->rgb[i] = rec.r;
+      out->rgb[i + 1] = rec.g;
+      out->rgb[i + 2] = rec.b;
+    }
   }
   return FloatRead::kRaw;
 }
@@ -279,14 +359,28 @@ bool publish_raw(const RawFloatTiff& raw, RawImageHolder* out, std::string* erro
 
 }  // namespace
 
-int probe_identity_rec2020_tiff(const std::string& path, unsigned* master_w, unsigned* master_h,
-                                std::string* error) {
+bool describe_float_tiff(const std::string& path, FloatTiffInfo* info, std::string* error) {
+  RawFloatTiff raw;
+  return read_float_tiff(path, false, &raw, info, error) != FloatRead::kError;
+}
+
+void log_float_tiff_fallback(const std::string& path) {
+  FloatTiffInfo info;
+  std::string err;
+  describe_float_tiff(path, &info, &err);
+  std::fprintf(stderr, "HDR TIFF: portable reader passed (%s); using the OS decoder\n",
+               info.why.empty() ? err.c_str() : info.why.c_str());
+}
+
+int probe_float_tiff_portable(const std::string& path, unsigned* master_w, unsigned* master_h,
+                              std::string* error) {
   if (!master_w || !master_h) {
     if (error) *error = "internal: null size output";
     return -1;
   }
   RawFloatTiff raw;
-  const FloatRead kind = read_identity_rec2020_float(path, false, &raw, error);
+  FloatTiffInfo info;
+  const FloatRead kind = read_float_tiff(path, false, &raw, &info, error);
   if (kind == FloatRead::kError) return -1;
   if (kind == FloatRead::kFallback) return 0;
   unsigned w = 0;
@@ -301,15 +395,16 @@ int probe_identity_rec2020_tiff(const std::string& path, unsigned* master_w, uns
   return 1;
 }
 
-int load_identity_rec2020_tiff(const std::string& path, RawImageHolder* out, std::string* error,
-                               unsigned master_w, unsigned master_h, const CropRect* crop,
-                               unsigned dst_w, unsigned dst_h) {
+int load_float_tiff_portable(const std::string& path, RawImageHolder* out, std::string* error,
+                             unsigned master_w, unsigned master_h, const CropRect* crop,
+                             unsigned dst_w, unsigned dst_h) {
   if (!out) {
     if (error) *error = "internal: null output";
     return -1;
   }
   RawFloatTiff raw;
-  const FloatRead kind = read_identity_rec2020_float(path, true, &raw, error);
+  FloatTiffInfo info;
+  const FloatRead kind = read_float_tiff(path, true, &raw, &info, error);
   if (kind == FloatRead::kError) return -1;
   if (kind == FloatRead::kFallback) return 0;
   out->reset();

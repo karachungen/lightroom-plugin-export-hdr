@@ -2,8 +2,8 @@
 
 #include "sdr_input.h"
 
+#include "sdr_jpeg.h"
 #include "wic_utils.h"
-#include "yuv_convert.h"
 
 #include <cstring>
 #include <vector>
@@ -44,33 +44,16 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
   }
 
   std::vector<uint8_t> rgba;
+  const int portable = load_sdr_jpeg_p3(path, master_width, master_height, out_w, out_h, crop_x, crop_y,
+                                        &rgba, error);
+  if (portable < 0) return false;
+  if (portable > 0) return rgba_p3_to_sdr_raw(rgba, out_w, out_h, out, error);
+  log_sdr_jpeg_fallback(path);
   if (!wic::decode_scale_crop_to_rgba8(path, master_width, master_height, out_w, out_h, crop_x,
                                        crop_y, rgba, error, wic::Rgba8Space::DisplayP3)) {
     return false;
   }
-
-  uint8_t* py = nullptr;
-  uint8_t* pu = nullptr;
-  uint8_t* pv = nullptr;
-  if (!rgba8888_to_yuv420_bt601(rgba.data(), out_w, out_h, &py, &pu, &pv, error)) {
-    return false;
-  }
-
-  uhdr_raw_image_t& r = out->ref();
-  std::memset(&r, 0, sizeof(r));
-  r.fmt = UHDR_IMG_FMT_12bppYCbCr420;
-  r.cg = UHDR_CG_DISPLAY_P3;
-  r.ct = UHDR_CT_SRGB;
-  r.range = UHDR_CR_FULL_RANGE;
-  r.w = out_w;
-  r.h = out_h;
-  r.planes[UHDR_PLANE_Y] = py;
-  r.planes[UHDR_PLANE_U] = pu;
-  r.planes[UHDR_PLANE_V] = pv;
-  r.stride[UHDR_PLANE_Y] = out_w;
-  r.stride[UHDR_PLANE_U] = out_w / 2;
-  r.stride[UHDR_PLANE_V] = out_w / 2;
-  return true;
+  return rgba_p3_to_sdr_raw(rgba, out_w, out_h, out, error);
 }
 
 }  // namespace uhdr_repack

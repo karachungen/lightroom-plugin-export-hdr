@@ -42,6 +42,7 @@ void print_usage() {
       << "Usage:\n"
       << "  uhdr_repack --hdr-tiff <path> --base <path> --out <path.jpg> [options]\n"
       << "  uhdr_repack --inspect <path.jpg>\n"
+      << "  uhdr_repack --describe-input <tif-or-jpg> [--require-portable] [--skip-if-missing]\n"
       << "  uhdr_repack --edit [--session <json>] [--sdr <path> --hdr-tiff <path> --out <path>]...\n"
       << "  uhdr_repack --self-test [--session <json>]\n"
       << "  uhdr_repack --probe-sdr <path>\n"

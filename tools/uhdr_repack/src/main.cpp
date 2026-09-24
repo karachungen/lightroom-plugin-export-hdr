@@ -48,6 +48,10 @@ static int run(int argc, char** argv) {
     return cli_inspect_main(argc, argv);
   }
 
+  if (std::strcmp(argv[1], "--describe-input") == 0) {
+    return describe_input_main(argc, argv);
+  }
+
   if (std::strcmp(argv[1], "--write-hdr-chart") == 0) {
     if (argc < 3) {
       std::cerr << "--write-hdr-chart requires an output directory\n";
