@@ -1569,11 +1569,12 @@ std::vector<ChartSample> expected_at_boost(std::vector<ChartSample> samples, con
     if (w <= 0.0f) {
       s.expected = display_p3_to_rec2020(sdr_p3(s.expected));
     } else if ((w < 1.0f || m.luma) && !inside_p3(s.expected)) {
-      // Partial headroom and luma maps decide out-of-P3 clipping in the blend space.
+      // Partial headroom and luma maps leave out-of-P3 samples ungated.
       s.gate_encoder = false;
       s.gate_lightroom = false;
     } else {
-      // Full headroom still clamps to max_content_boost; blended applies that ceiling.
+      // Gain map is in the base color space (Display P3). Expect that
+      // reconstruction, including the boost ceiling, not the Rec.2020 chart color.
       s.expected = blended(s.expected, m, w);
     }
   }
