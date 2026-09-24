@@ -35,24 +35,8 @@
   const IG_GALLERY_MAX = 20;
   const SETTINGS_DEBOUNCE_MS = 100;
   const IG_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
-  const COLOR_MAP = {
-    baseQuality: 95,
-    gainmapQuality: 95,
-    gainmapScale: 1,
-    minBoost: 1,
-    maxBoost: 16,
-    displayPeak: 3250,
-    monochromeGainmap: false,
-  };
-  const MONO_MAP = {
-    baseQuality: 95,
-    gainmapQuality: 95,
-    gainmapScale: 2,
-    minBoost: 1,
-    maxBoost: 4.92,
-    displayPeak: 1000,
-    monochromeGainmap: true,
-  };
+  const COLOR_MAP = {};
+  const MONO_MAP = {};
 
   const state = {
     items: [],
@@ -60,13 +44,13 @@
     mode: "hdr",
     encodePreset: "color",
     settings: {
-      baseQuality: COLOR_MAP.baseQuality,
-      gainmapQuality: COLOR_MAP.gainmapQuality,
-      gainmapScale: COLOR_MAP.gainmapScale,
-      minBoost: COLOR_MAP.minBoost,
-      maxBoost: COLOR_MAP.maxBoost,
-      displayPeak: COLOR_MAP.displayPeak,
-      monochromeGainmap: COLOR_MAP.monochromeGainmap,
+      baseQuality: null,
+      gainmapQuality: null,
+      gainmapScale: null,
+      minBoost: null,
+      maxBoost: null,
+      displayPeak: null,
+      monochromeGainmap: false,
       sliceAspect: "none",
       sliceCount: 1,
       cropOffset: 0.5,
@@ -633,7 +617,7 @@
     if (Math.abs(maxB - COLOR_MAP.maxBoost) > 0.15) return false;
     const q = Number(s.baseQuality);
     const g = Number(s.gainmapQuality);
-    return (q === 95 && g === 95) || (q === 85 && g === 85);
+    return (q === COLOR_MAP.baseQuality && g === COLOR_MAP.gainmapQuality) || (q === 85 && g === 85);
   }
 
   function normalizePresetName(name) {
@@ -702,10 +686,10 @@
     const hdrHint = document.getElementById("hdr-hint");
     if (color) {
       document.getElementById("delivery-hint").textContent =
-        "Full-resolution RGB Display P3 gain map with a 4-stop (16×) boost. Highlight color stays in the HDR layer; pixel size is unchanged.";
+        `Full-resolution RGB Display P3 gain map with a ${formatBoost(COLOR_MAP.maxBoost)} boost. Highlight color stays in the HDR layer; pixel size is unchanged.`;
     } else if (mono) {
       document.getElementById("delivery-hint").textContent =
-        "Half-resolution luma gain map with boost capped at 4.9×. HDR adds brightness only, not color, and the map is smaller.";
+        `Half-resolution luma gain map with boost capped at ${formatBoost(MONO_MAP.maxBoost)}. HDR adds brightness only, not color, and the map is smaller.`;
     } else {
       document.getElementById("delivery-hint").textContent =
         "Unlocks JPEG quality, boost, peak nits, and RGB vs luma map. Shown in the encoded HDR preview.";
@@ -732,6 +716,10 @@
   }
 
   function applySettings(msg) {
+    if (msg.presets) {
+      Object.assign(COLOR_MAP, msg.presets.color);
+      Object.assign(MONO_MAP, msg.presets.mono);
+    }
     SETTINGS_KEYS.forEach((key) => {
       if (msg[key] !== undefined) state.settings[key] = msg[key];
     });

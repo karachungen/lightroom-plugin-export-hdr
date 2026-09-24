@@ -120,6 +120,7 @@ FetchContent_MakeAvailable(miniz)
 set(_UHDR_CORE_SOURCES
   src/main.cpp
   src/cli_encode.cpp
+  src/encode_presets.cpp
   src/cli_inspect.cpp
   src/encode_engine.cpp
   src/session.cpp
