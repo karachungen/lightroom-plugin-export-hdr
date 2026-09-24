@@ -141,6 +141,7 @@ set(_UHDR_CORE_SOURCES
   src/yuv_convert.cpp
   src/sdr_jpeg.cpp
   src/cli_describe.cpp
+  src/delivery_check.cpp
   "${miniz_SOURCE_DIR}/miniz.c"
 )
 
@@ -155,6 +156,7 @@ set(_UHDR_GUI_SOURCES
   src/gui/gui_bridge.cpp
   src/gui/hdr_tiff_client.cpp
   src/gui/web_resources.cpp
+  src/gui/check_preview_jpeg.cpp
   src/gainmap_edit.cpp
 )
 

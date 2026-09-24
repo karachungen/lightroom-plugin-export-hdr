@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "delivery_check.h"
 #include "hdr_chart.h"
 #include "session.h"
 
@@ -140,6 +141,29 @@ static int run(int argc, char** argv) {
       }
     }
     return gui_self_test_main(session_path);
+#endif
+  }
+
+  if (std::strcmp(argv[1], "--verify-uhdr") == 0) return verify_uhdr_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-utf8-path") == 0) {
+    if (argc < 5) {
+      std::cerr << "--check-utf8-path requires <hdr-tiff> <sdr> <out-dir>\n";
+      print_usage();
+      return 1;
+    }
+    return check_utf8_path_main(argv[2], argv[3], argv[4]);
+  }
+  if (std::strcmp(argv[1], "--encode-or-skip") == 0) return encode_or_skip_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-preview-jpeg") == 0) {
+#ifndef UHDR_ENABLE_GUI
+    std::cerr << "uhdr_repack was built without GUI support (--check-preview-jpeg unavailable)\n";
+    return 1;
+#else
+    if (argc < 3) {
+      std::cerr << "--check-preview-jpeg requires an image path\n";
+      return 1;
+    }
+    return check_preview_jpeg_main(argv[2]);
 #endif
   }
 
