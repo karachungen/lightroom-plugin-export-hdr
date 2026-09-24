@@ -73,6 +73,7 @@ bool load_hdr_tiff_raw(const std::string& path, RawImageHolder* out, std::string
   if (identity < 0) return false;
   if (identity > 0) return true;
   out->reset();
+  log_float_tiff_fallback(path);
 
   std::vector<float> rgba;
   unsigned orig_w = 0;

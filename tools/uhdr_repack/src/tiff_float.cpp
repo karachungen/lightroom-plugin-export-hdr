@@ -365,6 +365,9 @@ bool describe_float_tiff(const std::string& path, FloatTiffInfo* info, std::stri
 }
 
 void log_float_tiff_fallback(const std::string& path) {
+  static std::string logged_path;
+  if (path == logged_path) return;
+  logged_path = path;
   FloatTiffInfo info;
   std::string err;
   describe_float_tiff(path, &info, &err);
