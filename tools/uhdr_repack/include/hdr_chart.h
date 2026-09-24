@@ -16,4 +16,7 @@ int check_hdr_chart_main(const std::string& dir);
  */
 int check_hdr_chart_file_main(const std::string& path, const std::string& manifest_path);
 
+/** Fail unless hdr-chart.tif and chart-manifest.json in both directories match byte for byte. */
+int check_hdr_chart_assets_main(const std::string& committed_dir, const std::string& fresh_dir);
+
 }  // namespace uhdr_repack

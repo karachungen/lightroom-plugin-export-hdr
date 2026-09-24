@@ -19,9 +19,9 @@
       "monotonic": true,
       "rect": [
         102,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 0
@@ -43,9 +43,9 @@
       "monotonic": true,
       "rect": [
         196,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 1
@@ -67,9 +67,9 @@
       "monotonic": true,
       "rect": [
         290,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 2
@@ -91,9 +91,9 @@
       "monotonic": true,
       "rect": [
         384,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 3
@@ -115,9 +115,9 @@
       "monotonic": true,
       "rect": [
         478,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 4
@@ -139,9 +139,9 @@
       "monotonic": true,
       "rect": [
         572,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 5
@@ -163,9 +163,9 @@
       "monotonic": true,
       "rect": [
         666,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 6
@@ -187,9 +187,9 @@
       "monotonic": true,
       "rect": [
         760,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 7
@@ -211,9 +211,9 @@
       "monotonic": true,
       "rect": [
         854,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 8
@@ -235,9 +235,9 @@
       "monotonic": true,
       "rect": [
         948,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 9
@@ -259,9 +259,9 @@
       "monotonic": true,
       "rect": [
         1042,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 10
@@ -283,9 +283,9 @@
       "monotonic": true,
       "rect": [
         1136,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 11
@@ -307,9 +307,9 @@
       "monotonic": true,
       "rect": [
         1230,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 12
@@ -331,12 +331,60 @@
       "monotonic": true,
       "rect": [
         1324,
+        74,
         44,
-        44,
-        44
+        24
       ],
       "series": "neutral",
       "series_index": 13
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0625,
+        0.003823366016149521,
+        -0.00010042567737400532
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        142,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.25,
+        0.015293464064598083,
+        -0.00040170270949602127
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/R/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        142,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
     },
     {
       "chromatic": "",
@@ -354,10 +402,10 @@
       "id": "hue/R/+0",
       "monotonic": false,
       "rect": [
-        100,
-        148,
-        40,
-        40
+        218,
+        142,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -378,10 +426,10 @@
       "id": "hue/R/+1",
       "monotonic": false,
       "rect": [
-        186,
-        148,
-        40,
-        40
+        280,
+        142,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -402,10 +450,10 @@
       "id": "hue/R/+2",
       "monotonic": false,
       "rect": [
-        272,
-        148,
-        40,
-        40
+        342,
+        142,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -426,10 +474,10 @@
       "id": "hue/R/+3",
       "monotonic": false,
       "rect": [
-        358,
-        148,
-        40,
-        40
+        404,
+        142,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -450,10 +498,58 @@
       "id": "hue/R/+4",
       "monotonic": false,
       "rect": [
-        444,
-        148,
-        40,
-        40
+        466,
+        142,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0625,
+        0.037873510271310806,
+        0.0005560041172429919
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        204,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.25,
+        0.15149404108524323,
+        0.0022240164689719677
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/OR/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        204,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -474,10 +570,10 @@
       "id": "hue/OR/+0",
       "monotonic": false,
       "rect": [
-        100,
-        234,
-        40,
-        40
+        218,
+        204,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -498,10 +594,10 @@
       "id": "hue/OR/+1",
       "monotonic": false,
       "rect": [
-        186,
-        234,
-        40,
-        40
+        280,
+        204,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -522,10 +618,10 @@
       "id": "hue/OR/+2",
       "monotonic": false,
       "rect": [
-        272,
-        234,
-        40,
-        40
+        342,
+        204,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -546,10 +642,10 @@
       "id": "hue/OR/+3",
       "monotonic": false,
       "rect": [
-        358,
-        234,
-        40,
-        40
+        404,
+        204,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -570,10 +666,58 @@
       "id": "hue/OR/+4",
       "monotonic": false,
       "rect": [
-        444,
-        234,
-        40,
-        40
+        466,
+        204,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.060259655117988586,
+        0.0625,
+        0.0010370038216933608
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        266,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.24103862047195435,
+        0.25,
+        0.004148015286773443
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/Y/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        266,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -594,10 +738,10 @@
       "id": "hue/Y/+0",
       "monotonic": false,
       "rect": [
-        100,
-        320,
-        40,
-        40
+        218,
+        266,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -618,10 +762,10 @@
       "id": "hue/Y/+1",
       "monotonic": false,
       "rect": [
-        186,
-        320,
-        40,
-        40
+        280,
+        266,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -642,10 +786,10 @@
       "id": "hue/Y/+2",
       "monotonic": false,
       "rect": [
-        272,
-        320,
-        40,
-        40
+        342,
+        266,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -666,10 +810,10 @@
       "id": "hue/Y/+3",
       "monotonic": false,
       "rect": [
-        358,
-        320,
-        40,
-        40
+        404,
+        266,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -690,10 +834,58 @@
       "id": "hue/Y/+4",
       "monotonic": false,
       "rect": [
-        444,
-        320,
-        40,
-        40
+        466,
+        266,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.037282612174749374,
+        0.0624999962747097,
+        0.0011010206071659923
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        328,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.1491304486989975,
+        0.2499999850988388,
+        0.004404082428663969
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/YG/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        328,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -714,10 +906,10 @@
       "id": "hue/YG/+0",
       "monotonic": false,
       "rect": [
-        100,
-        406,
-        40,
-        40
+        218,
+        328,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -738,10 +930,10 @@
       "id": "hue/YG/+1",
       "monotonic": false,
       "rect": [
-        186,
-        406,
-        40,
-        40
+        280,
+        328,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -762,10 +954,10 @@
       "id": "hue/YG/+2",
       "monotonic": false,
       "rect": [
-        272,
-        406,
-        40,
-        40
+        342,
+        328,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -786,10 +978,10 @@
       "id": "hue/YG/+3",
       "monotonic": false,
       "rect": [
-        358,
-        406,
-        40,
-        40
+        404,
+        328,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -810,10 +1002,58 @@
       "id": "hue/YG/+4",
       "monotonic": false,
       "rect": [
-        444,
-        406,
-        40,
-        40
+        466,
+        328,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.013180428184568882,
+        0.0625,
+        0.0011681729229167104
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        390,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.05272171273827553,
+        0.25,
+        0.0046726916916668415
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/G/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        390,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -834,10 +1074,10 @@
       "id": "hue/G/+0",
       "monotonic": false,
       "rect": [
-        100,
-        492,
-        40,
-        40
+        218,
+        390,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -858,10 +1098,10 @@
       "id": "hue/G/+1",
       "monotonic": false,
       "rect": [
-        186,
-        492,
-        40,
-        40
+        280,
+        390,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -882,10 +1122,10 @@
       "id": "hue/G/+2",
       "monotonic": false,
       "rect": [
-        272,
-        492,
-        40,
-        40
+        342,
+        390,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -906,10 +1146,10 @@
       "id": "hue/G/+3",
       "monotonic": false,
       "rect": [
-        358,
-        492,
-        40,
-        40
+        404,
+        390,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -930,10 +1170,58 @@
       "id": "hue/G/+4",
       "monotonic": false,
       "rect": [
-        444,
-        492,
-        40,
-        40
+        466,
+        390,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.014663523994386196,
+        0.0625,
+        0.033589404076337814
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        452,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.058654095977544785,
+        0.25,
+        0.13435761630535126
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/GC/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        452,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -954,10 +1242,10 @@
       "id": "hue/GC/+0",
       "monotonic": false,
       "rect": [
-        100,
-        578,
-        40,
-        40
+        218,
+        452,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -978,10 +1266,10 @@
       "id": "hue/GC/+1",
       "monotonic": false,
       "rect": [
-        186,
-        578,
-        40,
-        40
+        280,
+        452,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1002,10 +1290,10 @@
       "id": "hue/GC/+2",
       "monotonic": false,
       "rect": [
-        272,
-        578,
-        40,
-        40
+        342,
+        452,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1026,10 +1314,10 @@
       "id": "hue/GC/+3",
       "monotonic": false,
       "rect": [
-        358,
-        578,
-        40,
-        40
+        404,
+        452,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1050,10 +1338,58 @@
       "id": "hue/GC/+4",
       "monotonic": false,
       "rect": [
-        444,
-        578,
-        40,
-        40
+        466,
+        452,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.015366839244961739,
+        0.059551939368247986,
+        0.0625
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        514,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.061467356979846954,
+        0.23820775747299194,
+        0.25
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/C/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        514,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1074,10 +1410,10 @@
       "id": "hue/C/+0",
       "monotonic": false,
       "rect": [
-        100,
-        664,
-        40,
-        40
+        218,
+        514,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1098,10 +1434,10 @@
       "id": "hue/C/+1",
       "monotonic": false,
       "rect": [
-        186,
-        664,
-        40,
-        40
+        280,
+        514,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1122,10 +1458,10 @@
       "id": "hue/C/+2",
       "monotonic": false,
       "rect": [
-        272,
-        664,
-        40,
-        40
+        342,
+        514,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1146,10 +1482,10 @@
       "id": "hue/C/+3",
       "monotonic": false,
       "rect": [
-        358,
-        664,
-        40,
-        40
+        404,
+        514,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1170,10 +1506,58 @@
       "id": "hue/C/+4",
       "monotonic": false,
       "rect": [
-        444,
-        664,
-        40,
-        40
+        466,
+        514,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.009249474853277206,
+        0.03042604587972164,
+        0.0625
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        576,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.036997899413108826,
+        0.12170418351888657,
+        0.25
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/CB/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        576,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1194,10 +1578,10 @@
       "id": "hue/CB/+0",
       "monotonic": false,
       "rect": [
-        100,
-        750,
-        40,
-        40
+        218,
+        576,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1218,10 +1602,10 @@
       "id": "hue/CB/+1",
       "monotonic": false,
       "rect": [
-        186,
-        750,
-        40,
-        40
+        280,
+        576,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1242,10 +1626,10 @@
       "id": "hue/CB/+2",
       "monotonic": false,
       "rect": [
-        272,
-        750,
-        40,
-        40
+        342,
+        576,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1266,10 +1650,10 @@
       "id": "hue/CB/+3",
       "monotonic": false,
       "rect": [
-        358,
-        750,
-        40,
-        40
+        404,
+        576,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1290,10 +1674,58 @@
       "id": "hue/CB/+4",
       "monotonic": false,
       "rect": [
-        444,
-        750,
-        40,
-        40
+        466,
+        576,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0030226411763578653,
+        0.0007789513329043984,
+        0.0624999962747097
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        638,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.012090564705431461,
+        0.0031158053316175938,
+        0.2499999850988388
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/B/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        638,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1314,10 +1746,10 @@
       "id": "hue/B/+0",
       "monotonic": false,
       "rect": [
-        100,
-        836,
-        40,
-        40
+        218,
+        638,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1338,10 +1770,10 @@
       "id": "hue/B/+1",
       "monotonic": false,
       "rect": [
-        186,
-        836,
-        40,
-        40
+        280,
+        638,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1362,10 +1794,10 @@
       "id": "hue/B/+2",
       "monotonic": false,
       "rect": [
-        272,
-        836,
-        40,
-        40
+        342,
+        638,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1386,10 +1818,10 @@
       "id": "hue/B/+3",
       "monotonic": false,
       "rect": [
-        358,
-        836,
-        40,
-        40
+        404,
+        638,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1410,10 +1842,58 @@
       "id": "hue/B/+4",
       "monotonic": false,
       "rect": [
-        444,
-        836,
-        40,
-        40
+        466,
+        638,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.026989109814167023,
+        0.002245438750833273,
+        0.0624999962747097
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        700,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.10795643925666809,
+        0.008981755003333092,
+        0.2499999850988388
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/BM/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        700,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1434,10 +1914,10 @@
       "id": "hue/BM/+0",
       "monotonic": false,
       "rect": [
-        100,
-        922,
-        40,
-        40
+        218,
+        700,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1458,10 +1938,10 @@
       "id": "hue/BM/+1",
       "monotonic": false,
       "rect": [
-        186,
-        922,
-        40,
-        40
+        280,
+        700,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1482,10 +1962,10 @@
       "id": "hue/BM/+2",
       "monotonic": false,
       "rect": [
-        272,
-        922,
-        40,
-        40
+        342,
+        700,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1506,10 +1986,10 @@
       "id": "hue/BM/+3",
       "monotonic": false,
       "rect": [
-        358,
-        922,
-        40,
-        40
+        404,
+        700,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1530,10 +2010,58 @@
       "id": "hue/BM/+4",
       "monotonic": false,
       "rect": [
-        444,
-        922,
-        40,
-        40
+        466,
+        700,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.05098512023687363,
+        0.0037137337494641542,
+        0.0624999962747097
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        762,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.2039404809474945,
+        0.014854934997856617,
+        0.2499999850988388
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/M/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        762,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1554,10 +2082,10 @@
       "id": "hue/M/+0",
       "monotonic": false,
       "rect": [
-        100,
-        1008,
-        40,
-        40
+        218,
+        762,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1578,10 +2106,10 @@
       "id": "hue/M/+1",
       "monotonic": false,
       "rect": [
-        186,
-        1008,
-        40,
-        40
+        280,
+        762,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1602,10 +2130,10 @@
       "id": "hue/M/+2",
       "monotonic": false,
       "rect": [
-        272,
-        1008,
-        40,
-        40
+        342,
+        762,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1626,10 +2154,10 @@
       "id": "hue/M/+3",
       "monotonic": false,
       "rect": [
-        358,
-        1008,
-        40,
-        40
+        404,
+        762,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1650,10 +2178,58 @@
       "id": "hue/M/+4",
       "monotonic": false,
       "rect": [
-        444,
-        1008,
-        40,
-        40
+        466,
+        762,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.0625,
+        0.004199069458991289,
+        0.03943077474832535
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/-4",
+      "monotonic": false,
+      "rect": [
+        94,
+        824,
+        28,
+        28
+      ],
+      "series": "",
+      "series_index": -1
+    },
+    {
+      "chromatic": "",
+      "expected_rec2020": [
+        0.25,
+        0.016796277835965157,
+        0.1577230989933014
+      ],
+      "exposure_ref": false,
+      "gate": {
+        "encoder": "pass",
+        "lightroom": "pass"
+      },
+      "group": "hue",
+      "id": "hue/MR/-2",
+      "monotonic": false,
+      "rect": [
+        156,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1674,10 +2250,10 @@
       "id": "hue/MR/+0",
       "monotonic": false,
       "rect": [
-        100,
-        1094,
-        40,
-        40
+        218,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1698,10 +2274,10 @@
       "id": "hue/MR/+1",
       "monotonic": false,
       "rect": [
-        186,
-        1094,
-        40,
-        40
+        280,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1722,10 +2298,10 @@
       "id": "hue/MR/+2",
       "monotonic": false,
       "rect": [
-        272,
-        1094,
-        40,
-        40
+        342,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1746,10 +2322,10 @@
       "id": "hue/MR/+3",
       "monotonic": false,
       "rect": [
-        358,
-        1094,
-        40,
-        40
+        404,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -1770,10 +2346,10 @@
       "id": "hue/MR/+4",
       "monotonic": false,
       "rect": [
-        444,
-        1094,
-        40,
-        40
+        466,
+        824,
+        28,
+        28
       ],
       "series": "",
       "series_index": -1
@@ -2730,10 +3306,10 @@
       "id": "sat/R/25",
       "monotonic": false,
       "rect": [
-        568,
-        636,
-        48,
-        48
+        566,
+        634,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2754,10 +3330,10 @@
       "id": "sat/R/50",
       "monotonic": false,
       "rect": [
-        672,
-        636,
-        48,
-        48
+        660,
+        634,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2778,10 +3354,10 @@
       "id": "sat/R/75",
       "monotonic": false,
       "rect": [
-        776,
-        636,
-        48,
-        48
+        754,
+        634,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2802,10 +3378,10 @@
       "id": "sat/R/100",
       "monotonic": false,
       "rect": [
-        880,
-        636,
-        48,
-        48
+        848,
+        634,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2826,10 +3402,10 @@
       "id": "sat/Y/25",
       "monotonic": false,
       "rect": [
-        568,
-        740,
-        48,
-        48
+        566,
+        728,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2850,10 +3426,10 @@
       "id": "sat/Y/50",
       "monotonic": false,
       "rect": [
-        672,
-        740,
-        48,
-        48
+        660,
+        728,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2874,10 +3450,10 @@
       "id": "sat/Y/75",
       "monotonic": false,
       "rect": [
-        776,
-        740,
-        48,
-        48
+        754,
+        728,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2898,10 +3474,10 @@
       "id": "sat/Y/100",
       "monotonic": false,
       "rect": [
-        880,
-        740,
-        48,
-        48
+        848,
+        728,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2922,10 +3498,10 @@
       "id": "sat/G/25",
       "monotonic": false,
       "rect": [
-        568,
-        844,
-        48,
-        48
+        566,
+        822,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2946,10 +3522,10 @@
       "id": "sat/G/50",
       "monotonic": false,
       "rect": [
-        672,
-        844,
-        48,
-        48
+        660,
+        822,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2970,10 +3546,10 @@
       "id": "sat/G/75",
       "monotonic": false,
       "rect": [
-        776,
-        844,
-        48,
-        48
+        754,
+        822,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -2994,10 +3570,10 @@
       "id": "sat/G/100",
       "monotonic": false,
       "rect": [
-        880,
-        844,
-        48,
-        48
+        848,
+        822,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3018,10 +3594,10 @@
       "id": "sat/C/25",
       "monotonic": false,
       "rect": [
-        568,
-        948,
-        48,
-        48
+        566,
+        916,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3042,10 +3618,10 @@
       "id": "sat/C/50",
       "monotonic": false,
       "rect": [
-        672,
-        948,
-        48,
-        48
+        660,
+        916,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3066,10 +3642,10 @@
       "id": "sat/C/75",
       "monotonic": false,
       "rect": [
-        776,
-        948,
-        48,
-        48
+        754,
+        916,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3090,10 +3666,10 @@
       "id": "sat/C/100",
       "monotonic": false,
       "rect": [
-        880,
-        948,
-        48,
-        48
+        848,
+        916,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3114,10 +3690,10 @@
       "id": "sat/B/25",
       "monotonic": false,
       "rect": [
-        568,
-        1052,
-        48,
-        48
+        566,
+        1010,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3138,10 +3714,10 @@
       "id": "sat/B/50",
       "monotonic": false,
       "rect": [
-        672,
-        1052,
-        48,
-        48
+        660,
+        1010,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3162,10 +3738,10 @@
       "id": "sat/B/75",
       "monotonic": false,
       "rect": [
-        776,
-        1052,
-        48,
-        48
+        754,
+        1010,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3186,10 +3762,10 @@
       "id": "sat/B/100",
       "monotonic": false,
       "rect": [
-        880,
-        1052,
-        48,
-        48
+        848,
+        1010,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3210,10 +3786,10 @@
       "id": "sat/M/25",
       "monotonic": false,
       "rect": [
-        568,
-        1156,
-        48,
-        48
+        566,
+        1104,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3234,10 +3810,10 @@
       "id": "sat/M/50",
       "monotonic": false,
       "rect": [
-        672,
-        1156,
-        48,
-        48
+        660,
+        1104,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3258,10 +3834,10 @@
       "id": "sat/M/75",
       "monotonic": false,
       "rect": [
-        776,
-        1156,
-        48,
-        48
+        754,
+        1104,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1
@@ -3282,10 +3858,10 @@
       "id": "sat/M/100",
       "monotonic": false,
       "rect": [
-        880,
-        1156,
-        48,
-        48
+        848,
+        1104,
+        44,
+        44
       ],
       "series": "",
       "series_index": -1

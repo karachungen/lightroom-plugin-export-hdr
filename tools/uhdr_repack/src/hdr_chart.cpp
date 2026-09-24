@@ -5,12 +5,16 @@
 #include "half_float.h"
 #include "icc_profile.h"
 #include "path_io.h"
+#include "sdr_jpeg.h"
+#include "slice_plan.h"
 #include "tiff_float.h"
 #include "tiff_input.h"
 
 #include <ultrahdr_api.h>
 
 #include <nlohmann/json.hpp>
+
+#include <miniz.h>
 
 #include <algorithm>
 #include <cmath>
@@ -52,8 +56,9 @@ constexpr float kLrHue = 0.08f;
 constexpr float kRamp0 = -6.4f;
 constexpr float kRamp1 = 5.4f;
 
-constexpr int kAX = 80, kAY = 22, kAPatch = 88, kAGap = 6;
-constexpr int kBX = 80, kBY = 128, kBPatch = 80, kBGap = 6;
+constexpr int kAX = 80, kAY = 62, kAPatch = 88, kAPatchH = 48, kAGap = 6;
+constexpr int kBX = 80, kBY = 128, kBPatch = 56, kBGap = 6;
+constexpr int kHueStops[7] = {-4, -2, 0, 1, 2, 3, 4};
 constexpr int kCX = 544, kCY = 128, kCPatch = 72, kCGap = 6;
 constexpr int kEX = 1018, kEY = 128, kEPatch = 52, kEGap = 4;
 constexpr int kEGridW = 6 * kEPatch + 5 * kEGap;
@@ -72,6 +77,8 @@ static_assert(kHeight % kStripRows == 0, "TIFF strips must cover the height");
 static_assert(kFW % 24 == 0, "hue sweep must be an integer number of bands");
 static_assert(kAX + 14 * kAPatch + 13 * kAGap <= kWidth, "neutral row overflows");
 static_assert(kBY + 12 * kBPatch + 11 * kBGap <= kFRampY, "hue grid overlaps the ramp");
+static_assert(kAY + kAPatchH <= kBY - 18, "neutral row overlaps the hue labels");
+static_assert(kBX + 7 * kBPatch + 6 * kBGap <= kCX - 28, "hue grid overlaps the gamut row labels");
 static_assert(kCX + 6 * kCPatch + 5 * kCGap <= kEX, "gamut grid overlaps ColorChecker");
 static_assert(kEY2 + kEGridH <= kDY, "ColorChecker overlaps saturation");
 static_assert(kDX + 6 * kDPatch + 5 * kDGap <= kPX, "saturation overlaps Rec.2020 peaks");
@@ -248,16 +255,16 @@ bool build_samples(std::vector<ChartSample>* out, std::string* error) {
     s.gate_encoder = stop < 5;
     s.gate_lightroom = stop < 5;
     const int col = stop + 8;
-    push_flat(out, std::move(s), {kAX + col * (kAPatch + kAGap), kAY, kAPatch, kAPatch});
+    push_flat(out, std::move(s), {kAX + col * (kAPatch + kAGap), kAY, kAPatch, kAPatchH});
   }
 
   for (int row = 0; row < 12; ++row) {
     const LinearRgb unit = p3_edge(row * 30);
-    for (int col = 0; col < 5; ++col) {
+    for (int col = 0; col < 7; ++col) {
       ChartSample s;
-      s.id = std::string("hue/") + hue_labels[row] + "/" + stop_tag(col);
+      s.id = std::string("hue/") + hue_labels[row] + "/" + stop_tag(kHueStops[col]);
       s.group = "hue";
-      s.expected = at_stop(unit, col);
+      s.expected = at_stop(unit, kHueStops[col]);
       push_flat(out, std::move(s),
                 {kBX + col * (kBPatch + kBGap), kBY + row * (kBPatch + kBGap), kBPatch, kBPatch});
     }
@@ -573,15 +580,15 @@ void draw_slant(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y
 }
 
 void draw_labels(std::vector<float>& hdr, std::vector<uint8_t>& sdr) {
-  draw_text(hdr, sdr, 8, 4, "STOPS");
+  draw_text(hdr, sdr, 8, kAY - 18, "STOPS");
   for (int stop = -8; stop <= 5; ++stop) {
     const int col = stop + 8;
     const int x = kAX + col * (kAPatch + kAGap);
-    draw_text_centered(hdr, sdr, x, 4, kAPatch, stop_tag(stop).c_str());
+    draw_text_centered(hdr, sdr, x, kAY - 18, kAPatch, stop_tag(stop).c_str());
   }
   draw_text(hdr, sdr, 8, kBY - 16, "HUE");
-  for (int col = 0; col < 5; ++col) {
-    draw_text_centered(hdr, sdr, kBX + col * (kBPatch + kBGap), kBY - 16, kBPatch, stop_tag(col).c_str());
+  for (int col = 0; col < 7; ++col) {
+    draw_text_centered(hdr, sdr, kBX + col * (kBPatch + kBGap), kBY - 16, kBPatch, stop_tag(kHueStops[col]).c_str());
   }
   const char* hue_labels[] = {"R", "OR", "Y", "YG", "G", "GC", "C", "CB", "B", "BM", "M", "MR"};
   for (int row = 0; row < 12; ++row) {
@@ -746,9 +753,42 @@ void put_u32(std::vector<uint8_t>& b, size_t at, uint32_t v) {
   b[at + 3] = static_cast<uint8_t>(v >> 24);
 }
 
+void apply_float_predictor(uint8_t* row, size_t values, uint32_t stride) {
+  const size_t bytes = values * 4u;
+  std::vector<uint8_t> planes(bytes);
+  for (size_t v = 0; v < values; ++v) {
+    for (size_t b = 0; b < 4; ++b) planes[(3 - b) * values + v] = row[v * 4u + b];
+  }
+  for (size_t i = bytes; i-- > stride;) planes[i] = static_cast<uint8_t>(planes[i] - planes[i - stride]);
+  std::memcpy(row, planes.data(), bytes);
+}
+
 bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, const std::vector<uint8_t>& icc,
                       std::string* error) {
-  constexpr uint32_t ntags = 17;
+  const uint32_t nstrips = static_cast<uint32_t>(kHeight / kStripRows);
+  const size_t row_values = static_cast<size_t>(kWidth) * 3u;
+  const size_t strip_raw = static_cast<size_t>(kStripRows) * row_values * 4u;
+  if (rgb.size() < static_cast<size_t>(kHeight) * row_values) {
+    if (error) *error = "internal: HDR buffer does not cover the TIFF";
+    return false;
+  }
+  std::vector<std::vector<uint8_t>> strips(nstrips);
+  std::vector<uint8_t> raw(strip_raw);
+  for (uint32_t s = 0; s < nstrips; ++s) {
+    std::memcpy(raw.data(), rgb.data() + static_cast<size_t>(s) * kStripRows * row_values, strip_raw);
+    for (int r = 0; r < kStripRows; ++r) {
+      apply_float_predictor(raw.data() + static_cast<size_t>(r) * row_values * 4u, row_values, 3);
+    }
+    mz_ulong len = mz_compressBound(static_cast<mz_ulong>(strip_raw));
+    strips[s].resize(len);
+    if (mz_compress2(strips[s].data(), &len, raw.data(), static_cast<mz_ulong>(strip_raw), 6) != MZ_OK) {
+      if (error) *error = "Deflate failed on TIFF strip " + std::to_string(s);
+      return false;
+    }
+    strips[s].resize(len);
+  }
+
+  constexpr uint32_t ntags = 18;
   constexpr uint32_t ifd = 8;
   constexpr uint32_t after = ifd + 2 + ntags * 12 + 4;
   uint32_t cursor = (after + 3u) & ~3u;
@@ -765,7 +805,6 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, co
   const uint32_t soft_off = cursor;
   cursor += software_len;
   cursor = (cursor + 3u) & ~3u;
-  const uint32_t nstrips = static_cast<uint32_t>(kHeight / kStripRows);
   const uint32_t strips_off = cursor;
   cursor += nstrips * 4u;
   const uint32_t counts_off = cursor;
@@ -774,14 +813,10 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, co
   cursor += static_cast<uint32_t>(icc.size());
   cursor = (cursor + 3u) & ~3u;
   const uint32_t data_off = cursor;
-  const uint32_t strip_bytes = static_cast<uint32_t>(kStripRows) * static_cast<uint32_t>(kWidth) * 12u;
-  const uint32_t nbytes = nstrips * strip_bytes;
-  if (rgb.size() * sizeof(float) < nbytes) {
-    if (error) *error = "internal: HDR buffer does not cover the TIFF";
-    return false;
-  }
+  size_t total = data_off;
+  for (const auto& strip : strips) total += strip.size();
 
-  std::vector<uint8_t> file(static_cast<size_t>(data_off) + nbytes, 0);
+  std::vector<uint8_t> file(total, 0);
   file[0] = 'I';
   file[1] = 'I';
   put_u16(file, 2, 42);
@@ -798,7 +833,7 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, co
   entry(256, 3, 1, static_cast<uint32_t>(kWidth));
   entry(257, 3, 1, static_cast<uint32_t>(kHeight));
   entry(258, 3, 3, bits_off);
-  entry(259, 3, 1, 1);
+  entry(259, 3, 1, 8);
   entry(262, 3, 1, 2);
   entry(273, 4, nstrips, strips_off);
   entry(274, 3, 1, 1);
@@ -810,6 +845,7 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, co
   entry(284, 3, 1, 1);
   entry(296, 3, 1, 2);
   entry(305, 2, software_len, soft_off);
+  entry(317, 3, 1, 3);
   entry(339, 3, 3, fmt_off);
   entry(34675, 7, static_cast<uint32_t>(icc.size()), icc_off);
   put_u32(file, e, 0);
@@ -824,12 +860,14 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, co
   put_u32(file, yres_off, 72);
   put_u32(file, yres_off + 4, 1);
   std::memcpy(file.data() + soft_off, software, software_len);
-  for (uint32_t s = 0; s < nstrips; ++s) {
-    put_u32(file, strips_off + s * 4u, data_off + s * strip_bytes);
-    put_u32(file, counts_off + s * 4u, strip_bytes);
-  }
   std::memcpy(file.data() + icc_off, icc.data(), icc.size());
-  std::memcpy(file.data() + data_off, rgb.data(), nbytes);
+  uint32_t at = data_off;
+  for (uint32_t s = 0; s < nstrips; ++s) {
+    put_u32(file, strips_off + s * 4u, at);
+    put_u32(file, counts_off + s * 4u, static_cast<uint32_t>(strips[s].size()));
+    std::memcpy(file.data() + at, strips[s].data(), strips[s].size());
+    at += static_cast<uint32_t>(strips[s].size());
+  }
 
   std::ofstream out = open_output_binary(path);
   if (!out) {
@@ -974,17 +1012,6 @@ bool half_image_to_rgb(const RawImageHolder& hdr, std::vector<float>* rgb, int* 
     }
   }
   return true;
-}
-
-bool reload_identity(const std::string& path, std::vector<float>* rgb, int* width, int* height, std::string* error) {
-  RawImageHolder hdr;
-  const int identity = load_float_tiff_portable(path, &hdr, error);
-  if (identity < 0) return false;
-  if (identity == 0) {
-    if (error) *error = "TIFF was not read by the portable reader";
-    return false;
-  }
-  return half_image_to_rgb(hdr, rgb, width, height, error);
 }
 
 std::string join_dir(const std::string& dir, const char* name) {
@@ -1357,6 +1384,25 @@ bool is_tiff_path(const std::string& path) {
   return (mag[0] == 'I' && mag[1] == 'I') || (mag[0] == 'M' && mag[1] == 'M');
 }
 
+bool frame_for(int chart_w, int chart_h, SliceAspect aspect, float crop_offset, Rect* frame, std::string* error) {
+  *frame = {0, 0, chart_w, chart_h};
+  if (aspect == SliceAspect::kNone) return true;
+  std::vector<CropRect> tiles;
+  if (!compute_slices(static_cast<unsigned>(chart_w), static_cast<unsigned>(chart_h), aspect, &tiles, error,
+                      crop_offset, 1) ||
+      tiles.empty()) {
+    if (error && error->empty()) *error = "no crop fits the chart";
+    return false;
+  }
+  *frame = {static_cast<int>(tiles[0].x), static_cast<int>(tiles[0].y), static_cast<int>(tiles[0].w),
+            static_cast<int>(tiles[0].h)};
+  return true;
+}
+
+bool inside(const ChartSample& s, const Rect& f) {
+  return s.x >= f.x && s.y >= f.y && s.x + s.w <= f.x + f.w && s.y + s.h <= f.y + f.h;
+}
+
 bool embedded_profile_is(const std::string& path, IccPrimaries primaries, IccTransfer transfer,
                          std::string* error) {
   std::vector<uint8_t> icc;
@@ -1366,6 +1412,22 @@ bool embedded_profile_is(const std::string& path, IccPrimaries primaries, IccTra
     if (error) {
       *error = path + " embeds " + icc_class_name(got) + ", expected " + icc_class_name({primaries, transfer});
     }
+    return false;
+  }
+  return true;
+}
+
+bool same_bytes(const std::string& a, const std::string& b, std::string* error) {
+  std::ifstream ia = open_input_binary(a);
+  std::ifstream ib = open_input_binary(b);
+  if (!ia || !ib) {
+    if (error) *error = "could not open " + a + " and " + b;
+    return false;
+  }
+  const std::vector<char> ba((std::istreambuf_iterator<char>(ia)), {});
+  const std::vector<char> bb((std::istreambuf_iterator<char>(ib)), {});
+  if (ba != bb) {
+    if (error) *error = a + " and " + b + " differ (" + std::to_string(ba.size()) + " vs " + std::to_string(bb.size()) + " bytes)";
     return false;
   }
   return true;
@@ -1426,12 +1488,30 @@ int write_hdr_chart_main(const std::string& dir) {
     std::cerr << err << "\n";
     return 1;
   }
-  std::vector<float> fast;
-  int fw = 0;
-  int fh = 0;
-  if (!reload_identity(tiff, &fast, &fw, &fh, &err) || !samples_match(fast, fw, fh, samples, "fast reader", &err)) {
+  FloatTiffInfo tiff_info;
+  SdrJpegInfo jpeg_info;
+  if (!describe_float_tiff(tiff, &tiff_info, &err) || !describe_sdr_jpeg(jpeg, &jpeg_info, &err)) {
     std::cerr << err << "\n";
     return 1;
+  }
+  if (!tiff_info.supported || tiff_info.compression != 8 || tiff_info.predictor != 3) {
+    std::cerr << "chart TIFF must be Deflate + predictor 3 and read by the portable reader: " << tiff_info.why << "\n";
+    return 1;
+  }
+  if (!jpeg_info.supported) {
+    std::cerr << "chart JPEG must be read by the portable loader: " << jpeg_info.why << "\n";
+    return 1;
+  }
+  Rect feed;
+  if (!frame_for(kWidth, kHeight, SliceAspect::k4x5, 0.5f, &feed, &err)) {
+    std::cerr << err << "\n";
+    return 1;
+  }
+  for (const ChartSample& s : samples) {
+    if (s.gate_encoder && !inside(s, feed)) {
+      std::cerr << "gated sample " << s.id << " is outside the Instagram 4:5 crop\n";
+      return 1;
+    }
   }
   std::vector<float> reread;
   int rw = 0;
@@ -1445,8 +1525,8 @@ int write_hdr_chart_main(const std::string& dir) {
   std::cout << "Wrote " << jpeg << " (" << jpeg_bytes.size() << " bytes, Display P3 ICC)\n";
   std::cout << "Wrote " << man << " (" << samples.size() << " samples)\n";
   std::cout << kWidth << "x" << kHeight
-            << " linear Rec.2020, embedded profiles Rec.2020 / linear and Display P3 / sRGB curve,"
-               " readers match the manifest\n";
+            << " Deflate float TIFF, embedded profiles valid, portable readers match the manifest,"
+               " gated samples fit 4:5\n";
   return 0;
 }
 
@@ -1540,6 +1620,18 @@ int check_hdr_chart_file_main(const std::string& path, const std::string& manife
     return 1;
   }
   return grade(samples, rgb, w, h, chart_w, chart_h, true, "", nullptr);
+}
+
+int check_hdr_chart_assets_main(const std::string& committed_dir, const std::string& fresh_dir) {
+  for (const char* name : {"hdr-chart.tif", "chart-manifest.json"}) {
+    std::string err;
+    if (!same_bytes(join_dir(committed_dir, name), join_dir(fresh_dir, name), &err)) {
+      std::cerr << err << "\nCommitted chart is stale. Run --write-hdr-chart test/hdr-chart.\n";
+      return 1;
+    }
+  }
+  std::cout << "HDR_CHART assets match\n";
+  return 0;
 }
 
 }  // namespace uhdr_repack
