@@ -59,7 +59,7 @@ constexpr int kEX = 1018, kEY = 128, kEPatch = 52, kEGap = 4;
 constexpr int kEGridW = 6 * kEPatch + 5 * kEGap;
 constexpr int kEGridH = 4 * kEPatch + 3 * kEGap;
 constexpr int kEY2 = kEY + kEGridH + 18;
-constexpr int kDX = 544, kDY = 612, kDPatch = 96, kDGap = 8;
+constexpr int kDX = 544, kDY = 612, kDPatch = 88, kDGap = 6;
 constexpr int kPX = 1176, kPY = 640, kPPatch = 80, kPGap = 10;
 constexpr int kFX = 96, kFW = 1248;
 constexpr int kFRampY = 1180, kFRampH = 110;
@@ -75,6 +75,7 @@ static_assert(kBY + 12 * kBPatch + 11 * kBGap <= kFRampY, "hue grid overlaps the
 static_assert(kCX + 6 * kCPatch + 5 * kCGap <= kEX, "gamut grid overlaps ColorChecker");
 static_assert(kEY2 + kEGridH <= kDY, "ColorChecker overlaps saturation");
 static_assert(kDX + 6 * kDPatch + 5 * kDGap <= kPX, "saturation overlaps Rec.2020 peaks");
+static_assert(kDY + 6 * kDPatch + 5 * kDGap <= kFRampY, "saturation overlaps the ramp");
 static_assert(kPX + kPPatch < kWidth, "Rec.2020 peaks overflow");
 static_assert(kPY + 3 * kPPatch + 2 * kPGap <= kFRampY, "peaks overlap the ramp");
 static_assert(kFX + kFW <= kWidth, "gradients overflow");
