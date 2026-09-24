@@ -28,7 +28,7 @@ Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--p
   install       build → bundle → test (default; updates ExportHDR.lrplugin in place, no zip)
   build         cmake --preset + cmake --build
   bundle        Copy encoder + runtime libs into ExportHDR.lrplugin/bin
-  test          Run scripts/run_uhdr_test.sh
+  test          Run ctest in tools/uhdr_repack/build
   package       Create platform zip via scripts/package_plugin.sh
   all           build → bundle → test → package (CI / release)
 
@@ -677,11 +677,7 @@ cmd_bundle() {
 }
 
 cmd_test() {
-	if is_windows_host && [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/run_uhdr_test.ps1"
-		return
-	fi
-	"$SCRIPT_DIR/run_uhdr_test.sh"
+	ctest --test-dir "$BUILD_DIR" --output-on-failure
 }
 
 cmd_install() {

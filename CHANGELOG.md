@@ -7,6 +7,16 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+### Fixed
+
+- Display P3 profiles written by the chart tool used the inverse sRGB curve.
+- Lightroom's ZIP HDR TIFF and P3 JPEG are read by the same code on macOS and Windows instead of WIC or Core Image.
+
+### Changed
+
+- Encoder tests run with `ctest` on macOS and Windows. The HDR chart is graded through the editor's Apply path for both presets, every Instagram frame, and SDR, partial, and full HDR headroom.
+- Color map and Mono map presets are defined once in C++.
+
 ## v3.0.7 — 🧺 Color-safe cycle
 
 > Someone ran the HDR frame with the whites. Rec.2020 went through an sRGB wash, the clamp rinsed the dye out, and the reds came back pale. This load is sorted: decoded color goes to the display's own primaries, and the washing machine does not get a vote.

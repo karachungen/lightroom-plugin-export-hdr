@@ -240,14 +240,18 @@ function Invoke-CmakeBuild {
 }
 
 function Invoke-TestStep {
-	$bash = Get-BashExe
-	if ($bash -and $env:GITHUB_ACTIONS -ne "true") {
-		& $bash (Join-Path $ScriptDir "run_uhdr_test.sh")
-		if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-		return
+	$CmakeExe = Get-CmakeExe
+	if (-not $CmakeExe) {
+		throw "CMake 3.31.x not found. Run .\scripts\setup_windows_build.ps1"
 	}
-	& (Join-Path $ScriptDir "run_uhdr_test.ps1")
-	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	$CtestExe = Join-Path (Split-Path -Parent $CmakeExe) "ctest.exe"
+	if (-not (Test-Path -LiteralPath $CtestExe)) {
+		throw "ctest.exe not found beside $CmakeExe"
+	}
+	& $CtestExe --test-dir $BuildDir --output-on-failure
+	if ($LASTEXITCODE -ne 0) {
+		throw "ctest failed with exit code $LASTEXITCODE"
+	}
 }
 
 function Invoke-PackageStep {
