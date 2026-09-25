@@ -443,8 +443,13 @@ uhdr_chart_test(chart.input.hdr --describe-input "${UHDR_CHART_HDR}" --require-p
 uhdr_chart_test(chart.input.sdr --describe-input "${UHDR_CHART_SDR}" --require-portable)
 
 foreach(preset color mono)
+  if(preset STREQUAL "color")
+    set(_edge_gate --max-edge-p99 0.30)
+  else()
+    set(_edge_gate --max-edge-p99 1.34)
+  endif()
   uhdr_chart_test(chart.${preset}.original --check-hdr-chart "${UHDR_CHART_DIR}"
-    --out "${UHDR_TEST_OUT}/chart-${preset}-original.jpg" --preset ${preset})
+    --out "${UHDR_TEST_OUT}/chart-${preset}-original.jpg" --preset ${preset} ${_edge_gate})
   foreach(aspect 1x1 4x5 3x4 191x100)
     uhdr_chart_test(chart.${preset}.ig-${aspect}-1080 --check-hdr-chart "${UHDR_CHART_DIR}"
       --out "${UHDR_TEST_OUT}/chart-${preset}-${aspect}-1080.jpg" --preset ${preset}
@@ -456,8 +461,14 @@ foreach(preset color mono)
 endforeach()
 
 foreach(preset color mono)
+  if(preset STREQUAL "color")
+    set(_ig_gate --max-edge-p99-instagram 1.95)
+  else()
+    set(_ig_gate --max-edge-p99-instagram 1.96)
+  endif()
   uhdr_chart_test(chart.${preset}.instagram --check-hdr-chart "${UHDR_CHART_DIR}"
-    --out "${UHDR_TEST_OUT}/chart-${preset}-ig-src.jpg" --preset ${preset} --simulate-instagram)
+    --out "${UHDR_TEST_OUT}/chart-${preset}-ig-src.jpg" --preset ${preset} --simulate-instagram
+    ${_ig_gate})
   set_tests_properties(chart.${preset}.instagram PROPERTIES FAIL_REGULAR_EXPRESSION "edge report skipped")
 endforeach()
 

@@ -15,6 +15,8 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ### Changed
 
+- The HDR chart check measures error in a band around every patch edge and can grade an Instagram-style re-encode of the export (`--simulate-instagram`: base and gain map re-encoded at libjpeg q61 4:2:0, the settings Instagram's web upload uses). Both presets gate on today's edge error for the original file and the re-encode. The simulation is pessimistic: Instagram's own encoder loses less than libjpeg at the same quality.
+- `uhdr_repack --write-hdr-scenes <dir>` writes sunset, neon, and pastel HDR test scenes (1080x1350). `scripts/make_hdr_scenes.sh` encodes them into `test/hdr-scenes/*-uhdr.jpg` upload fixtures.
 - Encoder tests run with `ctest` on macOS and Windows. The HDR chart is graded through the editor's Apply path for both presets, every Instagram frame, and SDR, partial, and full HDR headroom.
 - Color map and Mono map presets are defined once in C++.
 
