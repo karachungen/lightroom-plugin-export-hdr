@@ -152,7 +152,20 @@ run_msvc_child() {
 	if [[ -n "${MSYS2_ENV_CONV_EXCL:-}" ]]; then
 		excl="${MSYS2_ENV_CONV_EXCL};${excl}"
 	fi
-	MSYS2_ENV_CONV_EXCL="$excl" PATH="$win_path" "$@"
+	# Bash searches PATH before it starts the child, so a semicolon Windows PATH
+	# hides cmake. Resolve it with the POSIX PATH, then hand the child vcvars.
+	local cmd="$1"
+	shift
+	local resolved
+	resolved="$(command -v "$cmd" || true)"
+	if [[ -z "$resolved" ]]; then
+		echo "$cmd not found on PATH" >&2
+		exit 1
+	fi
+	if command -v cygpath >/dev/null 2>&1; then
+		resolved="$(cygpath -w "$resolved")"
+	fi
+	MSYS2_ENV_CONV_EXCL="$excl" PATH="$win_path" "$resolved" "$@"
 }
 
 source_msvc_bash_env() {
