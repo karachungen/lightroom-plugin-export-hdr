@@ -109,6 +109,21 @@ is_windows_host() {
 	esac
 }
 
+webview2_sdk_header_present() {
+	[[ -f /c/WebView2Sdk/include/WebView2.h ]] ||
+		[[ -f /cygdrive/c/WebView2Sdk/include/WebView2.h ]] ||
+		[[ -f 'C:/WebView2Sdk/include/WebView2.h' ]]
+}
+
+export_webview2_sdk_if_present() {
+	webview2_sdk_header_present || return 0
+	if command -v cygpath >/dev/null 2>&1; then
+		export WEBVIEW2_SDK="$(cygpath -w /c/WebView2Sdk)"
+	else
+		export WEBVIEW2_SDK='C:\WebView2Sdk'
+	fi
+}
+
 if [[ -z "$PRESET" ]]; then
 	PRESET="$(detect_preset)"
 fi
@@ -253,6 +268,7 @@ resolve_qt_for_build() {
 		QT_RESOLVED=1
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		export_webview2_sdk_if_present
 		ensure_qt_kit windows-x64
 		local win_prefix
 		win_prefix="$(qt_prefix_path windows-x64)"
@@ -397,6 +413,7 @@ cmd_install_deps() {
 		# shellcheck disable=SC1090
 		source "$env_file"
 		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_webview2.ps1"
+		export_webview2_sdk_if_present
 		install_windows_zstd
 		install_sccache_bin
 		;;

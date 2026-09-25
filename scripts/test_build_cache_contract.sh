@@ -40,6 +40,7 @@ grep -q 'sccache-v0.17.0-aarch64-apple-darwin.tar.gz' "$build" || fail "missing 
 grep -q 'sccache-v0.17.0-x86_64-pc-windows-msvc.zip' "$build" || fail "missing Windows sccache URL"
 grep -q 'zstd-v1.5.7-win64.zip' "$build" || fail "missing Windows zstd URL"
 grep -q 'ensure_qt_kit' "$build" || fail "build_plugin.sh does not ensure the Qt kit"
+grep -q 'WEBVIEW2_SDK' "$build" || fail "build_plugin.sh does not export WEBVIEW2_SDK"
 grep -q 'test_macos_shell_quote.sh' "$build" || fail "quote test is not part of test"
 grep -q 'test_windows_cmd_quote.ps1' "$build" || fail "Windows quote test is not part of test"
 if grep -q 'GITHUB_ACTIONS' "$build"; then
