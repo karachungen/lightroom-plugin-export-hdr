@@ -7,6 +7,14 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.1.1 — 🪟 Windows slop machine
+
+> If the latest Windows 11 can look like slop, a slop patch can fix the slop. The encoder started without Qt6Gui.dll because the DLLs never left the Qt kit folder.
+
+### Fixed
+
+- Windows bundle now runs windeployqt and fails if Qt6Gui.dll or platforms/qwindows.dll is missing next to uhdr_repack.exe.
+
 ## v3.1.0 — 📸 I already had a JPEG
 
 > libultrahdr kept painting its own SDR base. The original frame now arrives as the JPEG it is. Display P3 also stops wearing the inverse sRGB curve, which was a bold look and the wrong one.

@@ -383,6 +383,10 @@ resolve_qt_for_build() {
 		local win_prefix
 		win_prefix="$(qt_prefix_path windows-x64)"
 		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$win_prefix")
+		# cmake gets -DUHDR_STATIC_QT=OFF, but the bundle step reads the env var.
+		# Leave it unset and Windows skips windeployqt, so Lightroom cannot find Qt6Gui.dll.
+		export UHDR_STATIC_QT=OFF
+		export QT_ROOT_DIR="$win_prefix"
 		if [[ -d "$win_prefix/bin" ]]; then
 			export PATH="$win_prefix/bin:$PATH"
 			if command -v cygpath >/dev/null 2>&1; then
@@ -633,6 +637,7 @@ clean_plugin_bin() {
 	if is_windows_host; then
 		# MSYS: rm uhdr_repack can delete uhdr_repack.exe — remove by explicit extension only.
 		rm -f "$PLUGIN_BIN/uhdr_repack.exe" "$PLUGIN_BIN"/*.dll "$PLUGIN_BIN"/*.dylib 2>/dev/null || true
+		rm -rf "$PLUGIN_BIN"/{platforms,imageformats,iconengines,styles,tls,generic,networkinformation,sqldrivers} 2>/dev/null || true
 	else
 		find "$PLUGIN_BIN" -maxdepth 1 -type f \( \
 			-name "uhdr_repack" -o -name "uhdr_repack.exe" -o -name "*.dylib" -o -name "*.dll" \
@@ -816,6 +821,9 @@ find_windeployqt() {
 	fi
 
 	local prefixes=()
+	if [[ -n "${QT_WINDOWS_BIN:-}" ]]; then
+		prefixes+=("${QT_WINDOWS_BIN%/bin}")
+	fi
 	if [[ -n "${QT_ROOT_DIR:-}" ]]; then
 		prefixes+=("$QT_ROOT_DIR")
 	fi
@@ -855,14 +863,19 @@ bundle_shared_qt_windows() {
 		return 0
 	fi
 
-	local windeployqt=""
+	local windeployqt="" bin_dir
 	windeployqt="$(find_windeployqt)" || {
-		echo "Warning: shared Qt build but windeployqt was not found." >&2
-		return 0
+		echo "Shared Qt build requires windeployqt next to the Qt kit." >&2
+		exit 1
 	}
 
 	echo "==> Bundling shared Qt dependencies with windeployqt"
 	"$windeployqt" --no-translations --no-compiler-runtime "$exe"
+	bin_dir="$(dirname "$exe")"
+	if [[ ! -f "$bin_dir/Qt6Gui.dll" || ! -f "$bin_dir/platforms/qwindows.dll" ]]; then
+		echo "windeployqt did not place Qt6Gui.dll and platforms/qwindows.dll next to $exe" >&2
+		exit 1
+	fi
 }
 
 bundle_macos() {
@@ -928,6 +941,7 @@ bundle_windows() {
 }
 
 cmd_bundle() {
+	resolve_qt_for_build
 	if [[ "$SKIP_FIXTURES" -eq 1 ]]; then
 		UHDR_SKIP_FIXTURES=1 "$SCRIPT_DIR/copy_ui_fixtures.sh"
 	else
