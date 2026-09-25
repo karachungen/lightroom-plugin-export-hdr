@@ -138,6 +138,7 @@ set(_UHDR_CORE_SOURCES
   src/tiff_float.cpp
   src/icc_profile.cpp
   src/hdr_chart.cpp
+  src/chart_io.cpp
   src/yuv_convert.cpp
   src/sdr_jpeg.cpp
   src/cli_describe.cpp
@@ -247,7 +248,7 @@ endif()
 # Fused multiply-adds change the chart and ICC bytes versus the committed Windows chart.
 # MSVC does not contract these expressions.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-  set_source_files_properties(src/hdr_chart.cpp src/icc_profile.cpp
+  set_source_files_properties(src/hdr_chart.cpp src/chart_io.cpp src/icc_profile.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
