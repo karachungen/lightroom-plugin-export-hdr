@@ -21,6 +21,8 @@ struct EncodeOptions {
   std::string metadata_patch;
   /** When non-empty, used as the Ultra HDR JPEG primary (no second SDR encode). */
   std::vector<uint8_t> sdr_jpeg;
+  /** uhdr_color_gamut_t for sdr_jpeg (0 = BT.709, 1 = Display P3). */
+  int sdr_jpeg_cg = 1;
 };
 
 /** Encode Ultra HDR JPEG from HDR raw plus SDR raw and/or a JPEG primary. */

@@ -47,7 +47,7 @@ bool encode_ultra_hdr_jpeg(const RawImageHolder& hdr_holder, const RawImageHolde
     jpeg.data = const_cast<uint8_t*>(opt.sdr_jpeg.data());
     jpeg.data_sz = opt.sdr_jpeg.size();
     jpeg.capacity = opt.sdr_jpeg.size();
-    jpeg.cg = UHDR_CG_DISPLAY_P3;
+    jpeg.cg = static_cast<uhdr_color_gamut_t>(opt.sdr_jpeg_cg);
     jpeg.ct = UHDR_CT_SRGB;
     jpeg.range = UHDR_CR_FULL_RANGE;
     // UHDR_BASE_IMG is the already-muxed primary for a base+gain-map encode. With an HDR raw

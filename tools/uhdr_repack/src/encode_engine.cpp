@@ -4,6 +4,7 @@
 #include "jpeg_container.h"
 #include "resize_lanczos.h"
 #include "sdr_input.h"
+#include "sdr_jpeg.h"
 #include "slice_plan.h"
 #include "tiff_input.h"
 #include "uhdr_encode.h"
@@ -48,6 +49,13 @@ bool load_sdr_jpeg_passthrough(const EncodeRequest& req, unsigned hdr_w, unsigne
   if (!load_binary_file(req.base_path, &opt->sdr_jpeg, err)) {
     opt->sdr_jpeg.clear();
     return false;
+  }
+  opt->sdr_jpeg_cg = 1;
+  SdrJpegInfo info;
+  std::string info_err;
+  if (describe_sdr_jpeg(req.base_path, &info, &info_err) &&
+      (!info.has_icc || info.icc.primaries == IccPrimaries::kSrgb)) {
+    opt->sdr_jpeg_cg = 0;
   }
   std::cerr << "SDR JPEG pass-through " << jpeg_w << "x" << jpeg_h << " (" << opt->sdr_jpeg.size()
             << " bytes)\n";
