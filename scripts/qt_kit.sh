@@ -11,6 +11,43 @@ qt_cache_dir() {
 	echo "${UHDR_BUILD_CACHE_DIR:-$root/.build-cache}"
 }
 
+qt_uppercase() {
+	local s="$1" out="" i c
+	for ((i = 0; i < ${#s}; i++)); do
+		c="${s:$i:1}"
+		case "$c" in
+		a) c=A ;;
+		b) c=B ;;
+		c) c=C ;;
+		d) c=D ;;
+		e) c=E ;;
+		f) c=F ;;
+		g) c=G ;;
+		h) c=H ;;
+		i) c=I ;;
+		j) c=J ;;
+		k) c=K ;;
+		l) c=L ;;
+		m) c=M ;;
+		n) c=N ;;
+		o) c=O ;;
+		p) c=P ;;
+		q) c=Q ;;
+		r) c=R ;;
+		s) c=S ;;
+		t) c=T ;;
+		u) c=U ;;
+		v) c=V ;;
+		w) c=W ;;
+		x) c=X ;;
+		y) c=Y ;;
+		z) c=Z ;;
+		esac
+		out+="$c"
+	done
+	printf '%s' "$out"
+}
+
 qt_read_stamp() {
 	local file="$1" line key value
 	[[ -f "$file" ]] || { echo "Missing Qt stamp: $file" >&2; exit 1; }
@@ -45,9 +82,10 @@ qt_read_stamp() {
 		echo "Stamp $file has unsupported linkage '${QT_STAMP_LINKAGE}'" >&2
 		exit 1
 	fi
-	local req
+	local req upper
 	for req in "${required[@]}"; do
-		local var="QT_STAMP_${req^^}"
+		upper="$(qt_uppercase "$req")"
+		local var="QT_STAMP_${upper}"
 		[[ -n "${!var}" ]] || { echo "Stamp $file missing $req" >&2; exit 1; }
 	done
 }

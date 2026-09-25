@@ -71,4 +71,12 @@ for banned in lukka/get-cmake ilammy/msvc-dev-cmd aqtinstall runner.home; do
 		fail "workflow still mentions $banned"
 	fi
 done
+qt_kit="$ROOT/scripts/qt_kit.sh"
+grep -q '\${req\^\^}' "$qt_kit" && fail "qt_kit.sh still uses bash 4+ \${req^^}"
+setup_ps1="$ROOT/scripts/setup_windows_build.ps1"
+grep -q -- '-Encoding UTF8' "$setup_ps1" && fail "setup_windows_build.ps1 still writes env with UTF-8 BOM"
+grep -q 'MSVC_WIN_PATH' "$build" || fail "build_plugin.sh does not mention MSVC_WIN_PATH"
+grep -q 'cygpath -up' "$build" || fail "build_plugin.sh does not convert MSVC_WIN_PATH with cygpath -up"
+qt_stamp_out="$(/bin/bash -c 'set -euo pipefail; source scripts/qt_kit.sh; qt_read_stamp scripts/qt/macos-arm64.stamp; echo "QT_STAMP_VERSION=$QT_STAMP_VERSION"')"
+[[ "$qt_stamp_out" == "QT_STAMP_VERSION=6.11.2" ]] || fail "qt_read_stamp under /bin/bash: got $qt_stamp_out"
 echo "ok build cache contract"

@@ -124,6 +124,37 @@ export_webview2_sdk_if_present() {
 	fi
 }
 
+apply_msvc_win_path() {
+	if [[ -n "${MSVC_WIN_PATH:-}" ]]; then
+		if ! command -v cygpath >/dev/null 2>&1; then
+			echo "cygpath is required to convert MSVC_WIN_PATH to POSIX PATH" >&2
+			exit 1
+		fi
+		export PATH="$(cygpath -up "$MSVC_WIN_PATH")"
+	fi
+}
+
+source_msvc_bash_env() {
+	local env_file="$1"
+	# shellcheck disable=SC1090
+	source "$env_file"
+	apply_msvc_win_path
+}
+
+msvc_cl_available() {
+	command -v cl &>/dev/null || command -v cl.exe &>/dev/null
+}
+
+ensure_msvc_bash_env() {
+	local env_file
+	env_file="$(qt_cache_dir)/msvc-env.sh"
+	if [[ ! -f "$env_file" ]]; then
+		echo "MSVC environment not found at $env_file. Run ./scripts/build_plugin.sh install-deps" >&2
+		exit 1
+	fi
+	source_msvc_bash_env "$env_file"
+}
+
 if [[ -z "$PRESET" ]]; then
 	PRESET="$(detect_preset)"
 fi
@@ -410,8 +441,7 @@ cmd_install_deps() {
 			win_env="$(cygpath -w "$env_file")"
 		fi
 		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/setup_windows_build.ps1" -EmitBashEnv "$win_env"
-		# shellcheck disable=SC1090
-		source "$env_file"
+		source_msvc_bash_env "$env_file"
 		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_webview2.ps1"
 		export_webview2_sdk_if_present
 		install_windows_zstd
@@ -427,6 +457,9 @@ cmd_install_deps() {
 cmd_build() {
 	prepend_tool_bin
 	assert_cmake_version
+	if is_windows_host && ! msvc_cl_available; then
+		ensure_msvc_bash_env
+	fi
 	resolve_qt_for_build
 	if command -v sccache >/dev/null 2>&1; then
 		export SCCACHE_DIR="$(qt_cache_dir)/sccache"

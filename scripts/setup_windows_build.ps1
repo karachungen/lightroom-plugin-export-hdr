@@ -241,17 +241,28 @@ if ($EmitBashEnv -ne "") {
 	if (-not (Import-MsvcDevEnvironment)) {
 		throw "MSVC x64 environment is required. Run .\scripts\setup_windows_build.ps1"
 	}
+	Refresh-BuildToolPath
+	$cmakeExe = Get-CmakeExe
+	if (-not $cmakeExe) {
+		throw "CMake 3.31.x is required. Run .\scripts\setup_windows_build.ps1"
+	}
 	function ConvertTo-BashSingleQuoted([string]$Value) {
 		return "'" + ($Value -replace "'", "'\''") + "'"
 	}
 	$lines = @()
-	foreach ($var in @("PATH", "INCLUDE", "LIB", "LIBPATH")) {
+	$winPath = [Environment]::GetEnvironmentVariable("PATH")
+	if ($winPath) {
+		$lines += "export MSVC_WIN_PATH=$(ConvertTo-BashSingleQuoted $winPath)"
+	}
+	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
 		$val = [Environment]::GetEnvironmentVariable($var)
 		if ($val) {
 			$lines += "export $var=$(ConvertTo-BashSingleQuoted $val)"
 		}
 	}
-	$lines | Set-Content -LiteralPath $EmitBashEnv -Encoding UTF8
+	$content = ($lines -join "`n") + "`n"
+	$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+	[System.IO.File]::WriteAllText($EmitBashEnv, $content, $utf8NoBom)
 }
 
 exit 0
