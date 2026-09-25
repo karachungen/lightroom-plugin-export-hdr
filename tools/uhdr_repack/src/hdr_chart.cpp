@@ -1738,6 +1738,7 @@ bool edge_report(const std::vector<ChartSample>& samples, const std::string& pat
   }
   if (w != frame.w || h != frame.h) {
     std::printf("edge report skipped: %dx%d export is scaled from the %dx%d frame\n", w, h, frame.w, frame.h);
+    *p99_out = -1.0f;
     return true;
   }
   std::map<std::string, std::vector<float>> by_group;
@@ -1970,9 +1971,14 @@ int check_hdr_chart_main(int argc, char** argv) {
   int failed = grade_uhdr_passes(samples, req.out_path, frame, false, &req.options);
   float p99 = 0.0f;
   if (!edge_report(samples, req.out_path, tiff, frame, "original", &p99)) return 1;
-  if (max_edge >= 0.0f && p99 > max_edge) {
-    std::fprintf(stderr, "edge p99 %.3f stops exceeds --max-edge-p99 %.3f\n", p99, max_edge);
-    failed = 1;
+  if (max_edge >= 0.0f) {
+    if (p99 < 0.0f) {
+      std::fprintf(stderr, "--max-edge-p99 needs an unscaled export; the edge report was skipped\n");
+      failed = 1;
+    } else if (p99 > max_edge) {
+      std::fprintf(stderr, "edge p99 %.3f stops exceeds --max-edge-p99 %.3f\n", p99, max_edge);
+      failed = 1;
+    }
   }
   if (simulate_ig) {
     const std::string ig = instagram_output_path(req.out_path);
@@ -1985,10 +1991,15 @@ int check_hdr_chart_main(int argc, char** argv) {
     std::printf("instagram grade %s (report only)\n", ig_grade ? "FAIL" : "PASS");
     float ig_p99 = 0.0f;
     if (!edge_report(samples, ig, tiff, frame, "instagram", &ig_p99)) return 1;
-    if (max_edge_ig >= 0.0f && ig_p99 > max_edge_ig) {
-      std::fprintf(stderr, "Instagram edge p99 %.3f stops exceeds --max-edge-p99-instagram %.3f\n", ig_p99,
-                   max_edge_ig);
-      failed = 1;
+    if (max_edge_ig >= 0.0f) {
+      if (ig_p99 < 0.0f) {
+        std::fprintf(stderr, "--max-edge-p99-instagram needs an unscaled export; the edge report was skipped\n");
+        failed = 1;
+      } else if (ig_p99 > max_edge_ig) {
+        std::fprintf(stderr, "Instagram edge p99 %.3f stops exceeds --max-edge-p99-instagram %.3f\n", ig_p99,
+                     max_edge_ig);
+        failed = 1;
+      }
     }
   }
   return failed ? 1 : 0;

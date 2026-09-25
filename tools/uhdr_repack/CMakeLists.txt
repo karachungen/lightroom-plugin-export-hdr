@@ -456,8 +456,12 @@ endforeach()
 foreach(preset color mono)
   uhdr_chart_test(chart.${preset}.instagram --check-hdr-chart "${UHDR_CHART_DIR}"
     --out "${UHDR_TEST_OUT}/chart-${preset}-ig-src.jpg" --preset ${preset} --simulate-instagram)
-  set_tests_properties(chart.${preset}.instagram PROPERTIES PASS_REGULAR_EXPRESSION "HDR_EDGE instagram")
+  set_tests_properties(chart.${preset}.instagram PROPERTIES FAIL_REGULAR_EXPRESSION "edge report skipped")
 endforeach()
+
+uhdr_chart_test(chart.color.edge-gate-trips --check-hdr-chart "${UHDR_CHART_DIR}"
+  --out "${UHDR_TEST_OUT}/chart-color-edge-gate.jpg" --preset color --max-edge-p99 0)
+set_tests_properties(chart.color.edge-gate-trips PROPERTIES WILL_FAIL TRUE)
 
 function(uhdr_smoke_pair name verify_args)
   add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})
