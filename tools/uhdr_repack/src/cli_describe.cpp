@@ -59,8 +59,10 @@ int describe_input_main(int argc, char** argv) {
       std::cerr << path << " is not a TIFF or JPEG\n";
       return 1;
     }
-    std::cout << "JPEG " << jpeg.width << "x" << jpeg.height
-              << " icc=" << (jpeg.has_icc ? icc_class_name(jpeg.icc) : std::string("none (read as sRGB)"));
+    const std::string icc_text = jpeg.has_icc              ? icc_class_name(jpeg.icc)
+                                 : jpeg.supported          ? std::string("none (read as sRGB)")
+                                                           : std::string("unreadable");
+    std::cout << "JPEG " << jpeg.width << "x" << jpeg.height << " icc=" << icc_text;
     supported = jpeg.supported;
     why = jpeg.why;
   }

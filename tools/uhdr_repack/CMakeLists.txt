@@ -243,6 +243,13 @@ if(UHDR_ENABLE_GUI)
   list(APPEND _UHDR_ALL_SOURCES ${_UHDR_GUI_SOURCES})
 endif()
 
+# Fused multiply-adds change the chart and ICC bytes versus the committed Windows chart.
+# MSVC does not contract these expressions.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  set_source_files_properties(src/hdr_chart.cpp src/icc_profile.cpp
+    PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+
 add_executable(uhdr_repack ${_UHDR_ALL_SOURCES})
 
 if(WIN32)

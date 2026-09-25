@@ -61,7 +61,7 @@ The neutral ladder and the neutral ramp are monotonic series. A gated sample may
 
 ## SDR rule
 
-For the synthetic SDR JPEG: if the linear Rec.2020 peak is above 1, divide by that peak (hue stays, peak becomes 1). Stops at or below 0 are not scaled. Convert to linear Display P3, clip to 0–1, and encode with the sRGB OETF.
+The synthetic SDR JPEG clips each Display P3 channel to 0–1 after converting from linear Rec.2020, then encodes with the sRGB OETF. A hue-preserving scale (divide by the Rec.2020 peak) is not used: it gives every positive channel the same gain, so a Rec.2020 primary's small extra P3 channel fails the chromatic check.
 
 ## ICC
 

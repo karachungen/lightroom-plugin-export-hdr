@@ -160,17 +160,25 @@ bool describe_sdr_jpeg(const std::string& path, SdrJpegInfo* info, std::string* 
   }
   std::vector<uint8_t> icc;
   std::string icc_err;
-  info->has_icc = read_embedded_icc(path, &icc, &icc_err);
-  if (info->has_icc) {
-    info->icc = classify_icc(icc);
-    if (info->icc.transfer != IccTransfer::kSrgb) {
-      info->why = "ICC curve is not the sRGB curve";
+  // A missing ICC_PROFILE marker is untagged sRGB. Any other failure to read the
+  // embedded profile is not sRGB: leave supported false so the OS decoder reads the file.
+  if (!read_embedded_icc(path, &icc, &icc_err)) {
+    if (icc_err == "JPEG has no ICC_PROFILE marker") {
+      info->supported = true;
       return true;
     }
-    if (info->icc.primaries != IccPrimaries::kDisplayP3 && info->icc.primaries != IccPrimaries::kSrgb) {
-      info->why = "ICC primaries are not Display P3 or sRGB";
-      return true;
-    }
+    info->why = icc_err.empty() ? "could not read the embedded ICC profile" : icc_err;
+    return true;
+  }
+  info->has_icc = true;
+  info->icc = classify_icc(icc);
+  if (info->icc.transfer != IccTransfer::kSrgb) {
+    info->why = "ICC curve is not the sRGB curve";
+    return true;
+  }
+  if (info->icc.primaries != IccPrimaries::kDisplayP3 && info->icc.primaries != IccPrimaries::kSrgb) {
+    info->why = "ICC primaries are not Display P3 or sRGB";
+    return true;
   }
   info->supported = true;
   return true;

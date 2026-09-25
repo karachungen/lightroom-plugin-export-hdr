@@ -1588,20 +1588,69 @@ std::vector<float> grade_boosts(const GainMeta& m) {
   return out;
 }
 
+bool within_two_percent(float got, float want) {
+  const float scale = std::max(std::fabs(want), 1e-6f);
+  return std::fabs(got - want) / scale <= 0.02f;
+}
+
+bool encoder_gain_meta_ok(const GainMeta& meta, const EncodeOptions& opt, std::string* error) {
+  const float headroom = opt.target_display_peak_nits / 203.0f;
+  for (int c = 0; c < 3; ++c) {
+    if (!within_two_percent(meta.max_boost[c], opt.max_content_boost)) {
+      if (error) {
+        char buf[160];
+        std::snprintf(buf, sizeof(buf),
+                      "gain-map max content boost %.4f does not match the preset %.4f", meta.max_boost[c],
+                      opt.max_content_boost);
+        *error = buf;
+      }
+      return false;
+    }
+    if (!within_two_percent(meta.min_boost[c], opt.min_content_boost)) {
+      if (error) {
+        char buf[160];
+        std::snprintf(buf, sizeof(buf),
+                      "gain-map min content boost %.4f does not match the preset %.4f", meta.min_boost[c],
+                      opt.min_content_boost);
+        *error = buf;
+      }
+      return false;
+    }
+  }
+  if (!within_two_percent(meta.cap_max, headroom)) {
+    if (error) {
+      char buf[160];
+      std::snprintf(buf, sizeof(buf), "gain-map headroom %.4f does not match target peak / 203 (%.4f)",
+                    meta.cap_max, headroom);
+      *error = buf;
+    }
+    return false;
+  }
+  return true;
+}
+
 int grade_uhdr_passes(const std::vector<ChartSample>& samples, const std::string& path, const Rect& frame,
-                      bool lightroom) {
+                      bool lightroom, const EncodeOptions* preset) {
   GainMeta meta;
   std::string err;
   if (!read_gain_meta(path, &meta, &err)) {
     std::cerr << err << "\n";
     return 1;
   }
+  if (!lightroom) {
+    if (!preset || !encoder_gain_meta_ok(meta, *preset, &err)) {
+      std::cerr << (err.empty() ? "encoder gain-map metadata does not match the preset" : err) << "\n";
+      return 1;
+    }
+  }
   std::printf("gain map %s, content boost %.3f-%.3f, capacity %.3f-%.3f, %s color space\n",
               meta.luma ? "luma" : "RGB", meta.min_boost[0], meta.max_boost[0], meta.cap_min, meta.cap_max,
               meta.use_base_cg ? "base" : "alternate");
   int failed = 0;
+  bool saw_full = false;
   for (const float boost : grade_boosts(meta)) {
     const bool full = boost >= meta.cap_max * 0.999f;
+    if (full) saw_full = true;
     std::vector<float> rgb;
     int w = 0;
     int h = 0;
@@ -1618,6 +1667,10 @@ int grade_uhdr_passes(const std::vector<ChartSample>& samples, const std::string
     if (full && !meta.luma) view.gain_path = path;
     if (full && meta.luma) std::printf("peak2020 chromatic gain check skipped: luma gain map\n");
     failed |= grade(expected_at_boost(samples, meta, boost, !lightroom || full), rgb, w, h, view, nullptr);
+  }
+  if (!lightroom && !saw_full) {
+    std::cerr << "full-headroom pass did not run\n";
+    return 1;
   }
   return failed ? 1 : 0;
 }
@@ -1801,7 +1854,7 @@ int check_hdr_chart_main(int argc, char** argv) {
   expect.max_bytes = kInstagramMaxBytes;
   expect.single_aspect = req.slice_aspect == SliceAspect::kNone ? "" : slice_aspect_label(req.slice_aspect);
   if (verify_uhdr_file(req.out_path, expect) != 0) return 1;
-  return grade_uhdr_passes(samples, req.out_path, frame, false);
+  return grade_uhdr_passes(samples, req.out_path, frame, false, &req.options);
 }
 
 int check_hdr_chart_file_main(int argc, char** argv) {
@@ -1845,7 +1898,7 @@ int check_hdr_chart_file_main(int argc, char** argv) {
     std::cerr << err << "\n";
     return 1;
   }
-  if (!is_tiff_path(path)) return grade_uhdr_passes(samples, path, frame, true);
+  if (!is_tiff_path(path)) return grade_uhdr_passes(samples, path, frame, true, nullptr);
   std::vector<float> rgb;
   int w = 0;
   int h = 0;

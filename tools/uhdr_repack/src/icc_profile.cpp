@@ -526,7 +526,8 @@ bool icc_from_jpeg(const std::vector<uint8_t>& file, std::vector<uint8_t>* icc, 
     }
     i += seglen;
   }
-  if (chunks.empty() || static_cast<int>(chunks.size()) != total) {
+  if (chunks.empty()) return fail_read(error, "JPEG has no ICC_PROFILE marker");
+  if (static_cast<int>(chunks.size()) != total) {
     return fail_read(error, "JPEG has no complete ICC_PROFILE sequence");
   }
   std::sort(chunks.begin(), chunks.end(), [](const Chunk& a, const Chunk& b) { return a.seq < b.seq; });

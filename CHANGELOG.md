@@ -9,6 +9,7 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ### Fixed
 
+- Original-frame encodes pass the SDR JPEG as the SDR rendition (`UHDR_SDR_IMG`), so libultrahdr uses that JPEG instead of inventing a base.
 - Display P3 profiles written by the chart tool used the inverse sRGB curve.
 - Lightroom's ZIP HDR TIFF and P3 JPEG are read by the same code on macOS and Windows instead of WIC or Core Image.
 

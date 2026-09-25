@@ -1,6 +1,13 @@
 # Encoder tests
 
-The chart is `test/hdr-chart/hdr-chart.tif` and `test/hdr-chart/sdr-chart.jpg` at 1440×1920 (3:4). The TIFF is float32 little-endian, Deflate (compression 8), predictor 3, 16-row strips, linear Rec.2020. The JPEG is Display P3 with a 1024-entry sRGB EOTF table.
+The chart is `test/hdr-chart/hdr-chart.tif` and `test/hdr-chart/sdr-chart.jpg` at 1440×1920 (3:4). The TIFF is float32 little-endian, Deflate (compression 8), predictor 3, 16-row strips, linear Rec.2020. The JPEG is Display P3 with a 1024-entry sRGB EOTF table. The synthetic SDR clips each Display P3 channel.
+
+Regenerate the committed chart, then check it against a fresh write:
+
+```text
+uhdr_repack --write-hdr-chart test/hdr-chart
+uhdr_repack --check-hdr-chart-assets test/hdr-chart tools/uhdr_repack/build/test-out/hdr-chart
+```
 
 Sections:
 
