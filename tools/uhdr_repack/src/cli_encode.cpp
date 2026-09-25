@@ -54,6 +54,7 @@ void print_usage() {
       << "  uhdr_repack --check-hdr-chart-file <jpg-or-tif> [--manifest <json>] [--slice-aspect <a>] [--crop-offset <0-1>]\n"
       << "  uhdr_repack --check-hdr-chart-assets <committed-dir> <fresh-dir>\n"
       << "  uhdr_repack --verify-uhdr <jpg> [--expect-size WxH] [--expect-single <aspect>] [--gainmap-scale N] [--max-bytes N] [--skip-if-missing]\n"
+      << "  uhdr_repack --simulate-instagram <in.jpg> <out.jpg>   re-encode like Instagram (q61, 4:2:0)\n"
       << "  uhdr_repack --check-utf8-path <hdr-tiff> <sdr> <out-dir>\n"
       << "  uhdr_repack --encode-or-skip <encode arguments>\n"
       << "  uhdr_repack --check-preview-jpeg <sdr.jpg>\n\n"

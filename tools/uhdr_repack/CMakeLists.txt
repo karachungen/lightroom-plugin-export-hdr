@@ -142,6 +142,7 @@ set(_UHDR_CORE_SOURCES
   src/sdr_jpeg.cpp
   src/cli_describe.cpp
   src/delivery_check.cpp
+  src/instagram_sim.cpp
   "${miniz_SOURCE_DIR}/miniz.c"
 )
 
@@ -476,6 +477,18 @@ uhdr_smoke_pair(cli.feed-4x5
 add_test(NAME smoke.utf8-path COMMAND ${UHDR_BIN} --check-utf8-path
   "${UHDR_CHART_HDR}" "${UHDR_CHART_SDR}" "${UHDR_TEST_OUT}")
 set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
+
+add_test(NAME smoke.instagram.encode COMMAND ${UHDR_BIN} --simulate-instagram
+  "${UHDR_TEST_OUT}/cli-default.jpg" "${UHDR_TEST_OUT}/cli-default-instagram.jpg")
+add_test(NAME smoke.instagram.inspect COMMAND ${UHDR_BIN} --inspect "${UHDR_TEST_OUT}/cli-default-instagram.jpg")
+add_test(NAME smoke.instagram.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/cli-default-instagram.jpg"
+  --expect-size 1440x1920)
+set_tests_properties(smoke.instagram.encode PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-cli.default FIXTURES_SETUP smoke-instagram ${_uhdr_qt_test_env})
+set_tests_properties(smoke.instagram.inspect PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-instagram PASS_REGULAR_EXPRESSION "gainmap_jpeg_420: likely" ${_uhdr_qt_test_env})
+set_tests_properties(smoke.instagram.verify PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-instagram ${_uhdr_qt_test_env})
 
 if(UHDR_ENABLE_GUI)
   add_test(NAME smoke.probe-sdr COMMAND ${UHDR_BIN} --probe-sdr "${UHDR_CHART_SDR}")

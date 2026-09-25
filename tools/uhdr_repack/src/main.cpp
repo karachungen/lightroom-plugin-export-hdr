@@ -1,6 +1,7 @@
 #include "cli.h"
 #include "delivery_check.h"
 #include "hdr_chart.h"
+#include "instagram_sim.h"
 #include "session.h"
 
 #include <cstring>
@@ -47,6 +48,10 @@ static int run(int argc, char** argv) {
 
   if (std::strcmp(argv[1], "--inspect") == 0) {
     return cli_inspect_main(argc, argv);
+  }
+
+  if (std::strcmp(argv[1], "--simulate-instagram") == 0) {
+    return cli_simulate_instagram_main(argc, argv);
   }
 
   if (std::strcmp(argv[1], "--describe-input") == 0) {
