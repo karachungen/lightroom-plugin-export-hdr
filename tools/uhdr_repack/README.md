@@ -84,6 +84,8 @@ cmake --build --preset macos-arm64-release
 .\scripts\build_plugin.ps1 all       # Windows x64
 ```
 
+`build_plugin.ps1` forwards to `build_plugin.sh`.
+
 Legacy aliases (build + bundle only): `bundle_uhdr_for_plugin.sh` / `bundle_uhdr_for_plugin_windows.ps1`.
 
 Each platform copies only that OS binary into **`ExportHDR.lrplugin/bin/`** (self-contained; no runtime `.dylib` / `.dll`). Plug-in flow: **[../../README.md](../../README.md)**
@@ -163,7 +165,7 @@ From the repo root, on macOS and on Windows:
 ctest --test-dir tools/uhdr_repack/build --output-on-failure
 ```
 
-`./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run that command.
+`./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run the cache contract test, the Qt kit fixture test, `ctest`, and the platform quote regression. `build_plugin.ps1` forwards to `build_plugin.sh`.
 
 Color map and Mono map are graded through the editor's Apply path for every Instagram frame (1:1, 4:5, 3:4, 1.91:1) at 1080 and at native size, plus the original frame, at SDR, partial, and full HDR headroom. The Lightroom check is in [../../test/README.md](../../test/README.md).
 

@@ -27,7 +27,7 @@ A 4, 6, and 8 px specular at +4 is report-only. Every gated sample lies inside t
 ctest --test-dir tools/uhdr_repack/build --output-on-failure
 ```
 
-`./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run that command. Tests write into `tools/uhdr_repack/build/test-out/`.
+`./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run the cache contract test, the Qt kit fixture test, `ctest`, and the platform quote regression. `build_plugin.ps1` forwards to `build_plugin.sh`. Tests write into `tools/uhdr_repack/build/test-out/`.
 
 CTest registers 29 tests, plus `smoke.probe-sdr` and `smoke.preview-jpeg` when the GUI is built:
 

@@ -62,6 +62,9 @@ To cut a release without other code changes, bump `Info.lua` and update `CHANGEL
 ```bash
 chmod +x ./scripts/build_release_notes.sh ./scripts/parse_plugin_version.sh
 
+# Same build the macOS Actions job runs, including tests and the zip.
+./scripts/build_plugin.sh all
+
 # Version + required vibe-coding name for Info.lua
 ./scripts/parse_plugin_version.sh
 

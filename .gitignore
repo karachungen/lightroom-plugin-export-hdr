@@ -45,3 +45,6 @@ scripts/update_existing_release_notes.sh
 
 # Local planning notes
 docs/superpowers/
+
+# Qt kit archives, sccache, and downloaded tool binaries
+.build-cache/
