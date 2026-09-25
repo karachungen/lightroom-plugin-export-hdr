@@ -31,7 +31,7 @@ ctest --test-dir tools/uhdr_repack/build --output-on-failure
 
 CTest registers 29 tests, plus `smoke.probe-sdr` and `smoke.preview-jpeg` when the GUI is built:
 
-- `chart.write`, `chart.assets-current`, `chart.input.hdr`, `chart.input.sdr`
+- `chart.write`, `chart.assets-current` (Mac only; the committed TIFF is a Mac write), `chart.input.hdr`, `chart.input.sdr`
 - `chart.color.original` and `chart.mono.original`
 - `chart.<preset>.ig-<aspect>-1080` and `chart.<preset>.ig-<aspect>-native` for presets `color` and `mono` and aspects `1x1`, `4x5`, `3x4`, `191x100`
 - `smoke.cli.default.encode`, `smoke.cli.default.verify`, `smoke.cli.slice-1x1.encode`, `smoke.cli.slice-1x1.verify`, `smoke.cli.feed-4x5.encode`, `smoke.cli.feed-4x5.verify`

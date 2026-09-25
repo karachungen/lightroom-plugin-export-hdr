@@ -440,7 +440,12 @@ function(uhdr_chart_test name)
   set_tests_properties(${name} PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
 endfunction()
 
-uhdr_chart_test(chart.assets-current --check-hdr-chart-assets "${UHDR_REPO_ROOT}/test/hdr-chart" "${UHDR_CHART_DIR}")
+# Apple libm and the Windows UCRT do not produce the same pow/exp2 bits, so the
+# Deflate strips of a fresh chart differ from the committed Mac TIFF. Keep the
+# byte check on Mac. Windows still writes the chart and grades that file.
+if(NOT WIN32)
+  uhdr_chart_test(chart.assets-current --check-hdr-chart-assets "${UHDR_REPO_ROOT}/test/hdr-chart" "${UHDR_CHART_DIR}")
+endif()
 uhdr_chart_test(chart.input.hdr --describe-input "${UHDR_CHART_HDR}" --require-portable)
 uhdr_chart_test(chart.input.sdr --describe-input "${UHDR_CHART_SDR}" --require-portable)
 
