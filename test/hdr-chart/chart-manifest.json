@@ -17,6 +17,12 @@
       "group": "neutral",
       "id": "neutral/-8",
       "monotonic": true,
+      "patch": [
+        80,
+        62,
+        88,
+        48
+      ],
       "rect": [
         102,
         74,
@@ -41,6 +47,12 @@
       "group": "neutral",
       "id": "neutral/-7",
       "monotonic": true,
+      "patch": [
+        174,
+        62,
+        88,
+        48
+      ],
       "rect": [
         196,
         74,
@@ -65,6 +77,12 @@
       "group": "neutral",
       "id": "neutral/-6",
       "monotonic": true,
+      "patch": [
+        268,
+        62,
+        88,
+        48
+      ],
       "rect": [
         290,
         74,
@@ -89,6 +107,12 @@
       "group": "neutral",
       "id": "neutral/-5",
       "monotonic": true,
+      "patch": [
+        362,
+        62,
+        88,
+        48
+      ],
       "rect": [
         384,
         74,
@@ -113,6 +137,12 @@
       "group": "neutral",
       "id": "neutral/-4",
       "monotonic": true,
+      "patch": [
+        456,
+        62,
+        88,
+        48
+      ],
       "rect": [
         478,
         74,
@@ -137,6 +167,12 @@
       "group": "neutral",
       "id": "neutral/-3",
       "monotonic": true,
+      "patch": [
+        550,
+        62,
+        88,
+        48
+      ],
       "rect": [
         572,
         74,
@@ -161,6 +197,12 @@
       "group": "neutral",
       "id": "neutral/-2",
       "monotonic": true,
+      "patch": [
+        644,
+        62,
+        88,
+        48
+      ],
       "rect": [
         666,
         74,
@@ -185,6 +227,12 @@
       "group": "neutral",
       "id": "neutral/-1",
       "monotonic": true,
+      "patch": [
+        738,
+        62,
+        88,
+        48
+      ],
       "rect": [
         760,
         74,
@@ -209,6 +257,12 @@
       "group": "neutral",
       "id": "neutral/+0",
       "monotonic": true,
+      "patch": [
+        832,
+        62,
+        88,
+        48
+      ],
       "rect": [
         854,
         74,
@@ -233,6 +287,12 @@
       "group": "neutral",
       "id": "neutral/+1",
       "monotonic": true,
+      "patch": [
+        926,
+        62,
+        88,
+        48
+      ],
       "rect": [
         948,
         74,
@@ -257,6 +317,12 @@
       "group": "neutral",
       "id": "neutral/+2",
       "monotonic": true,
+      "patch": [
+        1020,
+        62,
+        88,
+        48
+      ],
       "rect": [
         1042,
         74,
@@ -281,6 +347,12 @@
       "group": "neutral",
       "id": "neutral/+3",
       "monotonic": true,
+      "patch": [
+        1114,
+        62,
+        88,
+        48
+      ],
       "rect": [
         1136,
         74,
@@ -305,6 +377,12 @@
       "group": "neutral",
       "id": "neutral/+4",
       "monotonic": true,
+      "patch": [
+        1208,
+        62,
+        88,
+        48
+      ],
       "rect": [
         1230,
         74,
@@ -329,6 +407,12 @@
       "group": "neutral",
       "id": "neutral/+5",
       "monotonic": true,
+      "patch": [
+        1302,
+        62,
+        88,
+        48
+      ],
       "rect": [
         1324,
         74,
@@ -353,6 +437,12 @@
       "group": "hue",
       "id": "hue/R/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        128,
+        56,
+        56
+      ],
       "rect": [
         94,
         142,
@@ -377,6 +467,12 @@
       "group": "hue",
       "id": "hue/R/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        128,
+        56,
+        56
+      ],
       "rect": [
         156,
         142,
@@ -401,6 +497,12 @@
       "group": "hue",
       "id": "hue/R/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        128,
+        56,
+        56
+      ],
       "rect": [
         218,
         142,
@@ -425,6 +527,12 @@
       "group": "hue",
       "id": "hue/R/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        128,
+        56,
+        56
+      ],
       "rect": [
         280,
         142,
@@ -449,6 +557,12 @@
       "group": "hue",
       "id": "hue/R/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        128,
+        56,
+        56
+      ],
       "rect": [
         342,
         142,
@@ -473,6 +587,12 @@
       "group": "hue",
       "id": "hue/R/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        128,
+        56,
+        56
+      ],
       "rect": [
         404,
         142,
@@ -497,6 +617,12 @@
       "group": "hue",
       "id": "hue/R/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        128,
+        56,
+        56
+      ],
       "rect": [
         466,
         142,
@@ -521,6 +647,12 @@
       "group": "hue",
       "id": "hue/OR/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        190,
+        56,
+        56
+      ],
       "rect": [
         94,
         204,
@@ -545,6 +677,12 @@
       "group": "hue",
       "id": "hue/OR/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        190,
+        56,
+        56
+      ],
       "rect": [
         156,
         204,
@@ -569,6 +707,12 @@
       "group": "hue",
       "id": "hue/OR/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        190,
+        56,
+        56
+      ],
       "rect": [
         218,
         204,
@@ -593,6 +737,12 @@
       "group": "hue",
       "id": "hue/OR/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        190,
+        56,
+        56
+      ],
       "rect": [
         280,
         204,
@@ -617,6 +767,12 @@
       "group": "hue",
       "id": "hue/OR/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        190,
+        56,
+        56
+      ],
       "rect": [
         342,
         204,
@@ -641,6 +797,12 @@
       "group": "hue",
       "id": "hue/OR/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        190,
+        56,
+        56
+      ],
       "rect": [
         404,
         204,
@@ -665,6 +827,12 @@
       "group": "hue",
       "id": "hue/OR/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        190,
+        56,
+        56
+      ],
       "rect": [
         466,
         204,
@@ -689,6 +857,12 @@
       "group": "hue",
       "id": "hue/Y/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        252,
+        56,
+        56
+      ],
       "rect": [
         94,
         266,
@@ -713,6 +887,12 @@
       "group": "hue",
       "id": "hue/Y/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        252,
+        56,
+        56
+      ],
       "rect": [
         156,
         266,
@@ -737,6 +917,12 @@
       "group": "hue",
       "id": "hue/Y/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        252,
+        56,
+        56
+      ],
       "rect": [
         218,
         266,
@@ -761,6 +947,12 @@
       "group": "hue",
       "id": "hue/Y/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        252,
+        56,
+        56
+      ],
       "rect": [
         280,
         266,
@@ -785,6 +977,12 @@
       "group": "hue",
       "id": "hue/Y/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        252,
+        56,
+        56
+      ],
       "rect": [
         342,
         266,
@@ -809,6 +1007,12 @@
       "group": "hue",
       "id": "hue/Y/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        252,
+        56,
+        56
+      ],
       "rect": [
         404,
         266,
@@ -833,6 +1037,12 @@
       "group": "hue",
       "id": "hue/Y/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        252,
+        56,
+        56
+      ],
       "rect": [
         466,
         266,
@@ -857,6 +1067,12 @@
       "group": "hue",
       "id": "hue/YG/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        314,
+        56,
+        56
+      ],
       "rect": [
         94,
         328,
@@ -881,6 +1097,12 @@
       "group": "hue",
       "id": "hue/YG/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        314,
+        56,
+        56
+      ],
       "rect": [
         156,
         328,
@@ -905,6 +1127,12 @@
       "group": "hue",
       "id": "hue/YG/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        314,
+        56,
+        56
+      ],
       "rect": [
         218,
         328,
@@ -929,6 +1157,12 @@
       "group": "hue",
       "id": "hue/YG/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        314,
+        56,
+        56
+      ],
       "rect": [
         280,
         328,
@@ -953,6 +1187,12 @@
       "group": "hue",
       "id": "hue/YG/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        314,
+        56,
+        56
+      ],
       "rect": [
         342,
         328,
@@ -977,6 +1217,12 @@
       "group": "hue",
       "id": "hue/YG/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        314,
+        56,
+        56
+      ],
       "rect": [
         404,
         328,
@@ -1001,6 +1247,12 @@
       "group": "hue",
       "id": "hue/YG/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        314,
+        56,
+        56
+      ],
       "rect": [
         466,
         328,
@@ -1025,6 +1277,12 @@
       "group": "hue",
       "id": "hue/G/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        376,
+        56,
+        56
+      ],
       "rect": [
         94,
         390,
@@ -1049,6 +1307,12 @@
       "group": "hue",
       "id": "hue/G/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        376,
+        56,
+        56
+      ],
       "rect": [
         156,
         390,
@@ -1073,6 +1337,12 @@
       "group": "hue",
       "id": "hue/G/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        376,
+        56,
+        56
+      ],
       "rect": [
         218,
         390,
@@ -1097,6 +1367,12 @@
       "group": "hue",
       "id": "hue/G/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        376,
+        56,
+        56
+      ],
       "rect": [
         280,
         390,
@@ -1121,6 +1397,12 @@
       "group": "hue",
       "id": "hue/G/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        376,
+        56,
+        56
+      ],
       "rect": [
         342,
         390,
@@ -1145,6 +1427,12 @@
       "group": "hue",
       "id": "hue/G/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        376,
+        56,
+        56
+      ],
       "rect": [
         404,
         390,
@@ -1169,6 +1457,12 @@
       "group": "hue",
       "id": "hue/G/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        376,
+        56,
+        56
+      ],
       "rect": [
         466,
         390,
@@ -1193,6 +1487,12 @@
       "group": "hue",
       "id": "hue/GC/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        438,
+        56,
+        56
+      ],
       "rect": [
         94,
         452,
@@ -1217,6 +1517,12 @@
       "group": "hue",
       "id": "hue/GC/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        438,
+        56,
+        56
+      ],
       "rect": [
         156,
         452,
@@ -1241,6 +1547,12 @@
       "group": "hue",
       "id": "hue/GC/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        438,
+        56,
+        56
+      ],
       "rect": [
         218,
         452,
@@ -1265,6 +1577,12 @@
       "group": "hue",
       "id": "hue/GC/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        438,
+        56,
+        56
+      ],
       "rect": [
         280,
         452,
@@ -1289,6 +1607,12 @@
       "group": "hue",
       "id": "hue/GC/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        438,
+        56,
+        56
+      ],
       "rect": [
         342,
         452,
@@ -1313,6 +1637,12 @@
       "group": "hue",
       "id": "hue/GC/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        438,
+        56,
+        56
+      ],
       "rect": [
         404,
         452,
@@ -1337,6 +1667,12 @@
       "group": "hue",
       "id": "hue/GC/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        438,
+        56,
+        56
+      ],
       "rect": [
         466,
         452,
@@ -1361,6 +1697,12 @@
       "group": "hue",
       "id": "hue/C/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        500,
+        56,
+        56
+      ],
       "rect": [
         94,
         514,
@@ -1385,6 +1727,12 @@
       "group": "hue",
       "id": "hue/C/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        500,
+        56,
+        56
+      ],
       "rect": [
         156,
         514,
@@ -1409,6 +1757,12 @@
       "group": "hue",
       "id": "hue/C/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        500,
+        56,
+        56
+      ],
       "rect": [
         218,
         514,
@@ -1433,6 +1787,12 @@
       "group": "hue",
       "id": "hue/C/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        500,
+        56,
+        56
+      ],
       "rect": [
         280,
         514,
@@ -1457,6 +1817,12 @@
       "group": "hue",
       "id": "hue/C/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        500,
+        56,
+        56
+      ],
       "rect": [
         342,
         514,
@@ -1481,6 +1847,12 @@
       "group": "hue",
       "id": "hue/C/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        500,
+        56,
+        56
+      ],
       "rect": [
         404,
         514,
@@ -1505,6 +1877,12 @@
       "group": "hue",
       "id": "hue/C/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        500,
+        56,
+        56
+      ],
       "rect": [
         466,
         514,
@@ -1529,6 +1907,12 @@
       "group": "hue",
       "id": "hue/CB/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        562,
+        56,
+        56
+      ],
       "rect": [
         94,
         576,
@@ -1553,6 +1937,12 @@
       "group": "hue",
       "id": "hue/CB/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        562,
+        56,
+        56
+      ],
       "rect": [
         156,
         576,
@@ -1577,6 +1967,12 @@
       "group": "hue",
       "id": "hue/CB/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        562,
+        56,
+        56
+      ],
       "rect": [
         218,
         576,
@@ -1601,6 +1997,12 @@
       "group": "hue",
       "id": "hue/CB/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        562,
+        56,
+        56
+      ],
       "rect": [
         280,
         576,
@@ -1625,6 +2027,12 @@
       "group": "hue",
       "id": "hue/CB/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        562,
+        56,
+        56
+      ],
       "rect": [
         342,
         576,
@@ -1649,6 +2057,12 @@
       "group": "hue",
       "id": "hue/CB/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        562,
+        56,
+        56
+      ],
       "rect": [
         404,
         576,
@@ -1673,6 +2087,12 @@
       "group": "hue",
       "id": "hue/CB/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        562,
+        56,
+        56
+      ],
       "rect": [
         466,
         576,
@@ -1697,6 +2117,12 @@
       "group": "hue",
       "id": "hue/B/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        624,
+        56,
+        56
+      ],
       "rect": [
         94,
         638,
@@ -1721,6 +2147,12 @@
       "group": "hue",
       "id": "hue/B/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        624,
+        56,
+        56
+      ],
       "rect": [
         156,
         638,
@@ -1745,6 +2177,12 @@
       "group": "hue",
       "id": "hue/B/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        624,
+        56,
+        56
+      ],
       "rect": [
         218,
         638,
@@ -1769,6 +2207,12 @@
       "group": "hue",
       "id": "hue/B/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        624,
+        56,
+        56
+      ],
       "rect": [
         280,
         638,
@@ -1793,6 +2237,12 @@
       "group": "hue",
       "id": "hue/B/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        624,
+        56,
+        56
+      ],
       "rect": [
         342,
         638,
@@ -1817,6 +2267,12 @@
       "group": "hue",
       "id": "hue/B/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        624,
+        56,
+        56
+      ],
       "rect": [
         404,
         638,
@@ -1841,6 +2297,12 @@
       "group": "hue",
       "id": "hue/B/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        624,
+        56,
+        56
+      ],
       "rect": [
         466,
         638,
@@ -1865,6 +2327,12 @@
       "group": "hue",
       "id": "hue/BM/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        686,
+        56,
+        56
+      ],
       "rect": [
         94,
         700,
@@ -1889,6 +2357,12 @@
       "group": "hue",
       "id": "hue/BM/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        686,
+        56,
+        56
+      ],
       "rect": [
         156,
         700,
@@ -1913,6 +2387,12 @@
       "group": "hue",
       "id": "hue/BM/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        686,
+        56,
+        56
+      ],
       "rect": [
         218,
         700,
@@ -1937,6 +2417,12 @@
       "group": "hue",
       "id": "hue/BM/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        686,
+        56,
+        56
+      ],
       "rect": [
         280,
         700,
@@ -1961,6 +2447,12 @@
       "group": "hue",
       "id": "hue/BM/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        686,
+        56,
+        56
+      ],
       "rect": [
         342,
         700,
@@ -1985,6 +2477,12 @@
       "group": "hue",
       "id": "hue/BM/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        686,
+        56,
+        56
+      ],
       "rect": [
         404,
         700,
@@ -2009,6 +2507,12 @@
       "group": "hue",
       "id": "hue/BM/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        686,
+        56,
+        56
+      ],
       "rect": [
         466,
         700,
@@ -2033,6 +2537,12 @@
       "group": "hue",
       "id": "hue/M/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        748,
+        56,
+        56
+      ],
       "rect": [
         94,
         762,
@@ -2057,6 +2567,12 @@
       "group": "hue",
       "id": "hue/M/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        748,
+        56,
+        56
+      ],
       "rect": [
         156,
         762,
@@ -2081,6 +2597,12 @@
       "group": "hue",
       "id": "hue/M/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        748,
+        56,
+        56
+      ],
       "rect": [
         218,
         762,
@@ -2105,6 +2627,12 @@
       "group": "hue",
       "id": "hue/M/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        748,
+        56,
+        56
+      ],
       "rect": [
         280,
         762,
@@ -2129,6 +2657,12 @@
       "group": "hue",
       "id": "hue/M/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        748,
+        56,
+        56
+      ],
       "rect": [
         342,
         762,
@@ -2153,6 +2687,12 @@
       "group": "hue",
       "id": "hue/M/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        748,
+        56,
+        56
+      ],
       "rect": [
         404,
         762,
@@ -2177,6 +2717,12 @@
       "group": "hue",
       "id": "hue/M/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        748,
+        56,
+        56
+      ],
       "rect": [
         466,
         762,
@@ -2201,6 +2747,12 @@
       "group": "hue",
       "id": "hue/MR/-4",
       "monotonic": false,
+      "patch": [
+        80,
+        810,
+        56,
+        56
+      ],
       "rect": [
         94,
         824,
@@ -2225,6 +2777,12 @@
       "group": "hue",
       "id": "hue/MR/-2",
       "monotonic": false,
+      "patch": [
+        142,
+        810,
+        56,
+        56
+      ],
       "rect": [
         156,
         824,
@@ -2249,6 +2807,12 @@
       "group": "hue",
       "id": "hue/MR/+0",
       "monotonic": false,
+      "patch": [
+        204,
+        810,
+        56,
+        56
+      ],
       "rect": [
         218,
         824,
@@ -2273,6 +2837,12 @@
       "group": "hue",
       "id": "hue/MR/+1",
       "monotonic": false,
+      "patch": [
+        266,
+        810,
+        56,
+        56
+      ],
       "rect": [
         280,
         824,
@@ -2297,6 +2867,12 @@
       "group": "hue",
       "id": "hue/MR/+2",
       "monotonic": false,
+      "patch": [
+        328,
+        810,
+        56,
+        56
+      ],
       "rect": [
         342,
         824,
@@ -2321,6 +2897,12 @@
       "group": "hue",
       "id": "hue/MR/+3",
       "monotonic": false,
+      "patch": [
+        390,
+        810,
+        56,
+        56
+      ],
       "rect": [
         404,
         824,
@@ -2345,6 +2927,12 @@
       "group": "hue",
       "id": "hue/MR/+4",
       "monotonic": false,
+      "patch": [
+        452,
+        810,
+        56,
+        56
+      ],
       "rect": [
         466,
         824,
@@ -2369,6 +2957,12 @@
       "group": "gamut",
       "id": "gamut/srgb/R/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        128,
+        72,
+        72
+      ],
       "rect": [
         562,
         146,
@@ -2393,6 +2987,12 @@
       "group": "gamut",
       "id": "gamut/srgb/R/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        128,
+        72,
+        72
+      ],
       "rect": [
         640,
         146,
@@ -2417,6 +3017,12 @@
       "group": "gamut",
       "id": "gamut/p3/R/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        128,
+        72,
+        72
+      ],
       "rect": [
         718,
         146,
@@ -2441,6 +3047,12 @@
       "group": "gamut",
       "id": "gamut/p3/R/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        128,
+        72,
+        72
+      ],
       "rect": [
         796,
         146,
@@ -2465,6 +3077,12 @@
       "group": "gamut",
       "id": "gamut/2020/R/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        128,
+        72,
+        72
+      ],
       "rect": [
         874,
         146,
@@ -2489,6 +3107,12 @@
       "group": "gamut",
       "id": "gamut/2020/R/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        128,
+        72,
+        72
+      ],
       "rect": [
         952,
         146,
@@ -2513,6 +3137,12 @@
       "group": "gamut",
       "id": "gamut/srgb/Y/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        206,
+        72,
+        72
+      ],
       "rect": [
         562,
         224,
@@ -2537,6 +3167,12 @@
       "group": "gamut",
       "id": "gamut/srgb/Y/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        206,
+        72,
+        72
+      ],
       "rect": [
         640,
         224,
@@ -2561,6 +3197,12 @@
       "group": "gamut",
       "id": "gamut/p3/Y/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        206,
+        72,
+        72
+      ],
       "rect": [
         718,
         224,
@@ -2585,6 +3227,12 @@
       "group": "gamut",
       "id": "gamut/p3/Y/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        206,
+        72,
+        72
+      ],
       "rect": [
         796,
         224,
@@ -2609,6 +3257,12 @@
       "group": "gamut",
       "id": "gamut/2020/Y/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        206,
+        72,
+        72
+      ],
       "rect": [
         874,
         224,
@@ -2633,6 +3287,12 @@
       "group": "gamut",
       "id": "gamut/2020/Y/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        206,
+        72,
+        72
+      ],
       "rect": [
         952,
         224,
@@ -2657,6 +3317,12 @@
       "group": "gamut",
       "id": "gamut/srgb/G/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        284,
+        72,
+        72
+      ],
       "rect": [
         562,
         302,
@@ -2681,6 +3347,12 @@
       "group": "gamut",
       "id": "gamut/srgb/G/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        284,
+        72,
+        72
+      ],
       "rect": [
         640,
         302,
@@ -2705,6 +3377,12 @@
       "group": "gamut",
       "id": "gamut/p3/G/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        284,
+        72,
+        72
+      ],
       "rect": [
         718,
         302,
@@ -2729,6 +3407,12 @@
       "group": "gamut",
       "id": "gamut/p3/G/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        284,
+        72,
+        72
+      ],
       "rect": [
         796,
         302,
@@ -2753,6 +3437,12 @@
       "group": "gamut",
       "id": "gamut/2020/G/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        284,
+        72,
+        72
+      ],
       "rect": [
         874,
         302,
@@ -2777,6 +3467,12 @@
       "group": "gamut",
       "id": "gamut/2020/G/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        284,
+        72,
+        72
+      ],
       "rect": [
         952,
         302,
@@ -2801,6 +3497,12 @@
       "group": "gamut",
       "id": "gamut/srgb/C/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        362,
+        72,
+        72
+      ],
       "rect": [
         562,
         380,
@@ -2825,6 +3527,12 @@
       "group": "gamut",
       "id": "gamut/srgb/C/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        362,
+        72,
+        72
+      ],
       "rect": [
         640,
         380,
@@ -2849,6 +3557,12 @@
       "group": "gamut",
       "id": "gamut/p3/C/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        362,
+        72,
+        72
+      ],
       "rect": [
         718,
         380,
@@ -2873,6 +3587,12 @@
       "group": "gamut",
       "id": "gamut/p3/C/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        362,
+        72,
+        72
+      ],
       "rect": [
         796,
         380,
@@ -2897,6 +3617,12 @@
       "group": "gamut",
       "id": "gamut/2020/C/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        362,
+        72,
+        72
+      ],
       "rect": [
         874,
         380,
@@ -2921,6 +3647,12 @@
       "group": "gamut",
       "id": "gamut/2020/C/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        362,
+        72,
+        72
+      ],
       "rect": [
         952,
         380,
@@ -2945,6 +3677,12 @@
       "group": "gamut",
       "id": "gamut/srgb/B/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        440,
+        72,
+        72
+      ],
       "rect": [
         562,
         458,
@@ -2969,6 +3707,12 @@
       "group": "gamut",
       "id": "gamut/srgb/B/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        440,
+        72,
+        72
+      ],
       "rect": [
         640,
         458,
@@ -2993,6 +3737,12 @@
       "group": "gamut",
       "id": "gamut/p3/B/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        440,
+        72,
+        72
+      ],
       "rect": [
         718,
         458,
@@ -3017,6 +3767,12 @@
       "group": "gamut",
       "id": "gamut/p3/B/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        440,
+        72,
+        72
+      ],
       "rect": [
         796,
         458,
@@ -3041,6 +3797,12 @@
       "group": "gamut",
       "id": "gamut/2020/B/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        440,
+        72,
+        72
+      ],
       "rect": [
         874,
         458,
@@ -3065,6 +3827,12 @@
       "group": "gamut",
       "id": "gamut/2020/B/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        440,
+        72,
+        72
+      ],
       "rect": [
         952,
         458,
@@ -3089,6 +3857,12 @@
       "group": "gamut",
       "id": "gamut/srgb/M/+0",
       "monotonic": false,
+      "patch": [
+        544,
+        518,
+        72,
+        72
+      ],
       "rect": [
         562,
         536,
@@ -3113,6 +3887,12 @@
       "group": "gamut",
       "id": "gamut/srgb/M/+3",
       "monotonic": false,
+      "patch": [
+        622,
+        518,
+        72,
+        72
+      ],
       "rect": [
         640,
         536,
@@ -3137,6 +3917,12 @@
       "group": "gamut",
       "id": "gamut/p3/M/+0",
       "monotonic": false,
+      "patch": [
+        700,
+        518,
+        72,
+        72
+      ],
       "rect": [
         718,
         536,
@@ -3161,6 +3947,12 @@
       "group": "gamut",
       "id": "gamut/p3/M/+3",
       "monotonic": false,
+      "patch": [
+        778,
+        518,
+        72,
+        72
+      ],
       "rect": [
         796,
         536,
@@ -3185,6 +3977,12 @@
       "group": "gamut",
       "id": "gamut/2020/M/+0",
       "monotonic": false,
+      "patch": [
+        856,
+        518,
+        72,
+        72
+      ],
       "rect": [
         874,
         536,
@@ -3209,6 +4007,12 @@
       "group": "gamut",
       "id": "gamut/2020/M/+3",
       "monotonic": false,
+      "patch": [
+        934,
+        518,
+        72,
+        72
+      ],
       "rect": [
         952,
         536,
@@ -3233,6 +4037,12 @@
       "group": "peak2020",
       "id": "peak2020/R/+4",
       "monotonic": false,
+      "patch": [
+        1176,
+        640,
+        80,
+        80
+      ],
       "rect": [
         1196,
         660,
@@ -3257,6 +4067,12 @@
       "group": "peak2020",
       "id": "peak2020/G/+4",
       "monotonic": false,
+      "patch": [
+        1176,
+        730,
+        80,
+        80
+      ],
       "rect": [
         1196,
         750,
@@ -3281,6 +4097,12 @@
       "group": "peak2020",
       "id": "peak2020/B/+4",
       "monotonic": false,
+      "patch": [
+        1176,
+        820,
+        80,
+        80
+      ],
       "rect": [
         1196,
         840,
@@ -3305,6 +4127,12 @@
       "group": "sat",
       "id": "sat/R/25",
       "monotonic": false,
+      "patch": [
+        544,
+        612,
+        88,
+        88
+      ],
       "rect": [
         566,
         634,
@@ -3329,6 +4157,12 @@
       "group": "sat",
       "id": "sat/R/50",
       "monotonic": false,
+      "patch": [
+        638,
+        612,
+        88,
+        88
+      ],
       "rect": [
         660,
         634,
@@ -3353,6 +4187,12 @@
       "group": "sat",
       "id": "sat/R/75",
       "monotonic": false,
+      "patch": [
+        732,
+        612,
+        88,
+        88
+      ],
       "rect": [
         754,
         634,
@@ -3377,6 +4217,12 @@
       "group": "sat",
       "id": "sat/R/100",
       "monotonic": false,
+      "patch": [
+        826,
+        612,
+        88,
+        88
+      ],
       "rect": [
         848,
         634,
@@ -3401,6 +4247,12 @@
       "group": "sat",
       "id": "sat/Y/25",
       "monotonic": false,
+      "patch": [
+        544,
+        706,
+        88,
+        88
+      ],
       "rect": [
         566,
         728,
@@ -3425,6 +4277,12 @@
       "group": "sat",
       "id": "sat/Y/50",
       "monotonic": false,
+      "patch": [
+        638,
+        706,
+        88,
+        88
+      ],
       "rect": [
         660,
         728,
@@ -3449,6 +4307,12 @@
       "group": "sat",
       "id": "sat/Y/75",
       "monotonic": false,
+      "patch": [
+        732,
+        706,
+        88,
+        88
+      ],
       "rect": [
         754,
         728,
@@ -3473,6 +4337,12 @@
       "group": "sat",
       "id": "sat/Y/100",
       "monotonic": false,
+      "patch": [
+        826,
+        706,
+        88,
+        88
+      ],
       "rect": [
         848,
         728,
@@ -3497,6 +4367,12 @@
       "group": "sat",
       "id": "sat/G/25",
       "monotonic": false,
+      "patch": [
+        544,
+        800,
+        88,
+        88
+      ],
       "rect": [
         566,
         822,
@@ -3521,6 +4397,12 @@
       "group": "sat",
       "id": "sat/G/50",
       "monotonic": false,
+      "patch": [
+        638,
+        800,
+        88,
+        88
+      ],
       "rect": [
         660,
         822,
@@ -3545,6 +4427,12 @@
       "group": "sat",
       "id": "sat/G/75",
       "monotonic": false,
+      "patch": [
+        732,
+        800,
+        88,
+        88
+      ],
       "rect": [
         754,
         822,
@@ -3569,6 +4457,12 @@
       "group": "sat",
       "id": "sat/G/100",
       "monotonic": false,
+      "patch": [
+        826,
+        800,
+        88,
+        88
+      ],
       "rect": [
         848,
         822,
@@ -3593,6 +4487,12 @@
       "group": "sat",
       "id": "sat/C/25",
       "monotonic": false,
+      "patch": [
+        544,
+        894,
+        88,
+        88
+      ],
       "rect": [
         566,
         916,
@@ -3617,6 +4517,12 @@
       "group": "sat",
       "id": "sat/C/50",
       "monotonic": false,
+      "patch": [
+        638,
+        894,
+        88,
+        88
+      ],
       "rect": [
         660,
         916,
@@ -3641,6 +4547,12 @@
       "group": "sat",
       "id": "sat/C/75",
       "monotonic": false,
+      "patch": [
+        732,
+        894,
+        88,
+        88
+      ],
       "rect": [
         754,
         916,
@@ -3665,6 +4577,12 @@
       "group": "sat",
       "id": "sat/C/100",
       "monotonic": false,
+      "patch": [
+        826,
+        894,
+        88,
+        88
+      ],
       "rect": [
         848,
         916,
@@ -3689,6 +4607,12 @@
       "group": "sat",
       "id": "sat/B/25",
       "monotonic": false,
+      "patch": [
+        544,
+        988,
+        88,
+        88
+      ],
       "rect": [
         566,
         1010,
@@ -3713,6 +4637,12 @@
       "group": "sat",
       "id": "sat/B/50",
       "monotonic": false,
+      "patch": [
+        638,
+        988,
+        88,
+        88
+      ],
       "rect": [
         660,
         1010,
@@ -3737,6 +4667,12 @@
       "group": "sat",
       "id": "sat/B/75",
       "monotonic": false,
+      "patch": [
+        732,
+        988,
+        88,
+        88
+      ],
       "rect": [
         754,
         1010,
@@ -3761,6 +4697,12 @@
       "group": "sat",
       "id": "sat/B/100",
       "monotonic": false,
+      "patch": [
+        826,
+        988,
+        88,
+        88
+      ],
       "rect": [
         848,
         1010,
@@ -3785,6 +4727,12 @@
       "group": "sat",
       "id": "sat/M/25",
       "monotonic": false,
+      "patch": [
+        544,
+        1082,
+        88,
+        88
+      ],
       "rect": [
         566,
         1104,
@@ -3809,6 +4757,12 @@
       "group": "sat",
       "id": "sat/M/50",
       "monotonic": false,
+      "patch": [
+        638,
+        1082,
+        88,
+        88
+      ],
       "rect": [
         660,
         1104,
@@ -3833,6 +4787,12 @@
       "group": "sat",
       "id": "sat/M/75",
       "monotonic": false,
+      "patch": [
+        732,
+        1082,
+        88,
+        88
+      ],
       "rect": [
         754,
         1104,
@@ -3857,6 +4817,12 @@
       "group": "sat",
       "id": "sat/M/100",
       "monotonic": false,
+      "patch": [
+        826,
+        1082,
+        88,
+        88
+      ],
       "rect": [
         848,
         1104,
@@ -3881,6 +4847,12 @@
       "group": "cc",
       "id": "cc/01/+0",
       "monotonic": false,
+      "patch": [
+        1018,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1031,
         141,
@@ -3905,6 +4877,12 @@
       "group": "cc",
       "id": "cc/02/+0",
       "monotonic": false,
+      "patch": [
+        1074,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1087,
         141,
@@ -3929,6 +4907,12 @@
       "group": "cc",
       "id": "cc/03/+0",
       "monotonic": false,
+      "patch": [
+        1130,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1143,
         141,
@@ -3953,6 +4937,12 @@
       "group": "cc",
       "id": "cc/04/+0",
       "monotonic": false,
+      "patch": [
+        1186,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1199,
         141,
@@ -3977,6 +4967,12 @@
       "group": "cc",
       "id": "cc/05/+0",
       "monotonic": false,
+      "patch": [
+        1242,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1255,
         141,
@@ -4001,6 +4997,12 @@
       "group": "cc",
       "id": "cc/06/+0",
       "monotonic": false,
+      "patch": [
+        1298,
+        128,
+        52,
+        52
+      ],
       "rect": [
         1311,
         141,
@@ -4025,6 +5027,12 @@
       "group": "cc",
       "id": "cc/07/+0",
       "monotonic": false,
+      "patch": [
+        1018,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1031,
         197,
@@ -4049,6 +5057,12 @@
       "group": "cc",
       "id": "cc/08/+0",
       "monotonic": false,
+      "patch": [
+        1074,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1087,
         197,
@@ -4073,6 +5087,12 @@
       "group": "cc",
       "id": "cc/09/+0",
       "monotonic": false,
+      "patch": [
+        1130,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1143,
         197,
@@ -4097,6 +5117,12 @@
       "group": "cc",
       "id": "cc/10/+0",
       "monotonic": false,
+      "patch": [
+        1186,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1199,
         197,
@@ -4121,6 +5147,12 @@
       "group": "cc",
       "id": "cc/11/+0",
       "monotonic": false,
+      "patch": [
+        1242,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1255,
         197,
@@ -4145,6 +5177,12 @@
       "group": "cc",
       "id": "cc/12/+0",
       "monotonic": false,
+      "patch": [
+        1298,
+        184,
+        52,
+        52
+      ],
       "rect": [
         1311,
         197,
@@ -4169,6 +5207,12 @@
       "group": "cc",
       "id": "cc/13/+0",
       "monotonic": false,
+      "patch": [
+        1018,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1031,
         253,
@@ -4193,6 +5237,12 @@
       "group": "cc",
       "id": "cc/14/+0",
       "monotonic": false,
+      "patch": [
+        1074,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1087,
         253,
@@ -4217,6 +5267,12 @@
       "group": "cc",
       "id": "cc/15/+0",
       "monotonic": false,
+      "patch": [
+        1130,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1143,
         253,
@@ -4241,6 +5297,12 @@
       "group": "cc",
       "id": "cc/16/+0",
       "monotonic": false,
+      "patch": [
+        1186,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1199,
         253,
@@ -4265,6 +5327,12 @@
       "group": "cc",
       "id": "cc/17/+0",
       "monotonic": false,
+      "patch": [
+        1242,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1255,
         253,
@@ -4289,6 +5357,12 @@
       "group": "cc",
       "id": "cc/18/+0",
       "monotonic": false,
+      "patch": [
+        1298,
+        240,
+        52,
+        52
+      ],
       "rect": [
         1311,
         253,
@@ -4313,6 +5387,12 @@
       "group": "cc",
       "id": "cc/19/+0",
       "monotonic": false,
+      "patch": [
+        1018,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1031,
         309,
@@ -4337,6 +5417,12 @@
       "group": "cc",
       "id": "cc/20/+0",
       "monotonic": false,
+      "patch": [
+        1074,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1087,
         309,
@@ -4361,6 +5447,12 @@
       "group": "cc",
       "id": "cc/21/+0",
       "monotonic": false,
+      "patch": [
+        1130,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1143,
         309,
@@ -4385,6 +5477,12 @@
       "group": "cc",
       "id": "cc/22/+0",
       "monotonic": false,
+      "patch": [
+        1186,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1199,
         309,
@@ -4409,6 +5507,12 @@
       "group": "cc",
       "id": "cc/23/+0",
       "monotonic": false,
+      "patch": [
+        1242,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1255,
         309,
@@ -4433,6 +5537,12 @@
       "group": "cc",
       "id": "cc/24/+0",
       "monotonic": false,
+      "patch": [
+        1298,
+        296,
+        52,
+        52
+      ],
       "rect": [
         1311,
         309,
@@ -4457,6 +5567,12 @@
       "group": "cc",
       "id": "cc/01/+2",
       "monotonic": false,
+      "patch": [
+        1018,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1031,
         379,
@@ -4481,6 +5597,12 @@
       "group": "cc",
       "id": "cc/02/+2",
       "monotonic": false,
+      "patch": [
+        1074,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1087,
         379,
@@ -4505,6 +5627,12 @@
       "group": "cc",
       "id": "cc/03/+2",
       "monotonic": false,
+      "patch": [
+        1130,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1143,
         379,
@@ -4529,6 +5657,12 @@
       "group": "cc",
       "id": "cc/04/+2",
       "monotonic": false,
+      "patch": [
+        1186,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1199,
         379,
@@ -4553,6 +5687,12 @@
       "group": "cc",
       "id": "cc/05/+2",
       "monotonic": false,
+      "patch": [
+        1242,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1255,
         379,
@@ -4577,6 +5717,12 @@
       "group": "cc",
       "id": "cc/06/+2",
       "monotonic": false,
+      "patch": [
+        1298,
+        366,
+        52,
+        52
+      ],
       "rect": [
         1311,
         379,
@@ -4601,6 +5747,12 @@
       "group": "cc",
       "id": "cc/07/+2",
       "monotonic": false,
+      "patch": [
+        1018,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1031,
         435,
@@ -4625,6 +5777,12 @@
       "group": "cc",
       "id": "cc/08/+2",
       "monotonic": false,
+      "patch": [
+        1074,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1087,
         435,
@@ -4649,6 +5807,12 @@
       "group": "cc",
       "id": "cc/09/+2",
       "monotonic": false,
+      "patch": [
+        1130,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1143,
         435,
@@ -4673,6 +5837,12 @@
       "group": "cc",
       "id": "cc/10/+2",
       "monotonic": false,
+      "patch": [
+        1186,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1199,
         435,
@@ -4697,6 +5867,12 @@
       "group": "cc",
       "id": "cc/11/+2",
       "monotonic": false,
+      "patch": [
+        1242,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1255,
         435,
@@ -4721,6 +5897,12 @@
       "group": "cc",
       "id": "cc/12/+2",
       "monotonic": false,
+      "patch": [
+        1298,
+        422,
+        52,
+        52
+      ],
       "rect": [
         1311,
         435,
@@ -4745,6 +5927,12 @@
       "group": "cc",
       "id": "cc/13/+2",
       "monotonic": false,
+      "patch": [
+        1018,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1031,
         491,
@@ -4769,6 +5957,12 @@
       "group": "cc",
       "id": "cc/14/+2",
       "monotonic": false,
+      "patch": [
+        1074,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1087,
         491,
@@ -4793,6 +5987,12 @@
       "group": "cc",
       "id": "cc/15/+2",
       "monotonic": false,
+      "patch": [
+        1130,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1143,
         491,
@@ -4817,6 +6017,12 @@
       "group": "cc",
       "id": "cc/16/+2",
       "monotonic": false,
+      "patch": [
+        1186,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1199,
         491,
@@ -4841,6 +6047,12 @@
       "group": "cc",
       "id": "cc/17/+2",
       "monotonic": false,
+      "patch": [
+        1242,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1255,
         491,
@@ -4865,6 +6077,12 @@
       "group": "cc",
       "id": "cc/18/+2",
       "monotonic": false,
+      "patch": [
+        1298,
+        478,
+        52,
+        52
+      ],
       "rect": [
         1311,
         491,
@@ -4889,6 +6107,12 @@
       "group": "cc",
       "id": "cc/19/+2",
       "monotonic": false,
+      "patch": [
+        1018,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1031,
         547,
@@ -4913,6 +6137,12 @@
       "group": "cc",
       "id": "cc/20/+2",
       "monotonic": false,
+      "patch": [
+        1074,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1087,
         547,
@@ -4937,6 +6167,12 @@
       "group": "cc",
       "id": "cc/21/+2",
       "monotonic": false,
+      "patch": [
+        1130,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1143,
         547,
@@ -4961,6 +6197,12 @@
       "group": "cc",
       "id": "cc/22/+2",
       "monotonic": false,
+      "patch": [
+        1186,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1199,
         547,
@@ -4985,6 +6227,12 @@
       "group": "cc",
       "id": "cc/23/+2",
       "monotonic": false,
+      "patch": [
+        1242,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1255,
         547,
@@ -5009,6 +6257,12 @@
       "group": "cc",
       "id": "cc/24/+2",
       "monotonic": false,
+      "patch": [
+        1298,
+        534,
+        52,
+        52
+      ],
       "rect": [
         1311,
         547,
@@ -5321,6 +6575,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/000",
       "monotonic": false,
+      "patch": [
+        96,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         109,
         1329,
@@ -5345,6 +6605,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/015",
       "monotonic": false,
+      "patch": [
+        148,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         161,
         1329,
@@ -5369,6 +6635,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/030",
       "monotonic": false,
+      "patch": [
+        200,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         213,
         1329,
@@ -5393,6 +6665,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/045",
       "monotonic": false,
+      "patch": [
+        252,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         265,
         1329,
@@ -5417,6 +6695,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/060",
       "monotonic": false,
+      "patch": [
+        304,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         317,
         1329,
@@ -5441,6 +6725,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/075",
       "monotonic": false,
+      "patch": [
+        356,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         369,
         1329,
@@ -5465,6 +6755,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/090",
       "monotonic": false,
+      "patch": [
+        408,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         421,
         1329,
@@ -5489,6 +6785,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/105",
       "monotonic": false,
+      "patch": [
+        460,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         473,
         1329,
@@ -5513,6 +6815,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/120",
       "monotonic": false,
+      "patch": [
+        512,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         525,
         1329,
@@ -5537,6 +6845,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/135",
       "monotonic": false,
+      "patch": [
+        564,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         577,
         1329,
@@ -5561,6 +6875,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/150",
       "monotonic": false,
+      "patch": [
+        616,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         629,
         1329,
@@ -5585,6 +6905,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/165",
       "monotonic": false,
+      "patch": [
+        668,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         681,
         1329,
@@ -5609,6 +6935,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/180",
       "monotonic": false,
+      "patch": [
+        720,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         733,
         1329,
@@ -5633,6 +6965,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/195",
       "monotonic": false,
+      "patch": [
+        772,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         785,
         1329,
@@ -5657,6 +6995,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/210",
       "monotonic": false,
+      "patch": [
+        824,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         837,
         1329,
@@ -5681,6 +7025,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/225",
       "monotonic": false,
+      "patch": [
+        876,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         889,
         1329,
@@ -5705,6 +7055,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/240",
       "monotonic": false,
+      "patch": [
+        928,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         941,
         1329,
@@ -5729,6 +7085,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/255",
       "monotonic": false,
+      "patch": [
+        980,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         993,
         1329,
@@ -5753,6 +7115,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/270",
       "monotonic": false,
+      "patch": [
+        1032,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1045,
         1329,
@@ -5777,6 +7145,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/285",
       "monotonic": false,
+      "patch": [
+        1084,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1097,
         1329,
@@ -5801,6 +7175,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/300",
       "monotonic": false,
+      "patch": [
+        1136,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1149,
         1329,
@@ -5825,6 +7205,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/315",
       "monotonic": false,
+      "patch": [
+        1188,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1201,
         1329,
@@ -5849,6 +7235,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/330",
       "monotonic": false,
+      "patch": [
+        1240,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1253,
         1329,
@@ -5873,6 +7265,12 @@
       "group": "grad-hue0",
       "id": "grad-hue0/345",
       "monotonic": false,
+      "patch": [
+        1292,
+        1310,
+        52,
+        78
+      ],
       "rect": [
         1305,
         1329,
@@ -5897,6 +7295,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/000",
       "monotonic": false,
+      "patch": [
+        96,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         109,
         1427,
@@ -5921,6 +7325,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/015",
       "monotonic": false,
+      "patch": [
+        148,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         161,
         1427,
@@ -5945,6 +7355,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/030",
       "monotonic": false,
+      "patch": [
+        200,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         213,
         1427,
@@ -5969,6 +7385,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/045",
       "monotonic": false,
+      "patch": [
+        252,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         265,
         1427,
@@ -5993,6 +7415,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/060",
       "monotonic": false,
+      "patch": [
+        304,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         317,
         1427,
@@ -6017,6 +7445,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/075",
       "monotonic": false,
+      "patch": [
+        356,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         369,
         1427,
@@ -6041,6 +7475,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/090",
       "monotonic": false,
+      "patch": [
+        408,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         421,
         1427,
@@ -6065,6 +7505,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/105",
       "monotonic": false,
+      "patch": [
+        460,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         473,
         1427,
@@ -6089,6 +7535,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/120",
       "monotonic": false,
+      "patch": [
+        512,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         525,
         1427,
@@ -6113,6 +7565,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/135",
       "monotonic": false,
+      "patch": [
+        564,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         577,
         1427,
@@ -6137,6 +7595,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/150",
       "monotonic": false,
+      "patch": [
+        616,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         629,
         1427,
@@ -6161,6 +7625,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/165",
       "monotonic": false,
+      "patch": [
+        668,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         681,
         1427,
@@ -6185,6 +7655,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/180",
       "monotonic": false,
+      "patch": [
+        720,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         733,
         1427,
@@ -6209,6 +7685,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/195",
       "monotonic": false,
+      "patch": [
+        772,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         785,
         1427,
@@ -6233,6 +7715,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/210",
       "monotonic": false,
+      "patch": [
+        824,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         837,
         1427,
@@ -6257,6 +7745,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/225",
       "monotonic": false,
+      "patch": [
+        876,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         889,
         1427,
@@ -6281,6 +7775,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/240",
       "monotonic": false,
+      "patch": [
+        928,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         941,
         1427,
@@ -6305,6 +7805,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/255",
       "monotonic": false,
+      "patch": [
+        980,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         993,
         1427,
@@ -6329,6 +7835,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/270",
       "monotonic": false,
+      "patch": [
+        1032,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1045,
         1427,
@@ -6353,6 +7865,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/285",
       "monotonic": false,
+      "patch": [
+        1084,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1097,
         1427,
@@ -6377,6 +7895,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/300",
       "monotonic": false,
+      "patch": [
+        1136,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1149,
         1427,
@@ -6401,6 +7925,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/315",
       "monotonic": false,
+      "patch": [
+        1188,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1201,
         1427,
@@ -6425,6 +7955,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/330",
       "monotonic": false,
+      "patch": [
+        1240,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1253,
         1427,
@@ -6449,6 +7985,12 @@
       "group": "grad-hue3",
       "id": "grad-hue3/345",
       "monotonic": false,
+      "patch": [
+        1292,
+        1408,
+        52,
+        78
+      ],
       "rect": [
         1305,
         1427,
@@ -6473,6 +8015,12 @@
       "group": "specular",
       "id": "spec/4",
       "monotonic": false,
+      "patch": [
+        144,
+        1802,
+        4,
+        4
+      ],
       "rect": [
         144,
         1802,
@@ -6497,6 +8045,12 @@
       "group": "specular",
       "id": "spec/6",
       "monotonic": false,
+      "patch": [
+        224,
+        1802,
+        6,
+        6
+      ],
       "rect": [
         224,
         1802,
@@ -6521,6 +8075,12 @@
       "group": "specular",
       "id": "spec/8",
       "monotonic": false,
+      "patch": [
+        304,
+        1802,
+        8,
+        8
+      ],
       "rect": [
         304,
         1802,

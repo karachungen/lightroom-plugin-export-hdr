@@ -6,6 +6,7 @@
 #include "encode_engine.h"
 #include "half_float.h"
 #include "icc_profile.h"
+#include "instagram_sim.h"
 #include "path_io.h"
 #include "sdr_jpeg.h"
 #include "session.h"
@@ -672,17 +673,19 @@ void render_chart(std::vector<float>& hdr, std::vector<uint8_t>& sdr, const std:
 nlohmann::json manifest_json(const std::vector<ChartSample>& samples) {
   nlohmann::json rows = nlohmann::json::array();
   for (const ChartSample& s : samples) {
-    rows.push_back({{"id", s.id},
-                    {"group", s.group},
-                    {"series", s.series},
-                    {"series_index", s.series_index},
-                    {"monotonic", s.monotonic},
-                    {"exposure_ref", s.exposure_ref},
-                    {"rect", {s.x, s.y, s.w, s.h}},
-                    {"expected_rec2020", {s.expected.r, s.expected.g, s.expected.b}},
-                    {"gate", {{"encoder", s.gate_encoder ? "pass" : "report"},
-                              {"lightroom", s.gate_lightroom ? "pass" : "report"}}},
-                    {"chromatic", s.chromatic ? std::string(1, s.chromatic) : ""}});
+    nlohmann::json row = {{"id", s.id},
+                          {"group", s.group},
+                          {"series", s.series},
+                          {"series_index", s.series_index},
+                          {"monotonic", s.monotonic},
+                          {"exposure_ref", s.exposure_ref},
+                          {"rect", {s.x, s.y, s.w, s.h}},
+                          {"expected_rec2020", {s.expected.r, s.expected.g, s.expected.b}},
+                          {"gate", {{"encoder", s.gate_encoder ? "pass" : "report"},
+                                    {"lightroom", s.gate_lightroom ? "pass" : "report"}}},
+                          {"chromatic", s.chromatic ? std::string(1, s.chromatic) : ""}};
+    if (s.pw > 0 && s.ph > 0) row["patch"] = {s.px, s.py, s.pw, s.ph};
+    rows.push_back(std::move(row));
   }
   return {{"version", 2},
           {"width", kWidth},
@@ -730,6 +733,13 @@ bool load_manifest(const std::string& path, std::vector<ChartSample>* samples, i
     s.y = rect.at(1).get<int>();
     s.w = rect.at(2).get<int>();
     s.h = rect.at(3).get<int>();
+    if (row.contains("patch")) {
+      const auto& patch = row.at("patch");
+      s.px = patch.at(0).get<int>();
+      s.py = patch.at(1).get<int>();
+      s.pw = patch.at(2).get<int>();
+      s.ph = patch.at(3).get<int>();
+    }
     const auto& exp = row.at("expected_rec2020");
     s.expected = {exp.at(0).get<float>(), exp.at(1).get<float>(), exp.at(2).get<float>()};
     const auto& gate = row.at("gate");
@@ -1675,6 +1685,94 @@ int grade_uhdr_passes(const std::vector<ChartSample>& samples, const std::string
   return failed ? 1 : 0;
 }
 
+constexpr int kEdgeBand = 3;
+constexpr float kEdgeEps = 0.01f;
+
+float edge_err(LinearRgb got, LinearRgb want) {
+  const float g[3] = {got.r, got.g, got.b};
+  const float w[3] = {want.r, want.g, want.b};
+  float e = 0.0f;
+  for (int c = 0; c < 3; ++c) {
+    e = std::max(e, std::fabs(std::log2((std::max(0.0f, g[c]) + kEdgeEps) / (std::max(0.0f, w[c]) + kEdgeEps))));
+  }
+  return e;
+}
+
+float percentile(std::vector<float> v, float q) {
+  if (v.empty()) return 0.0f;
+  const size_t k = std::min(v.size() - 1, static_cast<size_t>(q * static_cast<float>(v.size())));
+  std::nth_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(k), v.end());
+  return v[k];
+}
+
+float mean_of(const std::vector<float>& v) {
+  if (v.empty()) return 0.0f;
+  double acc = 0;
+  for (float x : v) acc += x;
+  return static_cast<float>(acc / static_cast<double>(v.size()));
+}
+
+bool in_edge_band(int x, int y, const ChartSample& s) {
+  const bool outer = x >= s.px - kEdgeBand && x < s.px + s.pw + kEdgeBand && y >= s.py - kEdgeBand &&
+                     y < s.py + s.ph + kEdgeBand;
+  const bool inner = x >= s.px + kEdgeBand && x < s.px + s.pw - kEdgeBand && y >= s.py + kEdgeBand &&
+                     y < s.py + s.ph - kEdgeBand;
+  return outer && !inner;
+}
+
+bool edge_report(const std::vector<ChartSample>& samples, const std::string& path, const std::string& ref_tiff,
+                 const Rect& frame, const char* label, float* p99_out) {
+  *p99_out = 0.0f;
+  GainMeta meta;
+  std::string err;
+  std::vector<float> rgb;
+  std::vector<float> ref;
+  int w = 0;
+  int h = 0;
+  int rw = 0;
+  int rh = 0;
+  if (!read_gain_meta(path, &meta, &err) || !decode_uhdr_rec2020(path, meta.cap_max, &rgb, &w, &h, &err) ||
+      !load_tiff_rec2020(ref_tiff, &ref, &rw, &rh, &err)) {
+    std::cerr << err << "\n";
+    return false;
+  }
+  if (w != frame.w || h != frame.h) {
+    std::printf("edge report skipped: %dx%d export is scaled from the %dx%d frame\n", w, h, frame.w, frame.h);
+    return true;
+  }
+  std::map<std::string, std::vector<float>> by_group;
+  std::vector<float> all;
+  for (const ChartSample& s : samples) {
+    if (s.pw <= 0 || s.ph <= 0) continue;
+    if (s.px < frame.x || s.py < frame.y || s.px + s.pw > frame.x + frame.w || s.py + s.ph > frame.y + frame.h) {
+      continue;
+    }
+    for (int y = s.py - kEdgeBand; y < s.py + s.ph + kEdgeBand; ++y) {
+      for (int x = s.px - kEdgeBand; x < s.px + s.pw + kEdgeBand; ++x) {
+        if (!in_edge_band(x, y, s)) continue;
+        if (x < frame.x || y < frame.y || x >= frame.x + frame.w || y >= frame.y + frame.h || x >= rw || y >= rh) {
+          continue;
+        }
+        const size_t ri = (static_cast<size_t>(y) * static_cast<size_t>(rw) + static_cast<size_t>(x)) * 3u;
+        const size_t gi = (static_cast<size_t>(y - frame.y) * static_cast<size_t>(w) +
+                           static_cast<size_t>(x - frame.x)) * 3u;
+        const LinearRgb want = blended({ref[ri], ref[ri + 1], ref[ri + 2]}, meta, 1.0f);
+        const float e = edge_err({rgb[gi], rgb[gi + 1], rgb[gi + 2]}, want);
+        by_group[s.group].push_back(e);
+        all.push_back(e);
+      }
+    }
+  }
+  for (const auto& item : by_group) {
+    std::printf("edge %-14s %s n=%zu mean=%.3f p99=%.3f\n", item.first.c_str(), label, item.second.size(),
+                mean_of(item.second), percentile(item.second, 0.99f));
+  }
+  *p99_out = percentile(all, 0.99f);
+  std::printf("HDR_EDGE %s n=%zu mean=%.3f p99=%.3f\n", label, all.size(), mean_of(all), *p99_out);
+  std::fflush(stdout);
+  return true;
+}
+
 }  // namespace
 
 int write_hdr_chart_main(const std::string& dir) {
@@ -1783,10 +1881,25 @@ int check_hdr_chart_main(int argc, char** argv) {
   const std::string man = join_dir(dir, "chart-manifest.json");
   EncodeRequest req;
   req.out_path = join_dir(dir, "chart-uhdr.jpg");
+  bool simulate_ig = false;
+  float max_edge = -1.0f;
+  float max_edge_ig = -1.0f;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--out" && i + 1 < argc) {
       req.out_path = argv[++i];
+      continue;
+    }
+    if (a == "--simulate-instagram") {
+      simulate_ig = true;
+      continue;
+    }
+    if (a == "--max-edge-p99" && i + 1 < argc) {
+      max_edge = std::strtof(argv[++i], nullptr);
+      continue;
+    }
+    if (a == "--max-edge-p99-instagram" && i + 1 < argc) {
+      max_edge_ig = std::strtof(argv[++i], nullptr);
       continue;
     }
     const int used = parse_encode_flag(argc, argv, &i, &req);
@@ -1854,7 +1967,31 @@ int check_hdr_chart_main(int argc, char** argv) {
   expect.max_bytes = kInstagramMaxBytes;
   expect.single_aspect = req.slice_aspect == SliceAspect::kNone ? "" : slice_aspect_label(req.slice_aspect);
   if (verify_uhdr_file(req.out_path, expect) != 0) return 1;
-  return grade_uhdr_passes(samples, req.out_path, frame, false, &req.options);
+  int failed = grade_uhdr_passes(samples, req.out_path, frame, false, &req.options);
+  float p99 = 0.0f;
+  if (!edge_report(samples, req.out_path, tiff, frame, "original", &p99)) return 1;
+  if (max_edge >= 0.0f && p99 > max_edge) {
+    std::fprintf(stderr, "edge p99 %.3f stops exceeds --max-edge-p99 %.3f\n", p99, max_edge);
+    failed = 1;
+  }
+  if (simulate_ig) {
+    const std::string ig = instagram_output_path(req.out_path);
+    if (!simulate_instagram(req.out_path, ig, &err)) {
+      std::cerr << err << "\n";
+      return 1;
+    }
+    std::cout << "Wrote " << ig << " (Instagram re-encode)\n";
+    const int ig_grade = grade_uhdr_passes(samples, ig, frame, true, nullptr);
+    std::printf("instagram grade %s (report only)\n", ig_grade ? "FAIL" : "PASS");
+    float ig_p99 = 0.0f;
+    if (!edge_report(samples, ig, tiff, frame, "instagram", &ig_p99)) return 1;
+    if (max_edge_ig >= 0.0f && ig_p99 > max_edge_ig) {
+      std::fprintf(stderr, "Instagram edge p99 %.3f stops exceeds --max-edge-p99-instagram %.3f\n", ig_p99,
+                   max_edge_ig);
+      failed = 1;
+    }
+  }
+  return failed ? 1 : 0;
 }
 
 int check_hdr_chart_file_main(int argc, char** argv) {

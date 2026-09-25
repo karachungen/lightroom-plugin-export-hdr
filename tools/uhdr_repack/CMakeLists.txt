@@ -453,6 +453,12 @@ foreach(preset color mono)
   endforeach()
 endforeach()
 
+foreach(preset color mono)
+  uhdr_chart_test(chart.${preset}.instagram --check-hdr-chart "${UHDR_CHART_DIR}"
+    --out "${UHDR_TEST_OUT}/chart-${preset}-ig-src.jpg" --preset ${preset} --simulate-instagram)
+  set_tests_properties(chart.${preset}.instagram PROPERTIES PASS_REGULAR_EXPRESSION "HDR_EDGE instagram")
+endforeach()
+
 function(uhdr_smoke_pair name verify_args)
   add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})
   add_test(NAME smoke.${name}.verify COMMAND ${UHDR_BIN} ${verify_args})
