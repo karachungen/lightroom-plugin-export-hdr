@@ -233,7 +233,15 @@ if ($EmitBashEnv -ne "") {
 		return "'" + ($Value -replace "'", "'\''") + "'"
 	}
 	# Refresh-BuildToolPath replaces PATH with the machine/user PATH and drops vcvars.
+	# rc.exe and mt.exe live in the Windows SDK, not beside cl.exe. CMake's Ninja
+	# link step calls them by path, and Git bash does not leave that SDK directory
+	# on the PATH cmake searches.
 	$clExe = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source
+	$rcExe = (Get-Command rc.exe -ErrorAction SilentlyContinue).Source
+	$mtExe = (Get-Command mt.exe -ErrorAction SilentlyContinue).Source
+	if (-not $clExe -or -not $rcExe -or -not $mtExe) {
+		throw "vcvars did not provide cl.exe, rc.exe, and mt.exe"
+	}
 	$winPath = $env:PATH
 	$devVars = @{}
 	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
@@ -245,9 +253,9 @@ if ($EmitBashEnv -ne "") {
 		throw "CMake is required. Run .\scripts\setup_windows_build.ps1"
 	}
 	$lines = @()
-	if ($clExe) {
-		$lines += "export MSVC_CL=$(ConvertTo-BashSingleQuoted ($clExe -replace '\\', '/'))"
-	}
+	$lines += "export MSVC_CL=$(ConvertTo-BashSingleQuoted ($clExe -replace '\\', '/'))"
+	$lines += "export MSVC_RC=$(ConvertTo-BashSingleQuoted ($rcExe -replace '\\', '/'))"
+	$lines += "export MSVC_MT=$(ConvertTo-BashSingleQuoted ($mtExe -replace '\\', '/'))"
 	if ($winPath) {
 		$lines += "export MSVC_WIN_PATH=$(ConvertTo-BashSingleQuoted $winPath)"
 	}

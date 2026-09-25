@@ -171,17 +171,24 @@ run_msvc_child() {
 	PATH="$win_path" "$resolved" "$@"
 }
 
+# Windows tool path recorded by setup_windows_build.ps1 before PATH is refreshed.
+msvc_recorded_tool() {
+	local value="$1"
+	[[ -n "$value" ]] || return 1
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -w "$value"
+	else
+		printf '%s\n' "$value"
+	fi
+}
+
 # cl.exe lives under "Program Files", which Git bash drops when it rewrites PATH
 # for a Windows cmake. Return the full Windows path from the vcvars PATH itself.
 msvc_cl_path() {
 	local entry posix
 	if [[ -n "${MSVC_CL:-}" ]]; then
-		if command -v cygpath >/dev/null 2>&1; then
-			cygpath -w "$MSVC_CL"
-		else
-			printf '%s\n' "$MSVC_CL"
-		fi
-		return 0
+		msvc_recorded_tool "$MSVC_CL"
+		return
 	fi
 	[[ -n "${MSVC_WIN_PATH:-}" ]] || return 1
 	set -f
@@ -547,21 +554,29 @@ cmd_build() {
 		cmake_extra+=("-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
 	fi
 	if is_windows_host; then
-		local ninja cl
+		local ninja cl rc mt
 		ninja="$(command -v ninja || true)"
 		if [[ -z "$ninja" ]]; then
 			echo "ninja not found on PATH" >&2
 			exit 1
 		fi
 		cl="$(msvc_cl_path || true)"
-		if [[ -z "$cl" ]]; then
-			echo "cl.exe not found in the MSVC environment PATH" >&2
+		rc="$(msvc_recorded_tool "${MSVC_RC:-}" || true)"
+		mt="$(msvc_recorded_tool "${MSVC_MT:-}" || true)"
+		if [[ -z "$cl" || -z "$rc" || -z "$mt" ]]; then
+			echo "cl.exe, rc.exe, or mt.exe not found in the MSVC environment" >&2
 			exit 1
 		fi
 		if command -v cygpath >/dev/null 2>&1; then
 			ninja="$(cygpath -w "$ninja")"
 		fi
-		cmake_extra+=("-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_C_COMPILER=$cl" "-DCMAKE_CXX_COMPILER=$cl")
+		cmake_extra+=(
+			"-DCMAKE_MAKE_PROGRAM=$ninja"
+			"-DCMAKE_C_COMPILER=$cl"
+			"-DCMAKE_CXX_COMPILER=$cl"
+			"-DCMAKE_RC_COMPILER=$rc"
+			"-DCMAKE_MT=$mt"
+		)
 	fi
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
