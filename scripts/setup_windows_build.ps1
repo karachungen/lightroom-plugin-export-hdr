@@ -229,21 +229,30 @@ if ($EmitBashEnv -ne "") {
 	if (-not (Import-MsvcDevEnvironment)) {
 		throw "MSVC x64 environment is required. Run .\scripts\setup_windows_build.ps1"
 	}
+	function ConvertTo-BashSingleQuoted([string]$Value) {
+		return "'" + ($Value -replace "'", "'\''") + "'"
+	}
+	# Refresh-BuildToolPath replaces PATH with the machine/user PATH and drops vcvars.
+	$clExe = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source
+	$winPath = $env:PATH
+	$devVars = @{}
+	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
+		$devVars[$var] = [Environment]::GetEnvironmentVariable($var)
+	}
 	Refresh-BuildToolPath
 	$cmakeExe = Get-CmakeExe
 	if (-not $cmakeExe) {
 		throw "CMake is required. Run .\scripts\setup_windows_build.ps1"
 	}
-	function ConvertTo-BashSingleQuoted([string]$Value) {
-		return "'" + ($Value -replace "'", "'\''") + "'"
-	}
 	$lines = @()
-	$winPath = [Environment]::GetEnvironmentVariable("PATH")
+	if ($clExe) {
+		$lines += "export MSVC_CL=$(ConvertTo-BashSingleQuoted ($clExe -replace '\\', '/'))"
+	}
 	if ($winPath) {
 		$lines += "export MSVC_WIN_PATH=$(ConvertTo-BashSingleQuoted $winPath)"
 	}
 	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
-		$val = [Environment]::GetEnvironmentVariable($var)
+		$val = $devVars[$var]
 		if ($val) {
 			$lines += "export $var=$(ConvertTo-BashSingleQuoted $val)"
 		}

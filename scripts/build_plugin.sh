@@ -175,6 +175,14 @@ run_msvc_child() {
 # for a Windows cmake. Return the full Windows path from the vcvars PATH itself.
 msvc_cl_path() {
 	local entry posix
+	if [[ -n "${MSVC_CL:-}" ]]; then
+		if command -v cygpath >/dev/null 2>&1; then
+			cygpath -w "$MSVC_CL"
+		else
+			printf '%s\n' "$MSVC_CL"
+		fi
+		return 0
+	fi
 	[[ -n "${MSVC_WIN_PATH:-}" ]] || return 1
 	set -f
 	local IFS=';'
