@@ -7,6 +7,10 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.1.0 — 📸 I already had a JPEG
+
+> libultrahdr kept painting its own SDR base. The original frame now arrives as the JPEG it is. Display P3 also stops wearing the inverse sRGB curve, which was a bold look and the wrong one.
+
 ### Fixed
 
 - Original-frame encodes pass the SDR JPEG as the SDR rendition (`UHDR_SDR_IMG`), so libultrahdr uses that JPEG instead of inventing a base.
