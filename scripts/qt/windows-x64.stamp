@@ -1,0 +1,5 @@
+version=6.11.2
+linkage=shared
+arch=x64
+aqt_arch=win64_msvc2022_64
+modules=qtshadertools

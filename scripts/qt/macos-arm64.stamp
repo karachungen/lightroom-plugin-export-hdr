@@ -1,0 +1,5 @@
+version=6.11.2
+linkage=static
+arch=arm64
+deployment_target=13.0
+submodules=qtbase,qtshadertools
