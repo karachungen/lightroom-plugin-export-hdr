@@ -127,8 +127,32 @@ apply_msvc_win_path() {
 			echo "cygpath is required to convert MSVC_WIN_PATH to POSIX PATH" >&2
 			exit 1
 		fi
-		export PATH="$(cygpath -up "$MSVC_WIN_PATH")"
+		export PATH="$(cygpath -up "$MSVC_WIN_PATH"):$PATH"
 	fi
+}
+
+# Git bash rewrites PATH when it starts a Windows program, and that rewrite drops
+# "Program Files" entries. cl.exe then disappears while C:\mingw64\bin\cc.exe remains.
+# Give cmake, ninja, and ctest the vcvars PATH unchanged.
+run_msvc_child() {
+	if [[ -z "${MSVC_WIN_PATH:-}" ]]; then
+		"$@"
+		return
+	fi
+	local win_path="${MSVC_WIN_PATH}"
+	local tool_bin excl
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	if [[ -d "$tool_bin" ]] && command -v cygpath >/dev/null 2>&1; then
+		win_path="$(cygpath -w "$tool_bin");${win_path}"
+	fi
+	if [[ -n "${QT_WINDOWS_BIN:-}" ]]; then
+		win_path="${QT_WINDOWS_BIN};${win_path}"
+	fi
+	excl="PATH;INCLUDE;LIB;LIBPATH"
+	if [[ -n "${MSYS2_ENV_CONV_EXCL:-}" ]]; then
+		excl="${MSYS2_ENV_CONV_EXCL};${excl}"
+	fi
+	MSYS2_ENV_CONV_EXCL="$excl" PATH="$win_path" "$@"
 }
 
 source_msvc_bash_env() {
@@ -136,10 +160,6 @@ source_msvc_bash_env() {
 	# shellcheck disable=SC1090
 	source "$env_file"
 	apply_msvc_win_path
-}
-
-msvc_cl_available() {
-	command -v cl &>/dev/null || command -v cl.exe &>/dev/null
 }
 
 ensure_msvc_bash_env() {
@@ -303,6 +323,12 @@ resolve_qt_for_build() {
 		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$win_prefix")
 		if [[ -d "$win_prefix/bin" ]]; then
 			export PATH="$win_prefix/bin:$PATH"
+			if command -v cygpath >/dev/null 2>&1; then
+				QT_WINDOWS_BIN="$(cygpath -w "$win_prefix/bin")"
+			else
+				QT_WINDOWS_BIN="$win_prefix/bin"
+			fi
+			export QT_WINDOWS_BIN
 		fi
 		echo "==> Using shared Qt at $win_prefix"
 		QT_RESOLVED=1
@@ -464,7 +490,7 @@ cmd_install_deps() {
 cmd_build() {
 	prepend_tool_bin
 	assert_cmake_version
-	if is_windows_host && ! msvc_cl_available; then
+	if is_windows_host; then
 		ensure_msvc_bash_env
 	fi
 	resolve_qt_for_build
@@ -484,13 +510,13 @@ cmd_build() {
 
 	echo "==> Configuring preset: $PRESET"
 	if [[ ${#cmake_extra[@]} -gt 0 ]]; then
-		cmake --preset "$PRESET" -S "$UHDR_SRC" "${cmake_extra[@]}"
+		run_msvc_child cmake --preset "$PRESET" -S "$UHDR_SRC" "${cmake_extra[@]}"
 	else
-		cmake --preset "$PRESET" -S "$UHDR_SRC"
+		run_msvc_child cmake --preset "$PRESET" -S "$UHDR_SRC"
 	fi
 
 	echo "==> Building preset: $PRESET"
-	cmake --build "$BUILD_DIR"
+	run_msvc_child cmake --build "$BUILD_DIR"
 }
 
 find_build_exe() {
@@ -833,7 +859,7 @@ cmd_bundle() {
 cmd_test() {
 	bash "$SCRIPT_DIR/test_build_cache_contract.sh"
 	bash "$SCRIPT_DIR/test_qt_kit.sh"
-	ctest --test-dir "$BUILD_DIR" --output-on-failure
+	run_msvc_child ctest --test-dir "$BUILD_DIR" --output-on-failure
 	case "$(uname -s)" in
 	Darwin)
 		bash "$SCRIPT_DIR/test_macos_shell_quote.sh"
