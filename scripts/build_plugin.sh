@@ -325,6 +325,24 @@ prepend_tool_bin() {
 	export PATH="$(qt_cache_dir)/tool-bin:$PATH"
 }
 
+# Git bash `tar` on the Windows runner is not a zip reader. After the MSVC
+# environment is sourced it is also not Git's bsdtar.
+extract_zip() {
+	local archive="$1" dest="$2" win_archive win_dest
+	mkdir -p "$dest"
+	if [[ -x /usr/bin/unzip ]]; then
+		/usr/bin/unzip -q "$archive" -d "$dest"
+		return
+	fi
+	win_archive="$archive"
+	win_dest="$dest"
+	if command -v cygpath >/dev/null 2>&1; then
+		win_archive="$(cygpath -w "$archive")"
+		win_dest="$(cygpath -w "$dest")"
+	fi
+	powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '$win_archive' -DestinationPath '$win_dest' -Force"
+}
+
 install_sccache_bin() {
 	local tool_bin dest tmp archive url extracted
 	tool_bin="$(qt_cache_dir)/tool-bin"
@@ -353,7 +371,7 @@ install_sccache_bin() {
 		url="https://github.com/mozilla/sccache/releases/download/v0.17.0/sccache-v0.17.0-x86_64-pc-windows-msvc.zip"
 		archive="$tmp/sccache.zip"
 		curl --fail --location --retry 3 -o "$archive" "$url"
-		tar -xf "$archive" -C "$tmp"
+		extract_zip "$archive" "$tmp"
 		extracted="$(find "$tmp" -type f -name sccache.exe | head -n 1)"
 		;;
 	esac
@@ -381,7 +399,7 @@ install_windows_zstd() {
 	url="https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-v1.5.7-win64.zip"
 	archive="$tmp/zstd.zip"
 	curl --fail --location --retry 3 -o "$archive" "$url"
-	tar -xf "$archive" -C "$tmp"
+	extract_zip "$archive" "$tmp"
 	extracted="$(find "$tmp" -type f -name zstd.exe | head -n 1)"
 	if [[ -z "$extracted" || ! -f "$extracted" ]]; then
 		rm -rf "$tmp"
