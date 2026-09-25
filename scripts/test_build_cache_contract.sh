@@ -62,4 +62,13 @@ grep -q 'build_plugin.sh' "$ROOT/scripts/build_plugin.ps1" || fail "build_plugin
 if grep -q 'Invoke-CmakeBuild' "$ROOT/scripts/build_plugin.ps1"; then
 	fail "build_plugin.ps1 still builds on its own"
 fi
+wf="$ROOT/.github/workflows/release-plugin.yml"
+grep -q "hashFiles('scripts/qt/macos-arm64.stamp')" "$wf" || fail "workflow does not hash the macOS stamp"
+grep -q "hashFiles('scripts/qt/windows-x64.stamp')" "$wf" || fail "workflow does not hash the Windows stamp"
+grep -q 'bash scripts/build_plugin.sh all' "$wf" || fail "workflow does not run build_plugin.sh all"
+for banned in lukka/get-cmake ilammy/msvc-dev-cmd aqtinstall runner.home; do
+	if grep -q "$banned" "$wf"; then
+		fail "workflow still mentions $banned"
+	fi
+done
 echo "ok build cache contract"

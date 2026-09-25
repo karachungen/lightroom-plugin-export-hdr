@@ -27,131 +27,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build dependencies (macOS)
+      - name: Restore Qt cache (macOS)
         if: matrix.id == 'macos-arm64'
-        shell: bash
-        run: bash scripts/build_plugin.sh install-deps
-
-      - name: Cache static Qt (macOS)
-        if: matrix.id == 'macos-arm64'
-        uses: actions/cache@v4
+        id: qt-cache-macos
+        uses: actions/cache/restore@v4
         with:
-          path: ${{ runner.home }}/Qt/6.11.2-static
-          key: qt-6.11.2-macos-arm64-static-v1-${{ hashFiles('scripts/setup_qt_static.sh') }}
+          path: .build-cache/qt-macos-arm64.tar.zst
+          key: qt-macos-arm64-${{ hashFiles('scripts/qt/macos-arm64.stamp') }}
 
-      - name: Build static Qt (macOS)
-        if: matrix.id == 'macos-arm64'
-        shell: bash
-        run: |
-          export QT_STATIC_ROOT="$HOME/Qt/6.11.2-static"
-          bash scripts/setup_qt_static.sh
-          echo "QT_STATIC_ROOT=$QT_STATIC_ROOT" >> "$GITHUB_ENV"
-
-      - name: Setup CMake 3.31 (Windows)
+      - name: Restore Qt cache (Windows)
         if: matrix.id == 'windows-x64'
-        uses: lukka/get-cmake@latest
+        id: qt-cache-windows
+        uses: actions/cache/restore@v4
         with:
-          cmakeVersion: "3.31.6"
-          ninjaVersion: latest
+          path: .build-cache/qt-windows-x64.tar.zst
+          key: qt-windows-x64-${{ hashFiles('scripts/qt/windows-x64.stamp') }}
 
-      - name: Setup MSVC (Windows)
-        if: matrix.id == 'windows-x64'
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Restore sccache
+        uses: actions/cache/restore@v4
         with:
-          arch: x64
-
-      - name: Cache Qt (Windows)
-        if: matrix.id == 'windows-x64'
-        uses: actions/cache@v4
-        with:
-          path: C:/Qt/6.11.2
-          key: qt-6.11.2-windows-msvc2022-v3-${{ hashFiles('.github/workflows/release-plugin.yml') }}
+          path: .build-cache/sccache
+          key: sccache-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            qt-6.11.2-windows-msvc2022-v3-
-
-      - name: Install Qt 6.11 (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: |
-          $qtRoot = "C:\Qt"
-          $prefix = Join-Path $qtRoot "6.11.2\msvc2022_64"
-          $marker = Join-Path $prefix "lib\cmake\Qt6\Qt6Config.cmake"
-          $shaderTools = Join-Path $prefix "lib\cmake\Qt6ShaderTools\Qt6ShaderToolsConfig.cmake"
-          if (-not (Test-Path -LiteralPath $marker) -or -not (Test-Path -LiteralPath $shaderTools)) {
-            if (Test-Path -LiteralPath (Join-Path $qtRoot "6.11.2")) {
-              Write-Host "Removing incomplete Qt install at $(Join-Path $qtRoot '6.11.2')"
-              Remove-Item -LiteralPath (Join-Path $qtRoot "6.11.2") -Recurse -Force
-            }
-            New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
-            python -m pip install --upgrade pip "git+https://github.com/miurahr/aqtinstall.git"
-            python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 `
-              --outputdir $qtRoot `
-              --external 7z
-            python -m aqt install-qt windows desktop 6.11.2 win64_msvc2022_64 `
-              -m qtshadertools `
-              --outputdir $qtRoot `
-              --external 7z
-          } else {
-            Write-Host "Qt already present at $prefix"
-          }
-          "QT_ROOT_DIR=$prefix" >> $env:GITHUB_ENV
-
-      - name: Install WebView2 SDK (Windows)
-        if: matrix.id == 'windows-x64'
-        shell: pwsh
-        run: |
-          $sdkRoot = "C:\WebView2Sdk"
-          $marker = Join-Path $sdkRoot "include\WebView2.h"
-          if (-not (Test-Path -LiteralPath $marker)) {
-            $pkgRoot = Join-Path $env:RUNNER_TEMP "webview2-nuget"
-            $nuget = Join-Path $env:RUNNER_TEMP "nuget.exe"
-            if (-not (Test-Path -LiteralPath $nuget)) {
-              Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile $nuget
-            }
-            if (Test-Path -LiteralPath $pkgRoot) {
-              Remove-Item -LiteralPath $pkgRoot -Recurse -Force
-            }
-            & $nuget install Microsoft.Web.WebView2 -OutputDirectory $pkgRoot -ExcludeVersion
-            $pkg = Join-Path $pkgRoot "Microsoft.Web.WebView2"
-            New-Item -ItemType Directory -Force -Path (Join-Path $sdkRoot "include"), (Join-Path $sdkRoot "lib\x64") | Out-Null
-            Copy-Item -Path (Join-Path $pkg "build\native\include\*") -Destination (Join-Path $sdkRoot "include") -Recurse -Force
-            Copy-Item -Path (Join-Path $pkg "build\native\x64\WebView2LoaderStatic.lib") -Destination (Join-Path $sdkRoot "lib\x64") -Force
-          }
-          "WEBVIEW2_SDK=$sdkRoot" >> $env:GITHUB_ENV
+            sccache-${{ runner.os }}-
 
       - name: Build, test, and package plugin
         shell: bash
+        env:
+          UHDR_QT_CACHE_RESTORED: ${{ steps.qt-cache-macos.outputs.cache-hit || steps.qt-cache-windows.outputs.cache-hit || 'false' }}
+        run: bash scripts/build_plugin.sh all
+
+      - name: Stop sccache server
+        shell: bash
         run: |
-          if [[ "${{ matrix.id }}" == "macos-arm64" ]]; then
-            # Static Qt is the script default. The cache step already installed it.
-            export QT_STATIC_ROOT="${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
-          else
-            export UHDR_STATIC_QT=OFF
-            if [[ -n "${QT_ROOT_DIR:-}" ]]; then
-              if command -v cygpath &>/dev/null; then
-                export CMAKE_PREFIX_PATH="$(cygpath -u "$QT_ROOT_DIR")"
-                export PATH="$(cygpath -u "$QT_ROOT_DIR/bin"):$PATH"
-              else
-                export CMAKE_PREFIX_PATH="$QT_ROOT_DIR"
-                export PATH="$QT_ROOT_DIR/bin:$PATH"
-              fi
-            fi
+          export SCCACHE_DIR="$GITHUB_WORKSPACE/.build-cache/sccache"
+          tool="$GITHUB_WORKSPACE/.build-cache/tool-bin/sccache"
+          if [[ -x "$tool" ]]; then
+            "$tool" --stop-server || true
+          elif [[ -x "${tool}.exe" ]]; then
+            "${tool}.exe" --stop-server || true
           fi
-          bash scripts/build_plugin.sh all
 
-      - name: macOS shell quoting regression test
-        if: matrix.id == 'macos-arm64'
-        shell: bash
-        run: bash scripts/test_macos_shell_quote.sh
+      - name: Save Qt cache (macOS)
+        if: matrix.id == 'macos-arm64' && steps.qt-cache-macos.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .build-cache/qt-macos-arm64.tar.zst
+          key: qt-macos-arm64-${{ hashFiles('scripts/qt/macos-arm64.stamp') }}
 
-      - name: Windows cmd quoting regression test
-        if: matrix.id == 'windows-x64'
-        shell: powershell
-        run: .\scripts\test_windows_cmd_quote.ps1
+      - name: Save Qt cache (Windows)
+        if: matrix.id == 'windows-x64' && steps.qt-cache-windows.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .build-cache/qt-windows-x64.tar.zst
+          key: qt-windows-x64-${{ hashFiles('scripts/qt/windows-x64.stamp') }}
 
-      - name: Encoder tests
-        shell: bash
-        run: ctest --test-dir tools/uhdr_repack/build --output-on-failure
+      - name: Save sccache
+        uses: actions/cache/save@v4
+        with:
+          path: .build-cache/sccache
+          key: sccache-${{ runner.os }}-${{ github.run_id }}
 
       - name: Upload platform artifact
         uses: actions/upload-artifact@v4
