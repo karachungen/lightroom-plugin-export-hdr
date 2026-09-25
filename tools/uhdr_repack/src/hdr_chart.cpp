@@ -1511,8 +1511,7 @@ bool edge_report(const std::vector<ChartSample>& samples, const std::string& pat
   int h = 0;
   int rw = 0;
   int rh = 0;
-  if (!read_gain_meta(path, &meta, &err) || !decode_uhdr_rec2020(path, meta.cap_max, &rgb, &w, &h, &err) ||
-      !load_tiff_rec2020(ref_tiff, &ref, &rw, &rh, &err)) {
+  if (!read_gain_meta(path, &meta, &err) || !decode_uhdr_rec2020(path, meta.cap_max, &rgb, &w, &h, &err)) {
     std::cerr << err << "\n";
     return false;
   }
@@ -1520,6 +1519,10 @@ bool edge_report(const std::vector<ChartSample>& samples, const std::string& pat
     std::printf("edge report skipped: %dx%d export is scaled from the %dx%d frame\n", w, h, frame.w, frame.h);
     *p99_out = -1.0f;
     return true;
+  }
+  if (!load_tiff_rec2020(ref_tiff, &ref, &rw, &rh, &err)) {
+    std::cerr << err << "\n";
+    return false;
   }
   std::map<std::string, std::vector<float>> by_group;
   std::vector<float> all;
@@ -1769,7 +1772,7 @@ int check_hdr_chart_main(int argc, char** argv) {
     }
     std::cout << "Wrote " << ig << " (Instagram re-encode)\n";
     const int ig_grade = grade_uhdr_passes(samples, ig, frame, true, nullptr);
-    std::printf("instagram grade %s (report only)\n", ig_grade ? "FAIL" : "PASS");
+    std::printf("instagram grade %s (report only, Lightroom tolerances)\n", ig_grade ? "FAIL" : "PASS");
     float ig_p99 = 0.0f;
     if (!edge_report(samples, ig, tiff, frame, "instagram", &ig_p99)) return 1;
     if (max_edge_ig >= 0.0f) {

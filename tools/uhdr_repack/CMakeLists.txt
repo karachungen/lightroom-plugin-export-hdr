@@ -474,7 +474,8 @@ endforeach()
 
 uhdr_chart_test(chart.color.edge-gate-trips --check-hdr-chart "${UHDR_CHART_DIR}"
   --out "${UHDR_TEST_OUT}/chart-color-edge-gate.jpg" --preset color --max-edge-p99 0)
-set_tests_properties(chart.color.edge-gate-trips PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(chart.color.edge-gate-trips PROPERTIES
+  PASS_REGULAR_EXPRESSION "exceeds --max-edge-p99 0.000")
 
 function(uhdr_smoke_pair name verify_args)
   add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})

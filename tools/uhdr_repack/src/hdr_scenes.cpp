@@ -95,7 +95,7 @@ LinearRgb sunset_pixel(int x, int y) {
   const float xf = static_cast<float>(x) + 0.5f;
   const float yr = 0.62f * static_cast<float>(kH) + 40.0f * std::sin(xf / 180.0f) +
                    25.0f * std::sin(xf / 67.0f + 1.3f);
-  const float t = std::clamp(static_cast<float>(y) - yr + 0.5f, 0.0f, 1.0f);
+  const float t = std::clamp(static_cast<float>(y) + 1.0f - yr, 0.0f, 1.0f);
   const LinearRgb hill{0.010f, 0.008f, 0.012f};
   return mix(c, hill, t);
 }

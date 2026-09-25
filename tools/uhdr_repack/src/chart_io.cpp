@@ -8,6 +8,7 @@
 #include <cmath>
 #include <csetjmp>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -77,6 +78,10 @@ bool write_float_tiff(const std::string& path, const std::vector<float>& rgb, in
                       const std::vector<uint8_t>& icc, std::string* error) {
   if (width < 1 || height < 1) {
     if (error) *error = "TIFF width and height must be positive";
+    return false;
+  }
+  if (width > 65535 || height > 65535) {
+    if (error) *error = "float TIFF width and height must be at most 65535";
     return false;
   }
   const uint32_t nstrips =
@@ -204,16 +209,23 @@ bool encode_p3_jpeg(const uint8_t* rgba, int width, int height, const std::vecto
   JpegErr jerr{};
   cinfo.err = jpeg_std_error(&jerr.pub);
   jerr.pub.error_exit = jpeg_fail;
-  unsigned char* outbuf = nullptr;
-  unsigned long outsize = 0;
+  unsigned char* volatile buf = nullptr;
+  unsigned long size = 0;
+  std::vector<uint8_t> marker;
+  const char hdr[] = "ICC_PROFILE";
+  marker.insert(marker.end(), hdr, hdr + 12);
+  marker.push_back(1);
+  marker.push_back(1);
+  marker.insert(marker.end(), icc.begin(), icc.end());
+  std::vector<uint8_t> row(static_cast<size_t>(width) * 3u);
   if (setjmp(jerr.jump)) {
     jpeg_destroy_compress(&cinfo);
-    if (outbuf) free(outbuf);
+    if (buf) free(buf);
     if (error) *error = "libjpeg failed to compress the SDR JPEG";
     return false;
   }
   jpeg_create_compress(&cinfo);
-  jpeg_mem_dest(&cinfo, &outbuf, &outsize);
+  jpeg_mem_dest(&cinfo, (unsigned char**)&buf, &size);
   cinfo.image_width = static_cast<JDIMENSION>(width);
   cinfo.image_height = static_cast<JDIMENSION>(height);
   cinfo.input_components = 3;
@@ -221,14 +233,7 @@ bool encode_p3_jpeg(const uint8_t* rgba, int width, int height, const std::vecto
   jpeg_set_defaults(&cinfo);
   jpeg_set_quality(&cinfo, 95, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
-  std::vector<uint8_t> marker;
-  const char hdr[] = "ICC_PROFILE";
-  marker.insert(marker.end(), hdr, hdr + 12);
-  marker.push_back(1);
-  marker.push_back(1);
-  marker.insert(marker.end(), icc.begin(), icc.end());
   jpeg_write_marker(&cinfo, JPEG_APP0 + 2, marker.data(), static_cast<unsigned int>(marker.size()));
-  std::vector<uint8_t> row(static_cast<size_t>(width) * 3u);
   while (cinfo.next_scanline < cinfo.image_height) {
     const uint8_t* src = rgba + static_cast<size_t>(cinfo.next_scanline) * width * 4u;
     for (int x = 0; x < width; ++x) {
@@ -241,12 +246,13 @@ bool encode_p3_jpeg(const uint8_t* rgba, int width, int height, const std::vecto
   }
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
-  if (!outbuf || outsize == 0) {
+  if (!buf || size == 0) {
+    if (buf) free(buf);
     if (error) *error = "libjpeg produced an empty SDR JPEG";
     return false;
   }
-  jpeg->assign(outbuf, outbuf + outsize);
-  free(outbuf);
+  jpeg->assign(buf, buf + size);
+  free(buf);
   return true;
 }
 
