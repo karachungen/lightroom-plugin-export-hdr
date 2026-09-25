@@ -70,6 +70,7 @@ else()
     GIT_SHALLOW TRUE
     PATCH_COMMAND ${CMAKE_COMMAND}
       "-DJPEG_ENCODER_CPP=<SOURCE_DIR>/lib/src/jpegencoderhelper.cpp"
+      "-DLIBUHDR_CMAKE=<SOURCE_DIR>/CMakeLists.txt"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_libultrahdr_progressive.cmake"
   )
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libultrahdr as a static library" FORCE)
@@ -94,6 +95,7 @@ else()
   execute_process(
     COMMAND ${CMAKE_COMMAND}
       "-DJPEG_ENCODER_CPP=${libultrahdr_SOURCE_DIR}/lib/src/jpegencoderhelper.cpp"
+      "-DLIBUHDR_CMAKE=${libultrahdr_SOURCE_DIR}/CMakeLists.txt"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_libultrahdr_progressive.cmake"
     COMMAND_ERROR_IS_FATAL ANY
   )
