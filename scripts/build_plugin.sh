@@ -148,6 +148,11 @@ run_msvc_child() {
 	if [[ -n "${QT_WINDOWS_BIN:-}" ]]; then
 		win_path="${QT_WINDOWS_BIN};${win_path}"
 	fi
+	local ninja_bin
+	ninja_bin="$(command -v ninja || true)"
+	if [[ -n "$ninja_bin" ]] && command -v cygpath >/dev/null 2>&1; then
+		win_path="$(cygpath -w "${ninja_bin%/*}");${win_path}"
+	fi
 	excl="PATH;INCLUDE;LIB;LIBPATH"
 	if [[ -n "${MSYS2_ENV_CONV_EXCL:-}" ]]; then
 		excl="${MSYS2_ENV_CONV_EXCL};${excl}"
@@ -511,6 +516,18 @@ cmd_build() {
 		export SCCACHE_DIR="$(qt_cache_dir)/sccache"
 		mkdir -p "$SCCACHE_DIR"
 		cmake_extra+=("-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+	fi
+	if is_windows_host; then
+		local ninja
+		ninja="$(command -v ninja || true)"
+		if [[ -z "$ninja" ]]; then
+			echo "ninja not found on PATH" >&2
+			exit 1
+		fi
+		if command -v cygpath >/dev/null 2>&1; then
+			ninja="$(cygpath -w "$ninja")"
+		fi
+		cmake_extra+=("-DCMAKE_MAKE_PROGRAM=$ninja")
 	fi
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
