@@ -155,6 +155,13 @@ run_msvc_child() {
 	fi
 	excl="PATH;INCLUDE;LIB;LIBPATH"
 	export MSYS2_ENV_CONV_EXCL="$excl"
+	# Git bash rewrites C:/... arguments to C:\... . CMake then writes those
+	# backslashes into CMakeRCCompiler.cmake, where \P is an invalid escape.
+	local arg_excl="-DCMAKE_"
+	if [[ -n "${MSYS2_ARG_CONV_EXCL:-}" ]]; then
+		arg_excl="${MSYS2_ARG_CONV_EXCL};${arg_excl}"
+	fi
+	export MSYS2_ARG_CONV_EXCL="$arg_excl"
 	# Bash searches PATH before it starts the child, so a semicolon Windows PATH
 	# hides cmake. Resolve it with the POSIX PATH, then hand the child vcvars.
 	local cmd="$1"
@@ -175,8 +182,9 @@ run_msvc_child() {
 msvc_recorded_tool() {
 	local value="$1"
 	[[ -n "$value" ]] || return 1
+	value="${value//\\//}"
 	if command -v cygpath >/dev/null 2>&1; then
-		cygpath -w "$value"
+		cygpath -m "$value"
 	else
 		printf '%s\n' "$value"
 	fi
@@ -201,7 +209,7 @@ msvc_cl_path() {
 		fi
 		if [[ -n "$posix" && -f "$posix/cl.exe" ]]; then
 			set +f
-			cygpath -w "$posix/cl.exe"
+			cygpath -m "$posix/cl.exe"
 			return 0
 		fi
 	done
@@ -568,7 +576,7 @@ cmd_build() {
 			exit 1
 		fi
 		if command -v cygpath >/dev/null 2>&1; then
-			ninja="$(cygpath -w "$ninja")"
+			ninja="$(cygpath -m "$ninja")"
 		fi
 		cmake_extra+=(
 			"-DCMAKE_MAKE_PROGRAM=$ninja"

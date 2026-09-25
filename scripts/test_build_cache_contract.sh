@@ -80,6 +80,7 @@ grep -q 'MSVC_CL' "$setup_ps1" || fail "setup_windows_build.ps1 does not record 
 grep -q 'MSVC_RC' "$setup_ps1" || fail "setup_windows_build.ps1 does not record rc.exe"
 grep -q 'MSVC_MT' "$setup_ps1" || fail "setup_windows_build.ps1 does not record mt.exe"
 grep -q 'MSVC_CL' "$build" || fail "build_plugin.sh does not use MSVC_CL"
+grep -q 'MSYS2_ARG_CONV_EXCL' "$build" || fail "build_plugin.sh does not keep CMake tool paths in forward-slash form"
 grep -q 'CMAKE_RC_COMPILER' "$build" || fail "build_plugin.sh does not pass CMAKE_RC_COMPILER"
 grep -q 'CMAKE_MT' "$build" || fail "build_plugin.sh does not pass CMAKE_MT"
 grep -q 'MSVC_WIN_PATH' "$build" || fail "build_plugin.sh does not mention MSVC_WIN_PATH"
