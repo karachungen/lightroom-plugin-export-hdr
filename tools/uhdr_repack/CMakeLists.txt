@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.23)
 
 if(APPLE)
-  project(uhdr_repack LANGUAGES CXX OBJCXX)
+  project(uhdr_repack LANGUAGES C CXX OBJCXX)
 else()
-  project(uhdr_repack LANGUAGES CXX)
+  project(uhdr_repack LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -70,6 +70,7 @@ else()
     GIT_SHALLOW TRUE
     PATCH_COMMAND ${CMAKE_COMMAND}
       "-DJPEG_ENCODER_CPP=<SOURCE_DIR>/lib/src/jpegencoderhelper.cpp"
+      "-DLIBUHDR_CMAKE=<SOURCE_DIR>/CMakeLists.txt"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_libultrahdr_progressive.cmake"
   )
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libultrahdr as a static library" FORCE)
@@ -94,6 +95,7 @@ else()
   execute_process(
     COMMAND ${CMAKE_COMMAND}
       "-DJPEG_ENCODER_CPP=${libultrahdr_SOURCE_DIR}/lib/src/jpegencoderhelper.cpp"
+      "-DLIBUHDR_CMAKE=${libultrahdr_SOURCE_DIR}/CMakeLists.txt"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/apply_libultrahdr_progressive.cmake"
     COMMAND_ERROR_IS_FATAL ANY
   )
@@ -108,9 +110,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+FetchContent_Declare(
+  miniz
+  URL https://github.com/richgel999/miniz/releases/download/3.0.2/miniz-3.0.2.zip
+  URL_HASH SHA256=ada38db0b703a56d3dd6d57bf84a9c5d664921d870d8fea4db153979fb5332c5
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  SOURCE_SUBDIR no-cmake-project
+)
+FetchContent_MakeAvailable(miniz)
+
 set(_UHDR_CORE_SOURCES
   src/main.cpp
   src/cli_encode.cpp
+  src/encode_presets.cpp
   src/cli_inspect.cpp
   src/encode_engine.cpp
   src/session.cpp
@@ -126,8 +138,16 @@ set(_UHDR_CORE_SOURCES
   src/verify.cpp
   src/half_float.cpp
   src/tiff_float.cpp
+  src/icc_profile.cpp
   src/hdr_chart.cpp
+  src/chart_io.cpp
+  src/hdr_scenes.cpp
   src/yuv_convert.cpp
+  src/sdr_jpeg.cpp
+  src/cli_describe.cpp
+  src/delivery_check.cpp
+  src/instagram_sim.cpp
+  "${miniz_SOURCE_DIR}/miniz.c"
 )
 
 set(_UHDR_GUI_SOURCES
@@ -141,6 +161,7 @@ set(_UHDR_GUI_SOURCES
   src/gui/gui_bridge.cpp
   src/gui/hdr_tiff_client.cpp
   src/gui/web_resources.cpp
+  src/gui/check_preview_jpeg.cpp
   src/gainmap_edit.cpp
 )
 
@@ -227,6 +248,13 @@ if(UHDR_ENABLE_GUI)
   list(APPEND _UHDR_ALL_SOURCES ${_UHDR_GUI_SOURCES})
 endif()
 
+# Fused multiply-adds change the chart and ICC bytes versus the committed Windows chart.
+# MSVC does not contract these expressions.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  set_source_files_properties(src/hdr_chart.cpp src/chart_io.cpp src/hdr_scenes.cpp src/icc_profile.cpp
+    PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+
 add_executable(uhdr_repack ${_UHDR_ALL_SOURCES})
 
 if(WIN32)
@@ -267,6 +295,9 @@ else()
 endif()
 
 target_link_libraries(uhdr_repack PRIVATE nlohmann_json::nlohmann_json)
+target_include_directories(uhdr_repack PRIVATE "${miniz_SOURCE_DIR}")
+target_compile_definitions(uhdr_repack PRIVATE
+  MINIZ_NO_ZLIB_COMPATIBLE_NAMES MINIZ_NO_ARCHIVE_APIS MINIZ_NO_STDIO)
 
 if(UHDR_ENABLE_GUI)
   target_compile_definitions(uhdr_repack PRIVATE UHDR_ENABLE_GUI=1)
@@ -366,5 +397,149 @@ if(UHDR_STATIC_QT AND UHDR_ENABLE_GUI)
     COMMENT "Verifying the single executable has no shared Qt dependencies"
   )
 endif()
+
+enable_testing()
+
+get_filename_component(UHDR_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(UHDR_TEST_OUT "${CMAKE_CURRENT_BINARY_DIR}/test-out")
+set(UHDR_BIN $<TARGET_FILE:uhdr_repack>)
+set(UHDR_CHART_DIR "${UHDR_TEST_OUT}/hdr-chart")
+set(UHDR_CHART_HDR "${UHDR_CHART_DIR}/hdr-chart.tif")
+set(UHDR_CHART_SDR "${UHDR_CHART_DIR}/sdr-chart.jpg")
+
+# Windows CI builds shared Qt, then runs ctest in a new shell. PATH from the
+# build step does not carry over, so each test must find Qt6Core.dll itself.
+set(_uhdr_qt_test_env "")
+if(WIN32 AND NOT UHDR_STATIC_QT AND UHDR_ENABLE_GUI AND TARGET Qt6::Core)
+  set(_uhdr_qt_core_dll "")
+  if(CMAKE_BUILD_TYPE)
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _uhdr_qt_cfg)
+    get_target_property(_uhdr_qt_core_dll Qt6::Core "IMPORTED_LOCATION_${_uhdr_qt_cfg}")
+  endif()
+  if(NOT _uhdr_qt_core_dll OR _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+    foreach(_uhdr_qt_cfg IN ITEMS RELWITHDEBINFO RELEASE MINSIZEREL DEBUG)
+      if(NOT _uhdr_qt_core_dll OR _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+        get_target_property(_uhdr_qt_core_dll Qt6::Core "IMPORTED_LOCATION_${_uhdr_qt_cfg}")
+      endif()
+    endforeach()
+  endif()
+  if(_uhdr_qt_core_dll AND NOT _uhdr_qt_core_dll MATCHES "-NOTFOUND$")
+    get_filename_component(_uhdr_qt_bin "${_uhdr_qt_core_dll}" DIRECTORY)
+    if(_uhdr_qt_bin)
+      set(_uhdr_qt_test_env
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_uhdr_qt_bin}")
+    endif()
+  endif()
+endif()
+
+add_test(NAME chart.write COMMAND ${UHDR_BIN} --write-hdr-chart "${UHDR_CHART_DIR}")
+set_tests_properties(chart.write PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_SETUP chart ${_uhdr_qt_test_env})
+
+function(uhdr_chart_test name)
+  add_test(NAME ${name} COMMAND ${UHDR_BIN} ${ARGN})
+  set_tests_properties(${name} PROPERTIES LABELS chart TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
+endfunction()
+
+# Apple libm and the Windows UCRT do not produce the same pow/exp2 bits, so the
+# Deflate strips of a fresh chart differ from the committed Mac TIFF. Keep the
+# byte check on Mac. Windows still writes the chart and grades that file.
+if(NOT WIN32)
+  uhdr_chart_test(chart.assets-current --check-hdr-chart-assets "${UHDR_REPO_ROOT}/test/hdr-chart" "${UHDR_CHART_DIR}")
+endif()
+uhdr_chart_test(chart.input.hdr --describe-input "${UHDR_CHART_HDR}" --require-portable)
+uhdr_chart_test(chart.input.sdr --describe-input "${UHDR_CHART_SDR}" --require-portable)
+
+foreach(preset color mono)
+  if(preset STREQUAL "color")
+    set(_edge_gate --max-edge-p99 0.30)
+  else()
+    set(_edge_gate --max-edge-p99 1.34)
+  endif()
+  uhdr_chart_test(chart.${preset}.original --check-hdr-chart "${UHDR_CHART_DIR}"
+    --out "${UHDR_TEST_OUT}/chart-${preset}-original.jpg" --preset ${preset} ${_edge_gate})
+  foreach(aspect 1x1 4x5 3x4 191x100)
+    uhdr_chart_test(chart.${preset}.ig-${aspect}-1080 --check-hdr-chart "${UHDR_CHART_DIR}"
+      --out "${UHDR_TEST_OUT}/chart-${preset}-${aspect}-1080.jpg" --preset ${preset}
+      --slice-aspect ${aspect} --out-width 1080)
+    uhdr_chart_test(chart.${preset}.ig-${aspect}-native --check-hdr-chart "${UHDR_CHART_DIR}"
+      --out "${UHDR_TEST_OUT}/chart-${preset}-${aspect}-native.jpg" --preset ${preset}
+      --slice-aspect ${aspect})
+  endforeach()
+endforeach()
+
+foreach(preset color mono)
+  if(preset STREQUAL "color")
+    set(_ig_gate --max-edge-p99-instagram 1.95)
+  else()
+    set(_ig_gate --max-edge-p99-instagram 1.96)
+  endif()
+  uhdr_chart_test(chart.${preset}.instagram --check-hdr-chart "${UHDR_CHART_DIR}"
+    --out "${UHDR_TEST_OUT}/chart-${preset}-ig-src.jpg" --preset ${preset} --simulate-instagram
+    ${_ig_gate})
+  set_tests_properties(chart.${preset}.instagram PROPERTIES FAIL_REGULAR_EXPRESSION "edge report skipped")
+endforeach()
+
+uhdr_chart_test(chart.color.edge-gate-trips --check-hdr-chart "${UHDR_CHART_DIR}"
+  --out "${UHDR_TEST_OUT}/chart-color-edge-gate.jpg" --preset color --max-edge-p99 0)
+set_tests_properties(chart.color.edge-gate-trips PROPERTIES
+  PASS_REGULAR_EXPRESSION "exceeds --max-edge-p99 0.000")
+
+function(uhdr_smoke_pair name verify_args)
+  add_test(NAME smoke.${name}.encode COMMAND ${UHDR_BIN} ${ARGN})
+  add_test(NAME smoke.${name}.verify COMMAND ${UHDR_BIN} ${verify_args})
+  set_tests_properties(smoke.${name}.encode PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED chart FIXTURES_SETUP smoke-${name} ${_uhdr_qt_test_env})
+  set_tests_properties(smoke.${name}.verify PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED smoke-${name} ${_uhdr_qt_test_env})
+endfunction()
+
+uhdr_smoke_pair(cli.default
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-default.jpg;--expect-size;1440x1920"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-default.jpg")
+uhdr_smoke_pair(cli.slice-1x1
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-1x1.jpg;--expect-size;1440x1440;--expect-single;1x1"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-1x1.jpg"
+  --slice-aspect 1x1)
+uhdr_smoke_pair(cli.feed-4x5
+  "--verify-uhdr;${UHDR_TEST_OUT}/cli-4x5.jpg;--expect-size;1080x1350;--max-bytes;8388608"
+  --hdr-tiff "${UHDR_CHART_HDR}" --base "${UHDR_CHART_SDR}" --out "${UHDR_TEST_OUT}/cli-4x5.jpg"
+  --slice-aspect 4x5 --out-width 1080)
+
+add_test(NAME smoke.utf8-path COMMAND ${UHDR_BIN} --check-utf8-path
+  "${UHDR_CHART_HDR}" "${UHDR_CHART_SDR}" "${UHDR_TEST_OUT}")
+set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
+
+add_test(NAME smoke.instagram.encode COMMAND ${UHDR_BIN} --simulate-instagram
+  "${UHDR_TEST_OUT}/cli-default.jpg" "${UHDR_TEST_OUT}/cli-default-instagram.jpg")
+add_test(NAME smoke.instagram.inspect COMMAND ${UHDR_BIN} --inspect "${UHDR_TEST_OUT}/cli-default-instagram.jpg")
+add_test(NAME smoke.instagram.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/cli-default-instagram.jpg"
+  --expect-size 1440x1920)
+set_tests_properties(smoke.instagram.encode PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-cli.default FIXTURES_SETUP smoke-instagram ${_uhdr_qt_test_env})
+set_tests_properties(smoke.instagram.inspect PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-instagram PASS_REGULAR_EXPRESSION "gainmap_jpeg_420: likely" ${_uhdr_qt_test_env})
+set_tests_properties(smoke.instagram.verify PROPERTIES LABELS smoke TIMEOUT 600
+  FIXTURES_REQUIRED smoke-instagram ${_uhdr_qt_test_env})
+
+if(UHDR_ENABLE_GUI)
+  add_test(NAME smoke.probe-sdr COMMAND ${UHDR_BIN} --probe-sdr "${UHDR_CHART_SDR}")
+  add_test(NAME smoke.preview-jpeg COMMAND ${UHDR_BIN} --check-preview-jpeg "${UHDR_CHART_SDR}")
+  set_tests_properties(smoke.probe-sdr smoke.preview-jpeg PROPERTIES
+    LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart FAIL_REGULAR_EXPRESSION "Wrong JPEG library version" ${_uhdr_qt_test_env})
+endif()
+
+add_test(NAME scenes.write COMMAND ${UHDR_BIN} --write-hdr-scenes "${UHDR_TEST_OUT}/hdr-scenes")
+set_tests_properties(scenes.write PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_SETUP scenes ${_uhdr_qt_test_env})
+foreach(scene sunset neon pastel)
+  add_test(NAME scenes.${scene}.encode COMMAND ${UHDR_BIN}
+    --hdr-tiff "${UHDR_TEST_OUT}/hdr-scenes/${scene}-hdr.tif" --base "${UHDR_TEST_OUT}/hdr-scenes/${scene}-sdr.jpg"
+    --out "${UHDR_TEST_OUT}/hdr-scenes/${scene}-uhdr.jpg")
+  add_test(NAME scenes.${scene}.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/hdr-scenes/${scene}-uhdr.jpg"
+    --expect-size 1080x1350)
+  set_tests_properties(scenes.${scene}.encode PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED scenes FIXTURES_SETUP scene-${scene} ${_uhdr_qt_test_env})
+  set_tests_properties(scenes.${scene}.verify PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED scene-${scene} ${_uhdr_qt_test_env})
+endforeach()
 
 install(TARGETS uhdr_repack RUNTIME DESTINATION bin)

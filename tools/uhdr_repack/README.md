@@ -47,7 +47,7 @@ flowchart TB
 
 ## Build
 
-From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`** on both platforms (static link). Use **CMake 3.15–3.31.x** on Windows (CMake 4.x fails on the vendored libjpeg-turbo 3.1.0 `cmake_minimum_required` until upstream updates; CI pins **3.31.6**). First configure downloads libultrahdr into **`build/_deps/`**.
+From **`tools/uhdr_repack`**. CMake 3.15+, C++17. macOS also uses Objective-C++. libjpeg-turbo is vendored automatically via libultrahdr **`UHDR_BUILD_DEPS`** on both platforms (static link). CMake 4.x is fine: `build_plugin.sh` exports `CMAKE_POLICY_VERSION_MINIMUM=3.5` so vendored libjpeg-turbo 3.1.0 still configures. First configure downloads libultrahdr into **`build/_deps/`**.
 
 **Canonical configure/build** (shared by local builds and GitHub Actions) — use [CMakePresets.json](CMakePresets.json):
 
@@ -83,6 +83,8 @@ cmake --build --preset macos-arm64-release
 ```powershell
 .\scripts\build_plugin.ps1 all       # Windows x64
 ```
+
+`build_plugin.ps1` forwards to `build_plugin.sh`.
 
 Legacy aliases (build + bundle only): `bundle_uhdr_for_plugin.sh` / `bundle_uhdr_for_plugin_windows.ps1`.
 
@@ -157,30 +159,30 @@ Gain maps are **re-derived per slice** from identically cropped HDR TIFF + SDR b
 
 ## Test
 
-Fixtures: **[../../test/README.md](../../test/README.md)** · repo root:
+From the repo root, on macOS and on Windows:
 
-```bash
-./scripts/build_plugin.sh test
-# or: ./scripts/run_uhdr_test.sh
+```text
+ctest --test-dir tools/uhdr_repack/build --output-on-failure
 ```
 
-```powershell
-.\scripts\build_plugin.ps1 test
-```
+`./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run the cache contract test, the Qt kit fixture test, `ctest`, and the platform quote regression. `build_plugin.ps1` forwards to `build_plugin.sh`.
 
-Defaults → encode, **`--inspect`**, checks **`gainmap_size`** & **`primary_xmp`**
+Color map and Mono map are graded through the editor's Apply path for every Instagram frame (1:1, 4:5, 3:4, 1.91:1) at 1080 and at native size, plus the original frame, at SDR, partial, and full HDR headroom. The Lightroom check is in [../../test/README.md](../../test/README.md).
 
 ## HDR stop / color chart
 
-Writes a labeled linear Rec.2020 TIFF (`+0`…`+5` stops, P3-safe and Rec.2020-only patches, sharpness band) plus a matching Display P3 SDR JPEG at **Instagram 3:4, 1440×1920**. `--check-hdr-chart` encodes with the Color map preset (boost 16 / 4 stops) and prints recovered level and hue per patch.
+The chart is 1440×1920 (3:4). Sections A–G cover neutral stops −8 through +5, hue stops −4 through +4, three gamuts, Rec.2020 peaks, saturation, a ColorChecker, ramps, and a visual sharpness band. Every gated sample sits inside the Instagram 4:5 crop.
+
+From the repo root, on macOS and on Windows:
+
+```text
+ctest --test-dir tools/uhdr_repack/build --output-on-failure
+```
+
+Color map and Mono map are graded through the editor's Apply path for every Instagram frame (1:1, 4:5, 3:4, 1.91:1) at 1080 and at native size, plus the original frame, at SDR, partial, and full HDR headroom. The Lightroom check is in [../../test/README.md](../../test/README.md).
 
 ```bash
 ./scripts/run_hdr_chart_edit.sh
 # Windows: .\scripts\run_hdr_chart_edit.ps1
-# or:
-./build/uhdr_repack --write-hdr-chart ../../test/hdr-chart
-./build/uhdr_repack --check-hdr-chart ../../test/hdr-chart
-./build/uhdr_repack --edit --session ../../test/hdr-chart/session.json
 ```
 
-The committed pair is **1440×1920** (Instagram 3:4) in `test/hdr-chart/`. The TIFF is float linear Rec.2020 with that profile embedded. Rebuild with `--write-hdr-chart` if the layout changes. Encode output `chart-uhdr.jpg` stays gitignored. P3-safe rows `+0`–`+5` must recover within 0.15 stop (hue 0.05). Rec.2020-only rows are reported, and **R2020 +4** must keep a chromatic gain map (red near full boost, green near none) so highlights do not wash out to the SDR hue. Sharpness is visual: 4px line pairs should still read as separate lines at `+0` and `+4` in HDR. The Color map preset advertises boost 16 / 4 stops; the checker still requires `+5` to survive, which current libultrahdr does.

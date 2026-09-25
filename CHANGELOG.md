@@ -7,6 +7,23 @@ Each public release is tagged `vX.Y.Z`, where `X.Y.Z` comes from `Info.lua` `maj
 
 ## Unreleased
 
+## v3.1.0 — 📸 I already had a JPEG
+
+> libultrahdr kept painting its own SDR base. The original frame now arrives as the JPEG it is. Display P3 also stops wearing the inverse sRGB curve, which was a bold look and the wrong one.
+
+### Fixed
+
+- Original-frame encodes pass the SDR JPEG as the SDR rendition (`UHDR_SDR_IMG`), so libultrahdr uses that JPEG instead of inventing a base.
+- Display P3 profiles written by the chart tool used the inverse sRGB curve.
+- Lightroom's ZIP HDR TIFF and P3 JPEG are read by the same code on macOS and Windows instead of WIC or Core Image.
+
+### Changed
+
+- The HDR chart check measures error in a band around every patch edge and can grade an Instagram-style re-encode of the export (`--simulate-instagram`: base and gain map re-encoded at libjpeg q61 4:2:0, the settings Instagram's web upload uses). Both presets gate on today's edge error for the original file and the re-encode. The simulation is pessimistic: Instagram's own encoder loses less than libjpeg at the same quality.
+- `uhdr_repack --write-hdr-scenes <dir>` writes sunset, neon, and pastel HDR test scenes (1080x1350). `scripts/make_hdr_scenes.sh` encodes them into `test/hdr-scenes/*-uhdr.jpg` upload fixtures.
+- Encoder tests run with `ctest` on macOS and Windows. The HDR chart is graded through the editor's Apply path for both presets, every Instagram frame, and SDR, partial, and full HDR headroom.
+- Color map and Mono map presets are defined once in C++.
+
 ## v3.0.7 — 🧺 Color-safe cycle
 
 > Someone ran the HDR frame with the whites. Rec.2020 went through an sRGB wash, the clamp rinsed the dye out, and the reds came back pale. This load is sorted: decoded color goes to the display's own primaries, and the washing machine does not get a vote.

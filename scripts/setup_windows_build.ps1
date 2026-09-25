@@ -1,7 +1,8 @@
 # Install local Windows build dependencies for uhdr_repack / ExportHDR.lrplugin.
 #Requires -Version 5.1
 param(
-	[switch]$VsOnly
+	[switch]$VsOnly,
+	[string]$EmitBashEnv = ""
 )
 
 Set-StrictMode -Version Latest
@@ -201,23 +202,11 @@ if (-not $VsOnly) {
 		Write-Host "    git: OK"
 	}
 
-	$cmakeVersion = "3.31.6"
-	$cmakeOk = $false
 	if (Test-CommandAvailable "cmake") {
 		$verLine = (& cmake --version 2>$null | Select-Object -First 1)
-		if ($verLine -match "3\.31\.") {
-			$cmakeOk = $true
-			Write-Host "    cmake: OK ($verLine)"
-		} else {
-			Write-Host "    cmake: found but wrong version ($verLine); need 3.31.x (CMake 4.x breaks vendored libjpeg-turbo)"
-		}
-	}
-	if (-not $cmakeOk) {
-		if (-not (Test-WingetPackageInstalled -Id "Kitware.CMake" -Version $cmakeVersion)) {
-			Install-WingetPackage -Id "Kitware.CMake" -ExtraArgs @("--version", $cmakeVersion)
-		} else {
-			Write-Host "    cmake ${cmakeVersion}: installed via winget (refresh PATH or open a new shell if cmake is missing)"
-		}
+		Write-Host "    cmake: OK ($verLine)"
+	} elseif (-not (Test-WingetPackageInstalled -Id "Kitware.CMake")) {
+		Install-WingetPackage -Id "Kitware.CMake"
 	}
 
 	if (-not (Test-CommandAvailable "ninja")) {
@@ -235,4 +224,50 @@ Write-Host ""
 Write-Host "==> Dependency setup complete."
 Write-Host "    Open a new PowerShell window (or restart the terminal) so PATH includes Git, CMake, and Ninja."
 Write-Host "    Then run: .\scripts\build_plugin.ps1"
+
+if ($EmitBashEnv -ne "") {
+	if (-not (Import-MsvcDevEnvironment)) {
+		throw "MSVC x64 environment is required. Run .\scripts\setup_windows_build.ps1"
+	}
+	function ConvertTo-BashSingleQuoted([string]$Value) {
+		return "'" + ($Value -replace "'", "'\''") + "'"
+	}
+	# Refresh-BuildToolPath replaces PATH with the machine/user PATH and drops vcvars.
+	# rc.exe and mt.exe live in the Windows SDK, not beside cl.exe. CMake's Ninja
+	# link step calls them by path, and Git bash does not leave that SDK directory
+	# on the PATH cmake searches.
+	$clExe = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source
+	$rcExe = (Get-Command rc.exe -ErrorAction SilentlyContinue).Source
+	$mtExe = (Get-Command mt.exe -ErrorAction SilentlyContinue).Source
+	if (-not $clExe -or -not $rcExe -or -not $mtExe) {
+		throw "vcvars did not provide cl.exe, rc.exe, and mt.exe"
+	}
+	$winPath = $env:PATH
+	$devVars = @{}
+	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
+		$devVars[$var] = [Environment]::GetEnvironmentVariable($var)
+	}
+	Refresh-BuildToolPath
+	$cmakeExe = Get-CmakeExe
+	if (-not $cmakeExe) {
+		throw "CMake is required. Run .\scripts\setup_windows_build.ps1"
+	}
+	$lines = @()
+	$lines += "export MSVC_CL=$(ConvertTo-BashSingleQuoted ($clExe -replace '\\', '/'))"
+	$lines += "export MSVC_RC=$(ConvertTo-BashSingleQuoted ($rcExe -replace '\\', '/'))"
+	$lines += "export MSVC_MT=$(ConvertTo-BashSingleQuoted ($mtExe -replace '\\', '/'))"
+	if ($winPath) {
+		$lines += "export MSVC_WIN_PATH=$(ConvertTo-BashSingleQuoted $winPath)"
+	}
+	foreach ($var in @("INCLUDE", "LIB", "LIBPATH")) {
+		$val = $devVars[$var]
+		if ($val) {
+			$lines += "export $var=$(ConvertTo-BashSingleQuoted $val)"
+		}
+	}
+	$content = ($lines -join "`n") + "`n"
+	$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+	[System.IO.File]::WriteAllText($EmitBashEnv, $content, $utf8NoBom)
+}
+
 exit 0

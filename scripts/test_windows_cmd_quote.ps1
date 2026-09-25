@@ -71,6 +71,29 @@ uhdr_repack.exe not found. Build with:
 "@
 }
 
+# ctest prepends the shared Qt bin. This cmd.exe launch does not, so the staged
+# exe exits STATUS_DLL_NOT_FOUND before main.
+function Add-SharedQtBinToPath {
+	$bins = @()
+	if ($env:QT_WINDOWS_BIN) { $bins += $env:QT_WINDOWS_BIN }
+	if (Test-Path -LiteralPath "C:\Qt") {
+		foreach ($ver in Get-ChildItem -LiteralPath "C:\Qt" -Directory) {
+			foreach ($kit in Get-ChildItem -LiteralPath $ver.FullName -Directory) {
+				$bin = Join-Path $kit.FullName "bin"
+				if (Test-Path -LiteralPath (Join-Path $bin "Qt6Core.dll")) { $bins += $bin }
+			}
+		}
+	}
+	foreach ($bin in $bins) {
+		if (Test-Path -LiteralPath (Join-Path $bin "Qt6Core.dll")) {
+			$env:PATH = "$bin;$env:PATH"
+			Write-Host "Qt bin on PATH: $bin"
+			return
+		}
+	}
+}
+Add-SharedQtBinToPath
+
 if (-not (Test-Path -LiteralPath $Hdr) -or -not (Test-Path -LiteralPath $Base)) {
 	Write-Error ("Missing test inputs. See test/README.md - need:" + [Environment]::NewLine + "  $Hdr" + [Environment]::NewLine + "  $Base")
 }

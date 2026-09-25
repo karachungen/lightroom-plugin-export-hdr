@@ -2,6 +2,7 @@
 
 #include "activity_log.h"
 #include "color_primaries.h"
+#include "encode_presets.h"
 #include "gui/hdr_tiff_client.h"
 #include "gui/sdr_preview_image.h"
 #include "gui/web_chrome.h"
@@ -1154,15 +1155,10 @@ void GuiBridge::handleMessage(const QString& json_text) {
       sendDisplayStatus(viewport_->status());
     }
     const auto& opt = document_->session().default_encode_options;
-    json settings;
+    json settings = encode_options_ui_json(opt);
     settings["type"] = "settings";
-    settings["baseQuality"] = opt.base_quality;
-    settings["gainmapQuality"] = opt.gainmap_quality;
-    settings["gainmapScale"] = opt.gainmap_scale;
-    settings["minBoost"] = opt.min_content_boost;
-    settings["maxBoost"] = opt.max_content_boost;
-    settings["displayPeak"] = opt.target_display_peak_nits;
-    settings["monochromeGainmap"] = opt.monochrome_gainmap;
+    settings["presets"] = {{"color", encode_options_ui_json(color_map_preset())},
+                           {"mono", encode_options_ui_json(mono_map_preset())}};
     SliceAspect aspect = document_->session().default_slice_aspect;
     float crop_offset = 0.5f;
     unsigned slice_count = 1;

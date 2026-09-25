@@ -73,13 +73,7 @@ function Import-MsvcDevEnvironment {
 function Get-CmakeExe {
 	Refresh-BuildToolPath
 	if (Test-CommandAvailable "cmake") {
-		$verLine = (& cmake --version 2>$null | Select-Object -First 1)
-		if ($verLine -match "version 3\.31\.") {
-			return (Get-Command cmake).Source
-		}
-		if ($verLine) {
-			Write-Warning "cmake on PATH is not 3.31.x ($verLine). CMake 4.x breaks vendored libjpeg-turbo; run .\scripts\setup_windows_build.ps1"
-		}
+		return (Get-Command cmake).Source
 	}
 
 	$candidates = @(
@@ -91,11 +85,8 @@ function Get-CmakeExe {
 	)
 	foreach ($candidate in $candidates) {
 		if (-not (Test-Path -LiteralPath $candidate)) { continue }
-		$verLine = (& $candidate --version 2>$null | Select-Object -First 1)
-		if ($verLine -match "version 3\.31\.") {
-			Add-PathEntryIfMissing (Split-Path -Parent $candidate)
-			return $candidate
-		}
+		Add-PathEntryIfMissing (Split-Path -Parent $candidate)
+		return $candidate
 	}
 	return $null
 }
@@ -126,7 +117,7 @@ function Ensure-BuildDependencies {
 	)
 
 	$missing = @()
-	if (-not (Get-CmakeExe)) { $missing += "CMake 3.31.x" }
+	if (-not (Get-CmakeExe)) { $missing += "CMake" }
 	if (-not (Test-MsvcInstalled)) { $missing += "MSVC (Visual Studio 2022+ / Build Tools, x64)" }
 	Refresh-BuildToolPath
 	if (-not (Test-CommandAvailable "git")) { $missing += "Git" }
@@ -142,7 +133,7 @@ function Ensure-BuildDependencies {
 			throw "MSVC still unavailable after setup. Open a new terminal or run .\scripts\setup_windows_build.ps1 as Administrator."
 		}
 		if (-not (Get-CmakeExe)) {
-			throw "CMake 3.31.x still unavailable after setup. Open a new terminal or run .\scripts\setup_windows_build.ps1"
+			throw "CMake still unavailable after setup. Open a new terminal or run .\scripts\setup_windows_build.ps1"
 		}
 		if (-not (Test-CommandAvailable "git")) {
 			throw "Git still unavailable after setup. Open a new terminal or run .\scripts\setup_windows_build.ps1"

@@ -3,7 +3,12 @@
 # and cannot produce the single-file plugin binary required by this project.
 set -euo pipefail
 
-QT_VERSION="${QT_VERSION:-6.11.2}"
+unset CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/qt_kit.sh
+source "$ROOT/scripts/qt_kit.sh"
+qt_read_stamp "$ROOT/scripts/qt/macos-arm64.stamp"
+QT_VERSION="$QT_STAMP_VERSION"
 PREFIX="${QT_STATIC_ROOT:-$HOME/Qt/$QT_VERSION-static}"
 CACHE_DIR="${QT_SOURCE_CACHE:-$HOME/.cache/uhdr-qt-static}"
 ARCHIVE="$CACHE_DIR/qt-everywhere-src-$QT_VERSION.tar.xz"
@@ -47,12 +52,6 @@ fi
 echo "==> Configuring static Qt $QT_VERSION at $PREFIX"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
-# Command Line Tools have the macOS SDK via xcrun, but not xcodebuild. Qt 6.11
-# treats a missing Xcode version as fatal. Skip that check on local machines.
-xcode_check_args=()
-if [[ -z "${GITHUB_ACTIONS:-}" ]]; then
-  xcode_check_args=(-DQT_NO_XCODE_MIN_VERSION_CHECK=ON)
-fi
 (
   cd "$BUILD_DIR"
   "$SOURCE_DIR/configure" \
@@ -63,15 +62,15 @@ fi
     -confirm-license \
     -nomake examples \
     -nomake tests \
-    -submodules qtbase,qtshadertools \
+    -submodules "$QT_STAMP_SUBMODULES" \
     -- \
     -GNinja \
-    -DCMAKE_OSX_ARCHITECTURES=arm64 \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
+    -DCMAKE_OSX_ARCHITECTURES="$QT_STAMP_ARCH" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$QT_STAMP_DEPLOYMENT_TARGET" \
     -DQT_BUILD_TOOLS_BY_DEFAULT=ON \
     -DQT_BUILD_TESTS=OFF \
     -DQT_BUILD_EXAMPLES=OFF \
-    ${xcode_check_args[@]+"${xcode_check_args[@]}"}
+    -DQT_NO_XCODE_MIN_VERSION_CHECK=ON
 )
 
 echo "==> Building and installing static Qt (this can take a while)"

@@ -3,6 +3,7 @@
 #include "activity_log.h"
 #include "color_primaries.h"
 #include "encode_engine.h"
+#include "encode_presets.h"
 #include "gainmap_compute.h"
 #include "gainmap_edit.h"
 #include "gui/gainmap_canvas.h"
@@ -1350,13 +1351,7 @@ int gui_self_test_main(const std::string& session_path) {
   fs::remove(mono.out_path);
 
   EncodeRequest mono_map = req;
-  mono_map.options.monochrome_gainmap = true;
-  mono_map.options.gainmap_scale = 2;
-  mono_map.options.min_content_boost = 1.0f;
-  mono_map.options.max_content_boost = 4.92f;
-  mono_map.options.target_display_peak_nits = 1000.0f;
-  mono_map.options.base_quality = 95;
-  mono_map.options.gainmap_quality = 95;
+  apply_encode_preset("mono", &mono_map.options);
   mono_map.out_path = (fs::path(encode_item.out).parent_path() / "mono_map.jpg").u8string();
   if (encode_from_paths(mono_map, &err) != 0) {
     return fail("mono map encode: " + err);

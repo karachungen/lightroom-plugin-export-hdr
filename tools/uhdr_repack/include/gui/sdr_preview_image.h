@@ -64,4 +64,7 @@ int probe_sdr_main(const std::string& path);
 /** Load path, encode a JPEG data URL, print one line, return 0 or 1. */
 int encode_preview_jpeg_main(const std::string& path);
 
+/** Encode a preview JPEG, check the SOI marker, reload it; return 0 or 1. */
+int check_preview_jpeg_main(const std::string& path);
+
 }  // namespace uhdr_repack

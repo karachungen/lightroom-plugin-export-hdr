@@ -1,6 +1,7 @@
 #include "cli.h"
 
 #include "encode_engine.h"
+#include "encode_presets.h"
 #include "gainmap_compute.h"
 #include "slice_plan.h"
 
@@ -42,14 +43,24 @@ void print_usage() {
       << "Usage:\n"
       << "  uhdr_repack --hdr-tiff <path> --base <path> --out <path.jpg> [options]\n"
       << "  uhdr_repack --inspect <path.jpg>\n"
+      << "  uhdr_repack --describe-input <tif-or-jpg> [--require-portable] [--skip-if-missing]\n"
       << "  uhdr_repack --edit [--session <json>] [--sdr <path> --hdr-tiff <path> --out <path>]...\n"
       << "  uhdr_repack --self-test [--session <json>]\n"
       << "  uhdr_repack --probe-sdr <path>\n"
       << "  uhdr_repack --encode-preview-jpeg <path>\n"
       << "  uhdr_repack --dump-gainmap --sdr <path> --hdr-tiff <path> --out <path.gainmap>\n"
       << "  uhdr_repack --write-hdr-chart <dir>\n"
-      << "  uhdr_repack --check-hdr-chart <dir>\n\n"
+      << "  uhdr_repack --write-hdr-scenes <dir>          write sunset/neon/pastel HDR TIFF + SDR JPEG pairs (1080x1350)\n"
+      << "  uhdr_repack --check-hdr-chart <dir> [--out <jpg>] [--preset color|mono] [--simulate-instagram] [--max-edge-p99 <stops>] [--max-edge-p99-instagram <stops>] [encode options]\n"
+      << "  uhdr_repack --check-hdr-chart-file <jpg-or-tif> [--manifest <json>] [--slice-aspect <a>] [--crop-offset <0-1>]\n"
+      << "  uhdr_repack --check-hdr-chart-assets <committed-dir> <fresh-dir>\n"
+      << "  uhdr_repack --verify-uhdr <jpg> [--expect-size WxH] [--expect-single <aspect>] [--gainmap-scale N] [--max-bytes N] [--skip-if-missing]\n"
+      << "  uhdr_repack --simulate-instagram <in.jpg> <out.jpg>   re-encode like Instagram web upload (q61, 4:2:0; pessimistic)\n"
+      << "  uhdr_repack --check-utf8-path <hdr-tiff> <sdr> <out-dir>\n"
+      << "  uhdr_repack --encode-or-skip <encode arguments>\n"
+      << "  uhdr_repack --check-preview-jpeg <sdr.jpg>\n\n"
       << "Encode options:\n"
+      << "  --preset <color|mono>          editor delivery preset; later options override it\n"
       << "  --base-quality <0-100>       (default 95)\n"
       << "  --gainmap-quality <0-100>    (default 95)\n"
       << "  --gainmap-scale <N>          gain-map downsample factor vs base (1 = full size; default 1)\n"
@@ -66,102 +77,89 @@ void print_usage() {
       << "  --metadata-patch <json>        XMP/IPTC metadata patch\n";
 }
 
+int parse_encode_flag(int argc, char** argv, int* i, EncodeRequest* req) {
+  const std::string a = argv[*i];
+  if (*i + 1 >= argc) {
+    if (a == "--monochrome-gainmap") {
+      req->options.monochrome_gainmap = true;
+      return 1;
+    }
+    return 0;
+  }
+  const char* v = argv[*i + 1];
+  auto bad = [](const char* msg) {
+    std::cerr << msg << "\n";
+    return -1;
+  };
+  int n = 0;
+  float f = 0.f;
+  if (a == "--preset") {
+    if (!apply_encode_preset(v, &req->options)) return bad("bad --preset (use color or mono)");
+  } else if (a == "--slice-aspect") {
+    if (!parse_slice_aspect(v, &req->slice_aspect)) return bad("bad --slice-aspect (use none, 1x1, 4x5, 3x4, or 191x100)");
+  } else if (a == "--slice-count") {
+    if (std::strcmp(v, "max") == 0 || std::strcmp(v, "all") == 0) req->slice_count = 0;
+    else if (parse_int(v, &n)) req->slice_count = static_cast<unsigned>(n);
+    else return bad("bad --slice-count (use a non-negative integer or max)");
+  } else if (a == "--crop-offset") {
+    if (!parse_float(v, &f) || f < 0.f || f > 1.f) return bad("bad --crop-offset (use 0..1)");
+    req->crop_offset = f;
+  } else if (a == "--out-width") {
+    if (!parse_int(v, &n)) return bad("bad --out-width");
+    req->output_width = static_cast<unsigned>(n);
+  } else if (a == "--base-quality") {
+    if (!parse_int(v, &n)) return bad("bad --base-quality");
+    req->options.base_quality = n;
+  } else if (a == "--gainmap-quality") {
+    if (!parse_int(v, &n)) return bad("bad --gainmap-quality");
+    req->options.gainmap_quality = n;
+  } else if (a == "--gainmap-scale") {
+    if (!parse_int(v, &n)) return bad("bad --gainmap-scale");
+    req->options.gainmap_scale = n;
+  } else if (a == "--min-content-boost") {
+    if (!parse_float(v, &f)) return bad("bad --min-content-boost");
+    req->options.min_content_boost = f;
+  } else if (a == "--max-content-boost") {
+    if (!parse_float(v, &f)) return bad("bad --max-content-boost");
+    req->options.max_content_boost = f;
+  } else if (a == "--target-display-peak") {
+    if (!parse_float(v, &f)) return bad("bad --target-display-peak");
+    req->options.target_display_peak_nits = f;
+  } else if (a == "--gainmap-in") {
+    req->gainmap_in = v;
+  } else if (a == "--watermark-config") {
+    req->watermark_config = v;
+  } else if (a == "--metadata-patch") {
+    req->metadata_patch = v;
+  } else if (a == "--monochrome-gainmap") {
+    req->options.monochrome_gainmap = true;
+    return 1;
+  } else {
+    return 0;
+  }
+  ++*i;
+  return 1;
+}
+
 int cli_encode_main(int argc, char** argv) {
   EncodeRequest req;
 
   for (int i = 1; i < argc; ++i) {
-    std::string a = argv[i];
+    const std::string a = argv[i];
     if (a == "--hdr-tiff" && i + 1 < argc) {
       req.hdr_tiff = argv[++i];
     } else if (a == "--base" && i + 1 < argc) {
       req.base_path = argv[++i];
     } else if (a == "--out" && i + 1 < argc) {
       req.out_path = argv[++i];
-    } else if (a == "--slice-aspect" && i + 1 < argc) {
-      if (!parse_slice_aspect(argv[++i], &req.slice_aspect)) {
-        std::cerr << "bad --slice-aspect (use none, 1x1, 4x5, 3x4, or 191x100)\n";
-        return 1;
-      }
-    } else if (a == "--slice-count" && i + 1 < argc) {
-      const char* raw = argv[++i];
-      if (std::strcmp(raw, "max") == 0 || std::strcmp(raw, "all") == 0) {
-        req.slice_count = 0;
-      } else {
-        int n = 0;
-        if (!parse_int(raw, &n) || n < 0) {
-          std::cerr << "bad --slice-count (use a non-negative integer or max)\n";
-          return 1;
-        }
-        req.slice_count = static_cast<unsigned>(n);
-      }
-    } else if (a == "--crop-offset" && i + 1 < argc) {
-      float v = 0.f;
-      if (!parse_float(argv[++i], &v) || v < 0.f || v > 1.f) {
-        std::cerr << "bad --crop-offset (use 0..1)\n";
-        return 1;
-      }
-      req.crop_offset = v;
-    } else if (a == "--out-width" && i + 1 < argc) {
-      int w = 0;
-      if (!parse_int(argv[++i], &w)) {
-        std::cerr << "bad --out-width\n";
-        return 1;
-      }
-      req.output_width = static_cast<unsigned>(w);
-    } else if (a == "--base-quality" && i + 1 < argc) {
-      int q = 0;
-      if (!parse_int(argv[++i], &q)) {
-        std::cerr << "bad --base-quality\n";
-        return 1;
-      }
-      req.options.base_quality = q;
-    } else if (a == "--gainmap-quality" && i + 1 < argc) {
-      int q = 0;
-      if (!parse_int(argv[++i], &q)) {
-        std::cerr << "bad --gainmap-quality\n";
-        return 1;
-      }
-      req.options.gainmap_quality = q;
-    } else if (a == "--gainmap-scale" && i + 1 < argc) {
-      int s = 0;
-      if (!parse_int(argv[++i], &s)) {
-        std::cerr << "bad --gainmap-scale\n";
-        return 1;
-      }
-      req.options.gainmap_scale = s;
-    } else if (a == "--min-content-boost" && i + 1 < argc) {
-      float v = 0.f;
-      if (!parse_float(argv[++i], &v)) {
-        std::cerr << "bad --min-content-boost\n";
-        return 1;
-      }
-      req.options.min_content_boost = v;
-    } else if (a == "--max-content-boost" && i + 1 < argc) {
-      float v = 0.f;
-      if (!parse_float(argv[++i], &v)) {
-        std::cerr << "bad --max-content-boost\n";
-        return 1;
-      }
-      req.options.max_content_boost = v;
-    } else if (a == "--target-display-peak" && i + 1 < argc) {
-      float v = 0.f;
-      if (!parse_float(argv[++i], &v)) {
-        std::cerr << "bad --target-display-peak\n";
-        return 1;
-      }
-      req.options.target_display_peak_nits = v;
-    } else if (a == "--monochrome-gainmap") {
-      req.options.monochrome_gainmap = true;
-    } else if (a == "--gainmap-in" && i + 1 < argc) {
-      req.gainmap_in = argv[++i];
-    } else if (a == "--watermark-config" && i + 1 < argc) {
-      req.watermark_config = argv[++i];
-    } else if (a == "--metadata-patch" && i + 1 < argc) {
-      req.metadata_patch = argv[++i];
     } else {
-      std::cerr << "unknown argument: " << a << "\n";
-      print_usage();
-      return 1;
+      const int used = parse_encode_flag(argc, argv, &i, &req);
+      if (used < 0) return 1;
+      if (used == 0) {
+        std::cerr << "unknown argument: " << a << "\n";
+        print_usage();
+        return 1;
+      }
     }
   }
 

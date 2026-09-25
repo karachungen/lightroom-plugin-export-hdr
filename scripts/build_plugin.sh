@@ -6,11 +6,10 @@
 #   ./scripts/build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean] [--skip-fixtures]
 set -euo pipefail
 
-# Pin CMake 3.31.x on Windows (CMake 4.x breaks vendored libjpeg-turbo).
-REQUIRED_CMAKE_VERSION_PREFIX="3.31."
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/qt_kit.sh
+source "$SCRIPT_DIR/qt_kit.sh"
 UHDR_SRC="$REPO_ROOT/tools/uhdr_repack"
 BUILD_DIR="$UHDR_SRC/build"
 PLUGIN_BIN="$REPO_ROOT/ExportHDR.lrplugin/bin"
@@ -28,7 +27,7 @@ Usage: build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--p
   install       build → bundle → test (default; updates ExportHDR.lrplugin in place, no zip)
   build         cmake --preset + cmake --build
   bundle        Copy encoder + runtime libs into ExportHDR.lrplugin/bin
-  test          Run scripts/run_uhdr_test.sh
+  test          Run ctest in tools/uhdr_repack/build
   package       Create platform zip via scripts/package_plugin.sh
   all           build → bundle → test → package (CI / release)
 
@@ -105,6 +104,134 @@ is_windows_host() {
 	MINGW* | MSYS* | CYGWIN* | Windows_NT) return 0 ;;
 	*) return 1 ;;
 	esac
+}
+
+webview2_sdk_header_present() {
+	[[ -f /c/WebView2Sdk/include/WebView2.h ]] ||
+		[[ -f /cygdrive/c/WebView2Sdk/include/WebView2.h ]] ||
+		[[ -f 'C:/WebView2Sdk/include/WebView2.h' ]]
+}
+
+export_webview2_sdk_if_present() {
+	webview2_sdk_header_present || return 0
+	if command -v cygpath >/dev/null 2>&1; then
+		export WEBVIEW2_SDK="$(cygpath -w /c/WebView2Sdk)"
+	else
+		export WEBVIEW2_SDK='C:\WebView2Sdk'
+	fi
+}
+
+apply_msvc_win_path() {
+	if [[ -n "${MSVC_WIN_PATH:-}" ]]; then
+		if ! command -v cygpath >/dev/null 2>&1; then
+			echo "cygpath is required to convert MSVC_WIN_PATH to POSIX PATH" >&2
+			exit 1
+		fi
+		export PATH="$(cygpath -up "$MSVC_WIN_PATH"):$PATH"
+	fi
+}
+
+# Git bash rewrites PATH when it starts a Windows program, and that rewrite drops
+# "Program Files" entries. cl.exe then disappears while C:\mingw64\bin\cc.exe remains.
+# Give cmake, ninja, and ctest the vcvars PATH unchanged.
+run_msvc_child() {
+	if [[ -z "${MSVC_WIN_PATH:-}" ]]; then
+		"$@"
+		return
+	fi
+	local win_path="${MSVC_WIN_PATH}"
+	local tool_bin excl
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	if [[ -d "$tool_bin" ]] && command -v cygpath >/dev/null 2>&1; then
+		win_path="$(cygpath -w "$tool_bin");${win_path}"
+	fi
+	if [[ -n "${QT_WINDOWS_BIN:-}" ]]; then
+		win_path="${QT_WINDOWS_BIN};${win_path}"
+	fi
+	local ninja_bin
+	ninja_bin="$(command -v ninja || true)"
+	if [[ -n "$ninja_bin" ]] && command -v cygpath >/dev/null 2>&1; then
+		win_path="$(cygpath -w "${ninja_bin%/*}");${win_path}"
+	fi
+	excl="PATH;INCLUDE;LIB;LIBPATH"
+	export MSYS2_ENV_CONV_EXCL="$excl"
+	# Git bash rewrites C:/... arguments to C:\... . CMake then writes those
+	# backslashes into CMakeRCCompiler.cmake, where \P is an invalid escape.
+	local arg_excl="-DCMAKE_"
+	if [[ -n "${MSYS2_ARG_CONV_EXCL:-}" ]]; then
+		arg_excl="${MSYS2_ARG_CONV_EXCL};${arg_excl}"
+	fi
+	export MSYS2_ARG_CONV_EXCL="$arg_excl"
+	# Bash searches PATH before it starts the child, so a semicolon Windows PATH
+	# hides cmake. Resolve it with the POSIX PATH, then hand the child vcvars.
+	local cmd="$1"
+	shift
+	local resolved
+	resolved="$(command -v "$cmd" || true)"
+	if [[ -z "$resolved" ]]; then
+		echo "$cmd not found on PATH" >&2
+		exit 1
+	fi
+	if command -v cygpath >/dev/null 2>&1; then
+		resolved="$(cygpath -w "$resolved")"
+	fi
+	PATH="$win_path" "$resolved" "$@"
+}
+
+# Windows tool path recorded by setup_windows_build.ps1 before PATH is refreshed.
+msvc_recorded_tool() {
+	local value="$1"
+	[[ -n "$value" ]] || return 1
+	value="${value//\\//}"
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -m "$value"
+	else
+		printf '%s\n' "$value"
+	fi
+}
+
+# cl.exe lives under "Program Files", which Git bash drops when it rewrites PATH
+# for a Windows cmake. Return the full Windows path from the vcvars PATH itself.
+msvc_cl_path() {
+	local entry posix
+	if [[ -n "${MSVC_CL:-}" ]]; then
+		msvc_recorded_tool "$MSVC_CL"
+		return
+	fi
+	[[ -n "${MSVC_WIN_PATH:-}" ]] || return 1
+	set -f
+	local IFS=';'
+	for entry in $MSVC_WIN_PATH; do
+		[[ -n "$entry" ]] || continue
+		posix="$entry"
+		if command -v cygpath >/dev/null 2>&1; then
+			posix="$(cygpath -u "$entry" 2>/dev/null || true)"
+		fi
+		if [[ -n "$posix" && -f "$posix/cl.exe" ]]; then
+			set +f
+			cygpath -m "$posix/cl.exe"
+			return 0
+		fi
+	done
+	set +f
+	return 1
+}
+
+source_msvc_bash_env() {
+	local env_file="$1"
+	# shellcheck disable=SC1090
+	source "$env_file"
+	apply_msvc_win_path
+}
+
+ensure_msvc_bash_env() {
+	local env_file
+	env_file="$(qt_cache_dir)/msvc-env.sh"
+	if [[ ! -f "$env_file" ]]; then
+		echo "MSVC environment not found at $env_file. Run ./scripts/build_plugin.sh install-deps" >&2
+		exit 1
+	fi
+	source_msvc_bash_env "$env_file"
 }
 
 if [[ -z "$PRESET" ]]; then
@@ -228,52 +355,51 @@ resolve_qt_for_build() {
 		return 0
 	fi
 
-	local static_root shared_prefix
-
-	if [[ "${UHDR_STATIC_QT:-ON}" == "0" || "${UHDR_STATIC_QT:-ON}" == "OFF" ]]; then
-		shared_prefix="$(find_qt_shared_prefix || true)"
-		if [[ -z "$shared_prefix" ]]; then
-			echo "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found." >&2
-			echo "Install Qt locally (e.g. brew install qt) or set CMAKE_PREFIX_PATH." >&2
-			exit 1
+	case "$(uname -s)" in
+	Darwin)
+		if [[ "${UHDR_STATIC_QT:-ON}" == "0" || "${UHDR_STATIC_QT:-ON}" == "OFF" ]]; then
+			local shared_prefix
+			shared_prefix="$(find_qt_shared_prefix || true)"
+			if [[ -z "$shared_prefix" ]]; then
+				echo "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found." >&2
+				echo "Install Qt locally (e.g. brew install qt) or set CMAKE_PREFIX_PATH." >&2
+				exit 1
+			fi
+			cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
+			echo "==> Using shared Qt at $shared_prefix (development build)"
+			QT_RESOLVED=1
+			return 0
 		fi
-		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
-		echo "==> Using shared Qt at $shared_prefix (development build)"
-		QT_RESOLVED=1
-		return 0
-	fi
-
-	static_root="$(find_qt_static_root || true)"
-	if [[ -z "$static_root" && "$(uname -s)" == "Darwin" ]]; then
-		echo "==> Static Qt kit missing; building ${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
-		"$SCRIPT_DIR/setup_qt_static.sh"
-		static_root="$(find_qt_static_root || true)"
-	fi
-	if [[ -n "$static_root" ]]; then
+		ensure_qt_kit macos-arm64
+		local static_root
+		static_root="$(qt_prefix_path macos-arm64)"
 		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON" "-DCMAKE_PREFIX_PATH=$static_root")
 		echo "==> Using static Qt at $static_root"
 		QT_RESOLVED=1
-		return 0
-	fi
-
-	if [[ "$(uname -s)" == "Darwin" || "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
-		echo "macOS release builds require a static Qt kit and will not fall back to shared Qt." >&2
-		echo "Run ./scripts/setup_qt_static.sh or set QT_STATIC_ROOT." >&2
-		exit 1
-	fi
-
-	shared_prefix="$(find_qt_shared_prefix || true)"
-	if [[ -n "$shared_prefix" ]]; then
-		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
-		echo "==> Using shared Qt at $shared_prefix (local development build)"
-		echo "    For a release single-file binary, run ./scripts/setup_qt_static.sh and export QT_STATIC_ROOT." >&2
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		export_webview2_sdk_if_present
+		ensure_qt_kit windows-x64
+		local win_prefix
+		win_prefix="$(qt_prefix_path windows-x64)"
+		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$win_prefix")
+		if [[ -d "$win_prefix/bin" ]]; then
+			export PATH="$win_prefix/bin:$PATH"
+			if command -v cygpath >/dev/null 2>&1; then
+				QT_WINDOWS_BIN="$(cygpath -w "$win_prefix/bin")"
+			else
+				QT_WINDOWS_BIN="$win_prefix/bin"
+			fi
+			export QT_WINDOWS_BIN
+		fi
+		echo "==> Using shared Qt at $win_prefix"
 		QT_RESOLVED=1
-		return 0
-	fi
-
-	echo "No Qt 6.11+ installation found." >&2
-	echo "Install Qt locally (e.g. brew install qt), or run ./scripts/setup_qt_static.sh for a static release kit." >&2
-	exit 1
+		;;
+	*)
+		echo "No Qt kit for $(uname -s)." >&2
+		exit 1
+		;;
+	esac
 }
 
 assert_cmake_version() {
@@ -281,17 +407,115 @@ assert_cmake_version() {
 		echo "cmake not found on PATH." >&2
 		exit 1
 	fi
-	if is_windows_host; then
-		local ver_line
-		ver_line="$(cmake --version 2>/dev/null | head -n 1)"
-		if [[ "$ver_line" != *"version ${REQUIRED_CMAKE_VERSION_PREFIX}"* ]]; then
-			echo "Windows requires CMake ${REQUIRED_CMAKE_VERSION_PREFIX}x ($ver_line). Run .\\scripts\\setup_windows_build.ps1" >&2
-			exit 1
-		fi
+}
+
+prepend_tool_bin() {
+	export PATH="$(qt_cache_dir)/tool-bin:$PATH"
+}
+
+# Git bash `tar` on the Windows runner is not a zip reader. After the MSVC
+# environment is sourced it is also not Git's bsdtar.
+extract_zip() {
+	local archive="$1" dest="$2" win_archive win_dest
+	mkdir -p "$dest"
+	if [[ -x /usr/bin/unzip ]]; then
+		/usr/bin/unzip -q "$archive" -d "$dest"
+		return
+	fi
+	win_archive="$archive"
+	win_dest="$dest"
+	if command -v cygpath >/dev/null 2>&1; then
+		win_archive="$(cygpath -w "$archive")"
+		win_dest="$(cygpath -w "$dest")"
+	fi
+	powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '$win_archive' -DestinationPath '$win_dest' -Force"
+}
+
+install_sccache_bin() {
+	local tool_bin dest tmp archive url extracted
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	mkdir -p "$tool_bin"
+	case "$(uname -s)" in
+	Darwin) dest="$tool_bin/sccache" ;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT) dest="$tool_bin/sccache.exe" ;;
+	*)
+		echo "sccache install is not supported on $(uname -s)" >&2
+		exit 1
+		;;
+	esac
+	if [[ -x "$dest" ]] && "$dest" --version 2>/dev/null | grep -q '0.17.0'; then
+		return 0
+	fi
+	tmp="$(mktemp -d)"
+	case "$(uname -s)" in
+	Darwin)
+		url="https://github.com/mozilla/sccache/releases/download/v0.17.0/sccache-v0.17.0-aarch64-apple-darwin.tar.gz"
+		archive="$tmp/sccache.tar.gz"
+		curl --fail --location --retry 3 -o "$archive" "$url"
+		tar -xf "$archive" -C "$tmp"
+		extracted="$(find "$tmp" -type f -name sccache | head -n 1)"
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		url="https://github.com/mozilla/sccache/releases/download/v0.17.0/sccache-v0.17.0-x86_64-pc-windows-msvc.zip"
+		archive="$tmp/sccache.zip"
+		curl --fail --location --retry 3 -o "$archive" "$url"
+		extract_zip "$archive" "$tmp"
+		extracted="$(find "$tmp" -type f -name sccache.exe | head -n 1)"
+		;;
+	esac
+	if [[ -z "$extracted" || ! -f "$extracted" ]]; then
+		rm -rf "$tmp"
+		echo "sccache binary not found in archive" >&2
+		exit 1
+	fi
+	cp -f "$extracted" "$dest"
+	rm -rf "$tmp"
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		chmod +x "$dest"
 	fi
 }
 
+install_windows_zstd() {
+	local tool_bin dest tmp archive url extracted
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	mkdir -p "$tool_bin"
+	dest="$tool_bin/zstd.exe"
+	if command -v zstd >/dev/null 2>&1 && zstd --version 2>/dev/null | grep -q '1.5.7'; then
+		return 0
+	fi
+	tmp="$(mktemp -d)"
+	url="https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-v1.5.7-win64.zip"
+	archive="$tmp/zstd.zip"
+	curl --fail --location --retry 3 -o "$archive" "$url"
+	extract_zip "$archive" "$tmp"
+	extracted="$(find "$tmp" -type f -name zstd.exe | head -n 1)"
+	if [[ -z "$extracted" || ! -f "$extracted" ]]; then
+		rm -rf "$tmp"
+		echo "zstd.exe not found in archive" >&2
+		exit 1
+	fi
+	cp -f "$extracted" "$dest"
+	rm -rf "$tmp"
+}
+
+qt_install_kit() {
+	local platform="$1" prefix="$2"
+	case "$platform" in
+	macos-arm64)
+		QT_STATIC_ROOT="$prefix" "$SCRIPT_DIR/setup_qt_static.sh"
+		;;
+	windows-x64)
+		QT_ROOT_DIR="$prefix" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_qt.ps1"
+		;;
+	*)
+		echo "qt_install_kit: unknown platform $platform" >&2
+		exit 1
+		;;
+	esac
+}
+
 cmd_install_deps() {
+	prepend_tool_bin
 	case "$(uname -s)" in
 	Darwin)
 		echo "==> Installing macOS build dependencies (brew)"
@@ -299,15 +523,24 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake ninja qt
+		brew install cmake ninja qt zstd
+		install_sccache_bin
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
-		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-			echo "==> Windows CI: dependencies provided by workflow actions (skipping install-deps)"
-			return 0
+		echo "==> Installing Windows build dependencies"
+		local env_file win_env
+		env_file="$(qt_cache_dir)/msvc-env.sh"
+		mkdir -p "$(qt_cache_dir)"
+		win_env="$env_file"
+		if command -v cygpath >/dev/null 2>&1; then
+			win_env="$(cygpath -w "$env_file")"
 		fi
-		echo "==> Installing Windows build dependencies (setup_windows_build.ps1)"
-		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/setup_windows_build.ps1"
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/setup_windows_build.ps1" -EmitBashEnv "$win_env"
+		source_msvc_bash_env "$env_file"
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_webview2.ps1"
+		export_webview2_sdk_if_present
+		install_windows_zstd
+		install_sccache_bin
 		;;
 	*)
 		echo "install-deps not supported on $(uname -s)" >&2
@@ -317,8 +550,42 @@ cmd_install_deps() {
 }
 
 cmd_build() {
+	prepend_tool_bin
 	assert_cmake_version
+	if is_windows_host; then
+		ensure_msvc_bash_env
+	fi
 	resolve_qt_for_build
+	if command -v sccache >/dev/null 2>&1; then
+		export SCCACHE_DIR="$(qt_cache_dir)/sccache"
+		mkdir -p "$SCCACHE_DIR"
+		cmake_extra+=("-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+	fi
+	if is_windows_host; then
+		local ninja cl rc mt
+		ninja="$(command -v ninja || true)"
+		if [[ -z "$ninja" ]]; then
+			echo "ninja not found on PATH" >&2
+			exit 1
+		fi
+		cl="$(msvc_cl_path || true)"
+		rc="$(msvc_recorded_tool "${MSVC_RC:-}" || true)"
+		mt="$(msvc_recorded_tool "${MSVC_MT:-}" || true)"
+		if [[ -z "$cl" || -z "$rc" || -z "$mt" ]]; then
+			echo "cl.exe, rc.exe, or mt.exe not found in the MSVC environment" >&2
+			exit 1
+		fi
+		if command -v cygpath >/dev/null 2>&1; then
+			ninja="$(cygpath -m "$ninja")"
+		fi
+		cmake_extra+=(
+			"-DCMAKE_MAKE_PROGRAM=$ninja"
+			"-DCMAKE_C_COMPILER=$cl"
+			"-DCMAKE_CXX_COMPILER=$cl"
+			"-DCMAKE_RC_COMPILER=$rc"
+			"-DCMAKE_MT=$mt"
+		)
+	fi
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
 		rm -rf "$BUILD_DIR"
@@ -330,13 +597,13 @@ cmd_build() {
 
 	echo "==> Configuring preset: $PRESET"
 	if [[ ${#cmake_extra[@]} -gt 0 ]]; then
-		cmake --preset "$PRESET" -S "$UHDR_SRC" "${cmake_extra[@]}"
+		run_msvc_child cmake --preset "$PRESET" -S "$UHDR_SRC" "${cmake_extra[@]}"
 	else
-		cmake --preset "$PRESET" -S "$UHDR_SRC"
+		run_msvc_child cmake --preset "$PRESET" -S "$UHDR_SRC"
 	fi
 
 	echo "==> Building preset: $PRESET"
-	cmake --build "$BUILD_DIR"
+	run_msvc_child cmake --build "$BUILD_DIR"
 }
 
 find_build_exe() {
@@ -677,14 +944,21 @@ cmd_bundle() {
 }
 
 cmd_test() {
-	if is_windows_host && [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/run_uhdr_test.ps1"
-		return
-	fi
-	"$SCRIPT_DIR/run_uhdr_test.sh"
+	bash "$SCRIPT_DIR/test_build_cache_contract.sh"
+	bash "$SCRIPT_DIR/test_qt_kit.sh"
+	run_msvc_child ctest --test-dir "$BUILD_DIR" --output-on-failure
+	case "$(uname -s)" in
+	Darwin)
+		bash "$SCRIPT_DIR/test_macos_shell_quote.sh"
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/test_windows_cmd_quote.ps1"
+		;;
+	esac
 }
 
 cmd_install() {
+	cmd_install_deps
 	cmd_build
 	cmd_bundle
 	cmd_test
@@ -702,6 +976,7 @@ bundle) cmd_bundle ;;
 test) cmd_test ;;
 package) cmd_package ;;
 all)
+	cmd_install_deps
 	cmd_build
 	cmd_bundle
 	cmd_test

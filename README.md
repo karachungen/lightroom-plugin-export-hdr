@@ -36,9 +36,9 @@ From the repo root, build and refresh the in-tree plug-in (no zip):
 # same as: ./scripts/build_plugin.sh install
 ```
 
-This runs **build → bundle → test** and updates `ExportHDR.lrplugin/bin/` in place. In Lightroom: **File → Plug-in Manager → Add** (or Reload) and select the `ExportHDR.lrplugin` folder in this repo.
+The default `./scripts/build_plugin.sh` ensures dependencies, then runs build, bundle, and test. It updates `ExportHDR.lrplugin/bin/` in place. In Lightroom: **File → Plug-in Manager → Add** (or Reload) and select the `ExportHDR.lrplugin` folder in this repo.
 
-Do **not** unzip release archives over the dev `ExportHDR.lrplugin` folder — that can remove the Lua sources. Use `./scripts/build_plugin.sh all` only when you need a release zip (same as CI).
+Do **not** unzip release archives over the dev `ExportHDR.lrplugin` folder — that can remove the Lua sources. Use `./scripts/build_plugin.sh all` only when you need a release zip (same as CI). `./scripts/build_plugin.sh all` is the local preflight and matches the macOS Actions job, including the zip.
 
 ## Install and use
 

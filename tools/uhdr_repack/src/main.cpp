@@ -1,5 +1,8 @@
 #include "cli.h"
+#include "delivery_check.h"
 #include "hdr_chart.h"
+#include "hdr_scenes.h"
+#include "instagram_sim.h"
 #include "session.h"
 
 #include <cstring>
@@ -48,6 +51,14 @@ static int run(int argc, char** argv) {
     return cli_inspect_main(argc, argv);
   }
 
+  if (std::strcmp(argv[1], "--simulate-instagram") == 0) {
+    return cli_simulate_instagram_main(argc, argv);
+  }
+
+  if (std::strcmp(argv[1], "--describe-input") == 0) {
+    return describe_input_main(argc, argv);
+  }
+
   if (std::strcmp(argv[1], "--write-hdr-chart") == 0) {
     if (argc < 3) {
       std::cerr << "--write-hdr-chart requires an output directory\n";
@@ -57,13 +68,25 @@ static int run(int argc, char** argv) {
     return write_hdr_chart_main(argv[2]);
   }
 
-  if (std::strcmp(argv[1], "--check-hdr-chart") == 0) {
+  if (std::strcmp(argv[1], "--write-hdr-scenes") == 0) {
     if (argc < 3) {
-      std::cerr << "--check-hdr-chart requires a chart directory\n";
+      std::cerr << "--write-hdr-scenes requires an output directory\n";
       print_usage();
       return 1;
     }
-    return check_hdr_chart_main(argv[2]);
+    return write_hdr_scenes_main(argv[2]);
+  }
+
+  if (std::strcmp(argv[1], "--check-hdr-chart") == 0) return check_hdr_chart_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-hdr-chart-file") == 0) return check_hdr_chart_file_main(argc, argv);
+
+  if (std::strcmp(argv[1], "--check-hdr-chart-assets") == 0) {
+    if (argc < 4) {
+      std::cerr << "--check-hdr-chart-assets requires <committed-dir> <fresh-dir>\n";
+      print_usage();
+      return 1;
+    }
+    return check_hdr_chart_assets_main(argv[2], argv[3]);
   }
 
   if (std::strcmp(argv[1], "--dump-gainmap") == 0) {
@@ -108,6 +131,29 @@ static int run(int argc, char** argv) {
       }
     }
     return gui_self_test_main(session_path);
+#endif
+  }
+
+  if (std::strcmp(argv[1], "--verify-uhdr") == 0) return verify_uhdr_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-utf8-path") == 0) {
+    if (argc < 5) {
+      std::cerr << "--check-utf8-path requires <hdr-tiff> <sdr> <out-dir>\n";
+      print_usage();
+      return 1;
+    }
+    return check_utf8_path_main(argv[2], argv[3], argv[4]);
+  }
+  if (std::strcmp(argv[1], "--encode-or-skip") == 0) return encode_or_skip_main(argc, argv);
+  if (std::strcmp(argv[1], "--check-preview-jpeg") == 0) {
+#ifndef UHDR_ENABLE_GUI
+    std::cerr << "uhdr_repack was built without GUI support (--check-preview-jpeg unavailable)\n";
+    return 1;
+#else
+    if (argc < 3) {
+      std::cerr << "--check-preview-jpeg requires an image path\n";
+      return 1;
+    }
+    return check_preview_jpeg_main(argv[2]);
 #endif
   }
 

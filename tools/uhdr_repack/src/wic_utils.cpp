@@ -7,7 +7,9 @@
 #include "wic_utils.h"
 
 #include "color_primaries.h"
+#include "icc_profile.h"
 #include "jpeg_container.h"
+#include "sdr_jpeg.h"
 
 #include <algorithm>
 #include <cmath>
@@ -46,92 +48,6 @@ struct JpegError {
 void jpeg_error_exit(j_common_ptr cinfo) {
   auto* err = reinterpret_cast<JpegError*>(cinfo->err);
   longjmp(err->jump, 1);
-}
-
-bool decode_jpeg_rgba8(const std::vector<uint8_t>& jpeg, std::vector<uint8_t>& rgba, unsigned* width,
-                       unsigned* height, std::string* error) {
-  if (jpeg.size() < 4 || jpeg[0] != 0xff || jpeg[1] != 0xd8) {
-    if (error) *error = "Not a JPEG";
-    return false;
-  }
-  jpeg_decompress_struct cinfo{};
-  JpegError jerr{};
-  cinfo.err = jpeg_std_error(&jerr.pub);
-  jerr.pub.error_exit = jpeg_error_exit;
-  if (setjmp(jerr.jump)) {
-    jpeg_destroy_decompress(&cinfo);
-    if (error) *error = "libjpeg failed to decompress SDR JPEG";
-    return false;
-  }
-  jpeg_create_decompress(&cinfo);
-  jpeg_mem_src(&cinfo, jpeg.data(), static_cast<unsigned long>(jpeg.size()));
-  if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
-    jpeg_destroy_decompress(&cinfo);
-    if (error) *error = "libjpeg could not read JPEG header";
-    return false;
-  }
-  cinfo.out_color_space = JCS_RGB;
-  jpeg_start_decompress(&cinfo);
-  const unsigned w = cinfo.output_width;
-  const unsigned h = cinfo.output_height;
-  if (w < 1 || h < 1 || cinfo.output_components != 3) {
-    jpeg_destroy_decompress(&cinfo);
-    if (error) *error = "JPEG has empty extent";
-    return false;
-  }
-  rgba.assign(static_cast<size_t>(w) * h * 4u, 255);
-  std::vector<uint8_t> row(static_cast<size_t>(w) * 3u);
-  while (cinfo.output_scanline < cinfo.output_height) {
-    JSAMPROW rows[1] = {row.data()};
-    jpeg_read_scanlines(&cinfo, rows, 1);
-    uint8_t* dst = rgba.data() + static_cast<size_t>(cinfo.output_scanline - 1) * w * 4u;
-    for (unsigned x = 0; x < w; ++x) {
-      dst[0] = row[x * 3u];
-      dst[1] = row[x * 3u + 1];
-      dst[2] = row[x * 3u + 2];
-      dst[3] = 255;
-      dst += 4;
-    }
-  }
-  jpeg_finish_decompress(&cinfo);
-  jpeg_destroy_decompress(&cinfo);
-  if (width) *width = w;
-  if (height) *height = h;
-  return true;
-}
-
-bool scale_crop_rgba8_buffer(const std::vector<uint8_t>& src, unsigned src_w, unsigned src_h,
-                             unsigned master_w, unsigned master_h, unsigned out_w, unsigned out_h,
-                             unsigned crop_x, unsigned crop_y, std::vector<uint8_t>& dst,
-                             std::string* error) {
-  if (src_w < 1 || src_h < 1 || master_w < 1 || master_h < 1 || out_w < 1 || out_h < 1) {
-    if (error) *error = "Invalid SDR scale/crop size";
-    return false;
-  }
-  if (crop_x + out_w > master_w || crop_y + out_h > master_h) {
-    if (error) *error = "SDR crop exceeds master bounds";
-    return false;
-  }
-  auto sample = [&](unsigned x, unsigned y, uint8_t* px) {
-    x = std::min(x, src_w - 1);
-    y = std::min(y, src_h - 1);
-    const uint8_t* s = src.data() + (static_cast<size_t>(y) * src_w + x) * 4u;
-    px[0] = s[0];
-    px[1] = s[1];
-    px[2] = s[2];
-    px[3] = 255;
-  };
-  dst.assign(static_cast<size_t>(out_w) * out_h * 4u, 255);
-  for (unsigned y = 0; y < out_h; ++y) {
-    const float fy = (src_h / static_cast<float>(master_h)) * static_cast<float>(crop_y + y);
-    const unsigned sy = std::min(src_h - 1, static_cast<unsigned>(fy));
-    for (unsigned x = 0; x < out_w; ++x) {
-      const float fx = (src_w / static_cast<float>(master_w)) * static_cast<float>(crop_x + x);
-      const unsigned sx = std::min(src_w - 1, static_cast<unsigned>(fx));
-      sample(sx, sy, dst.data() + (static_cast<size_t>(y) * out_w + x) * 4u);
-    }
-  }
-  return true;
 }
 
 bool convert_frame_to_format(IWICImagingFactory* factory, IWICBitmapFrameDecode* frame,
@@ -326,13 +242,6 @@ bool load_rgba_float(const std::string& path, std::vector<float>& rgba, unsigned
   return true;
 }
 
-bool icc_bytes_look_like_display_p3(const uint8_t* data, size_t size) {
-  if (!data || size < 4) return false;
-  const std::string hay(reinterpret_cast<const char*>(data), size);
-  return hay.find("Display P3") != std::string::npos || hay.find("DisplayP3") != std::string::npos ||
-         hay.find("DCI-P3") != std::string::npos || hay.find("uP3") != std::string::npos;
-}
-
 bool frame_is_display_p3(IWICBitmapFrameDecode* frame) {
   if (!frame) return false;
   UINT count = 0;
@@ -351,7 +260,8 @@ bool frame_is_display_p3(IWICBitmapFrameDecode* frame) {
   std::vector<uint8_t> profile(bytes);
   UINT actual_bytes = 0;
   if (FAILED(ctx->GetProfileBytes(bytes, profile.data(), &actual_bytes))) return false;
-  return icc_bytes_look_like_display_p3(profile.data(), actual_bytes);
+  profile.resize(actual_bytes);
+  return classify_icc(profile).primaries == IccPrimaries::kDisplayP3;
 }
 
 bool open_frame(const std::string& path, Microsoft::WRL::ComPtr<IWICImagingFactory>& factory,

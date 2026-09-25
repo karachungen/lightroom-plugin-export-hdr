@@ -34,10 +34,6 @@ if [[ -z "${UHDR_FIXTURES_SRC:-}" ]]; then
     echo "==> UHDR_FIXTURES_SRC unset; using existing files in $DEST"
     exit 0
   fi
-  if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-    echo "WARN: UI fixtures missing in CI; optional preview tests will be skipped." >&2
-    exit 0
-  fi
   if fixtures_skipped; then
     echo "WARN: UI fixtures missing in $DEST; continuing (--skip-fixtures)." >&2
     exit 0

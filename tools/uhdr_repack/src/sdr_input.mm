@@ -4,10 +4,12 @@
 
 #include "sdr_input.h"
 
+#include "sdr_jpeg.h"
 #include "yuv_convert.h"
 
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 namespace uhdr_repack {
 
@@ -38,6 +40,17 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
     }
     out_w = crop->w;
     out_h = crop->h;
+  }
+
+  {
+    std::vector<uint8_t> rgba;
+    const unsigned crop_x = crop ? crop->x : 0;
+    const unsigned crop_y = crop ? crop->y : 0;
+    const int portable = load_sdr_jpeg_p3(path, master_width, master_height, out_w, out_h, crop_x, crop_y,
+                                          &rgba, error);
+    if (portable < 0) return false;
+    if (portable > 0) return rgba_p3_to_sdr_raw(rgba, out_w, out_h, out, error);
+    log_sdr_jpeg_fallback(path);
   }
 
   @autoreleasepool {
@@ -108,33 +121,10 @@ bool load_sdr_base_raw(const std::string& path, unsigned master_width, unsigned 
       colorSpace:p3];
     CGColorSpaceRelease(p3);
 
-    uint8_t* py = nullptr;
-    uint8_t* pu = nullptr;
-    uint8_t* pv = nullptr;
-    if (!rgba8888_to_yuv420_bt601(static_cast<const uint8_t*>(buf), out_w, out_h, &py, &pu, &pv,
-                                  error)) {
-      std::free(buf);
-      return false;
-    }
+    std::vector<uint8_t> rgba(static_cast<const uint8_t*>(buf), static_cast<const uint8_t*>(buf) + nbytes);
     std::free(buf);
-
-    uhdr_raw_image_t& r = out->ref();
-    std::memset(&r, 0, sizeof(r));
-    r.fmt = UHDR_IMG_FMT_12bppYCbCr420;
-    r.cg = UHDR_CG_DISPLAY_P3;
-    r.ct = UHDR_CT_SRGB;
-    r.range = UHDR_CR_FULL_RANGE;
-    r.w = out_w;
-    r.h = out_h;
-    r.planes[UHDR_PLANE_Y] = py;
-    r.planes[UHDR_PLANE_U] = pu;
-    r.planes[UHDR_PLANE_V] = pv;
-    r.stride[UHDR_PLANE_Y] = out_w;
-    r.stride[UHDR_PLANE_U] = out_w / 2;
-    r.stride[UHDR_PLANE_V] = out_w / 2;
+    return rgba_p3_to_sdr_raw(rgba, out_w, out_h, out, error);
   }
-
-  return true;
 }
 
 }  // namespace uhdr_repack

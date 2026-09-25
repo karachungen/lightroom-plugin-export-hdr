@@ -47,13 +47,13 @@ bool encode_ultra_hdr_jpeg(const RawImageHolder& hdr_holder, const RawImageHolde
     jpeg.data = const_cast<uint8_t*>(opt.sdr_jpeg.data());
     jpeg.data_sz = opt.sdr_jpeg.size();
     jpeg.capacity = opt.sdr_jpeg.size();
-    jpeg.cg = UHDR_CG_DISPLAY_P3;
+    jpeg.cg = static_cast<uhdr_color_gamut_t>(opt.sdr_jpeg_cg);
     jpeg.ct = UHDR_CT_SRGB;
     jpeg.range = UHDR_CR_FULL_RANGE;
-    st = uhdr_enc_set_compressed_image(enc, &jpeg, UHDR_BASE_IMG);
-    if (st.error_code != UHDR_CODEC_OK) {
-      st = uhdr_enc_set_compressed_image(enc, &jpeg, UHDR_SDR_IMG);
-    }
+    // UHDR_BASE_IMG is the already-muxed primary for a base+gain-map encode. With an HDR raw
+    // image and no gain map, that label makes libultrahdr take the HDR-only path and invent an
+    // SDR base. UHDR_SDR_IMG is the SDR rendition the gain map is built against.
+    st = uhdr_enc_set_compressed_image(enc, &jpeg, UHDR_SDR_IMG);
     if (st.error_code != UHDR_CODEC_OK) {
       uhdr_release_encoder(enc);
       if (error) *error = std::string("uhdr_enc_set_compressed_image SDR: ") + st.detail;

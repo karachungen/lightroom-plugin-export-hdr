@@ -29,8 +29,8 @@ find_bin() {
 	return 1
 }
 
-echo "==> [1/6] Smoke encode + inspect (existing CI test)"
-"$SCRIPT_DIR/run_uhdr_test.sh"
+echo "==> [1/6] Encoder tests"
+ctest --test-dir "$REPO_ROOT/tools/uhdr_repack/build" --output-on-failure
 
 echo ""
 echo "==> [2/6] Gain map compute / edit / encode"
