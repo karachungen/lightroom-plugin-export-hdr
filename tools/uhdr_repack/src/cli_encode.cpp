@@ -50,6 +50,7 @@ void print_usage() {
       << "  uhdr_repack --encode-preview-jpeg <path>\n"
       << "  uhdr_repack --dump-gainmap --sdr <path> --hdr-tiff <path> --out <path.gainmap>\n"
       << "  uhdr_repack --write-hdr-chart <dir>\n"
+      << "  uhdr_repack --write-hdr-scenes <dir>          write sunset/neon/pastel HDR TIFF + SDR JPEG pairs (1080x1350)\n"
       << "  uhdr_repack --check-hdr-chart <dir> [--out <jpg>] [--preset color|mono] [--simulate-instagram] [--max-edge-p99 <stops>] [--max-edge-p99-instagram <stops>] [encode options]\n"
       << "  uhdr_repack --check-hdr-chart-file <jpg-or-tif> [--manifest <json>] [--slice-aspect <a>] [--crop-offset <0-1>]\n"
       << "  uhdr_repack --check-hdr-chart-assets <committed-dir> <fresh-dir>\n"

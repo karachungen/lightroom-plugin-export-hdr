@@ -1,6 +1,7 @@
 #include "cli.h"
 #include "delivery_check.h"
 #include "hdr_chart.h"
+#include "hdr_scenes.h"
 #include "instagram_sim.h"
 #include "session.h"
 
@@ -65,6 +66,15 @@ static int run(int argc, char** argv) {
       return 1;
     }
     return write_hdr_chart_main(argv[2]);
+  }
+
+  if (std::strcmp(argv[1], "--write-hdr-scenes") == 0) {
+    if (argc < 3) {
+      std::cerr << "--write-hdr-scenes requires an output directory\n";
+      print_usage();
+      return 1;
+    }
+    return write_hdr_scenes_main(argv[2]);
   }
 
   if (std::strcmp(argv[1], "--check-hdr-chart") == 0) return check_hdr_chart_main(argc, argv);

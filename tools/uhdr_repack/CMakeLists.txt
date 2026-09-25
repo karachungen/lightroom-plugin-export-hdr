@@ -139,6 +139,7 @@ set(_UHDR_CORE_SOURCES
   src/icc_profile.cpp
   src/hdr_chart.cpp
   src/chart_io.cpp
+  src/hdr_scenes.cpp
   src/yuv_convert.cpp
   src/sdr_jpeg.cpp
   src/cli_describe.cpp
@@ -507,5 +508,19 @@ if(UHDR_ENABLE_GUI)
   set_tests_properties(smoke.probe-sdr smoke.preview-jpeg PROPERTIES
     LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart FAIL_REGULAR_EXPRESSION "Wrong JPEG library version" ${_uhdr_qt_test_env})
 endif()
+
+add_test(NAME scenes.write COMMAND ${UHDR_BIN} --write-hdr-scenes "${UHDR_TEST_OUT}/hdr-scenes")
+set_tests_properties(scenes.write PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_SETUP scenes ${_uhdr_qt_test_env})
+foreach(scene sunset neon pastel)
+  add_test(NAME scenes.${scene}.encode COMMAND ${UHDR_BIN}
+    --hdr-tiff "${UHDR_TEST_OUT}/hdr-scenes/${scene}-hdr.tif" --base "${UHDR_TEST_OUT}/hdr-scenes/${scene}-sdr.jpg"
+    --out "${UHDR_TEST_OUT}/hdr-scenes/${scene}-uhdr.jpg")
+  add_test(NAME scenes.${scene}.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/hdr-scenes/${scene}-uhdr.jpg"
+    --expect-size 1080x1350)
+  set_tests_properties(scenes.${scene}.encode PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED scenes FIXTURES_SETUP scene-${scene} ${_uhdr_qt_test_env})
+  set_tests_properties(scenes.${scene}.verify PROPERTIES LABELS smoke TIMEOUT 600
+    FIXTURES_REQUIRED scene-${scene} ${_uhdr_qt_test_env})
+endforeach()
 
 install(TARGETS uhdr_repack RUNTIME DESTINATION bin)
