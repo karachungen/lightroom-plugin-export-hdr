@@ -49,4 +49,16 @@ fixtures="$ROOT/scripts/copy_ui_fixtures.sh"
 if grep -q 'GITHUB_ACTIONS' "$fixtures"; then
 	fail "copy_ui_fixtures.sh still branches on GITHUB_ACTIONS"
 fi
+qtps1="$ROOT/scripts/install_windows_qt.ps1"
+webps1="$ROOT/scripts/install_windows_webview2.ps1"
+[[ -f "$qtps1" ]] || fail "missing install_windows_qt.ps1"
+[[ -f "$webps1" ]] || fail "missing install_windows_webview2.ps1"
+grep -q 'scripts/qt/windows-x64.stamp' "$qtps1" || fail "Windows Qt install does not read the stamp"
+grep -q 'git+https://github.com/miurahr/aqtinstall.git' "$qtps1" || fail "aqt install command changed"
+grep -q 'WebView2LoaderStatic.lib' "$webps1" || fail "WebView2 static loader is not copied"
+grep -q 'EmitBashEnv' "$ROOT/scripts/setup_windows_build.ps1" || fail "setup_windows_build.ps1 has no EmitBashEnv"
+grep -q 'build_plugin.sh' "$ROOT/scripts/build_plugin.ps1" || fail "build_plugin.ps1 does not forward to bash"
+if grep -q 'Invoke-CmakeBuild' "$ROOT/scripts/build_plugin.ps1"; then
+	fail "build_plugin.ps1 still builds on its own"
+fi
 echo "ok build cache contract"

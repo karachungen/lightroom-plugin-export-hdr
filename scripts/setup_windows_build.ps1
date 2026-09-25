@@ -1,7 +1,8 @@
 # Install local Windows build dependencies for uhdr_repack / ExportHDR.lrplugin.
 #Requires -Version 5.1
 param(
-	[switch]$VsOnly
+	[switch]$VsOnly,
+	[string]$EmitBashEnv = ""
 )
 
 Set-StrictMode -Version Latest
@@ -235,4 +236,22 @@ Write-Host ""
 Write-Host "==> Dependency setup complete."
 Write-Host "    Open a new PowerShell window (or restart the terminal) so PATH includes Git, CMake, and Ninja."
 Write-Host "    Then run: .\scripts\build_plugin.ps1"
+
+if ($EmitBashEnv -ne "") {
+	if (-not (Import-MsvcDevEnvironment)) {
+		throw "MSVC x64 environment is required. Run .\scripts\setup_windows_build.ps1"
+	}
+	function ConvertTo-BashSingleQuoted([string]$Value) {
+		return "'" + ($Value -replace "'", "'\''") + "'"
+	}
+	$lines = @()
+	foreach ($var in @("PATH", "INCLUDE", "LIB", "LIBPATH")) {
+		$val = [Environment]::GetEnvironmentVariable($var)
+		if ($val) {
+			$lines += "export $var=$(ConvertTo-BashSingleQuoted $val)"
+		}
+	}
+	$lines | Set-Content -LiteralPath $EmitBashEnv -Encoding UTF8
+}
+
 exit 0
