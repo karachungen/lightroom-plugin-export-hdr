@@ -154,9 +154,7 @@ run_msvc_child() {
 		win_path="$(cygpath -w "${ninja_bin%/*}");${win_path}"
 	fi
 	excl="PATH;INCLUDE;LIB;LIBPATH"
-	if [[ -n "${MSYS2_ENV_CONV_EXCL:-}" ]]; then
-		excl="${MSYS2_ENV_CONV_EXCL};${excl}"
-	fi
+	export MSYS2_ENV_CONV_EXCL="$excl"
 	# Bash searches PATH before it starts the child, so a semicolon Windows PATH
 	# hides cmake. Resolve it with the POSIX PATH, then hand the child vcvars.
 	local cmd="$1"
@@ -170,7 +168,30 @@ run_msvc_child() {
 	if command -v cygpath >/dev/null 2>&1; then
 		resolved="$(cygpath -w "$resolved")"
 	fi
-	MSYS2_ENV_CONV_EXCL="$excl" PATH="$win_path" "$resolved" "$@"
+	PATH="$win_path" "$resolved" "$@"
+}
+
+# cl.exe lives under "Program Files", which Git bash drops when it rewrites PATH
+# for a Windows cmake. Return the full Windows path from the vcvars PATH itself.
+msvc_cl_path() {
+	local entry posix
+	[[ -n "${MSVC_WIN_PATH:-}" ]] || return 1
+	set -f
+	local IFS=';'
+	for entry in $MSVC_WIN_PATH; do
+		[[ -n "$entry" ]] || continue
+		posix="$entry"
+		if command -v cygpath >/dev/null 2>&1; then
+			posix="$(cygpath -u "$entry" 2>/dev/null || true)"
+		fi
+		if [[ -n "$posix" && -f "$posix/cl.exe" ]]; then
+			set +f
+			cygpath -w "$posix/cl.exe"
+			return 0
+		fi
+	done
+	set +f
+	return 1
 }
 
 source_msvc_bash_env() {
@@ -518,16 +539,21 @@ cmd_build() {
 		cmake_extra+=("-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
 	fi
 	if is_windows_host; then
-		local ninja
+		local ninja cl
 		ninja="$(command -v ninja || true)"
 		if [[ -z "$ninja" ]]; then
 			echo "ninja not found on PATH" >&2
 			exit 1
 		fi
+		cl="$(msvc_cl_path || true)"
+		if [[ -z "$cl" ]]; then
+			echo "cl.exe not found in the MSVC environment PATH" >&2
+			exit 1
+		fi
 		if command -v cygpath >/dev/null 2>&1; then
 			ninja="$(cygpath -w "$ninja")"
 		fi
-		cmake_extra+=("-DCMAKE_MAKE_PROGRAM=$ninja")
+		cmake_extra+=("-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_C_COMPILER=$cl" "-DCMAKE_CXX_COMPILER=$cl")
 	fi
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
