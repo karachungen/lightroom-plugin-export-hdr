@@ -6,9 +6,6 @@
 #   ./scripts/build_plugin.sh [install-deps|install|build|bundle|test|package|all] [--preset NAME] [--clean] [--skip-fixtures]
 set -euo pipefail
 
-# Pin CMake 3.31.x on Windows (CMake 4.x breaks vendored libjpeg-turbo).
-REQUIRED_CMAKE_VERSION_PREFIX="3.31."
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=scripts/qt_kit.sh
@@ -321,14 +318,6 @@ assert_cmake_version() {
 	if ! command -v cmake &>/dev/null; then
 		echo "cmake not found on PATH." >&2
 		exit 1
-	fi
-	if is_windows_host; then
-		local ver_line
-		ver_line="$(cmake --version 2>/dev/null | head -n 1)"
-		if [[ "$ver_line" != *"version ${REQUIRED_CMAKE_VERSION_PREFIX}"* ]]; then
-			echo "Windows requires CMake ${REQUIRED_CMAKE_VERSION_PREFIX}x ($ver_line). Run .\\scripts\\setup_windows_build.ps1" >&2
-			exit 1
-		fi
 	fi
 }
 

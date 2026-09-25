@@ -11,4 +11,4 @@ docker build -t uhdr-repro-cmake4-turbojpeg "$SCRIPT_DIR"
 echo "==> Running repro (should exit 0 when failure is reproduced)"
 docker run --rm uhdr-repro-cmake4-turbojpeg
 
-echo "Done. Pin Windows CI to CMake 3.31.x (see .github/workflows/release-plugin.yml) to avoid this in the real build."
+echo "Done. The failure is the missing CMAKE_POLICY_VERSION_MINIMUM=3.5 that build_plugin.sh exports before configure."

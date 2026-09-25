@@ -202,23 +202,11 @@ if (-not $VsOnly) {
 		Write-Host "    git: OK"
 	}
 
-	$cmakeVersion = "3.31.6"
-	$cmakeOk = $false
 	if (Test-CommandAvailable "cmake") {
 		$verLine = (& cmake --version 2>$null | Select-Object -First 1)
-		if ($verLine -match "3\.31\.") {
-			$cmakeOk = $true
-			Write-Host "    cmake: OK ($verLine)"
-		} else {
-			Write-Host "    cmake: found but wrong version ($verLine); need 3.31.x (CMake 4.x breaks vendored libjpeg-turbo)"
-		}
-	}
-	if (-not $cmakeOk) {
-		if (-not (Test-WingetPackageInstalled -Id "Kitware.CMake" -Version $cmakeVersion)) {
-			Install-WingetPackage -Id "Kitware.CMake" -ExtraArgs @("--version", $cmakeVersion)
-		} else {
-			Write-Host "    cmake ${cmakeVersion}: installed via winget (refresh PATH or open a new shell if cmake is missing)"
-		}
+		Write-Host "    cmake: OK ($verLine)"
+	} elseif (-not (Test-WingetPackageInstalled -Id "Kitware.CMake")) {
+		Install-WingetPackage -Id "Kitware.CMake"
 	}
 
 	if (-not (Test-CommandAvailable "ninja")) {
@@ -244,7 +232,7 @@ if ($EmitBashEnv -ne "") {
 	Refresh-BuildToolPath
 	$cmakeExe = Get-CmakeExe
 	if (-not $cmakeExe) {
-		throw "CMake 3.31.x is required. Run .\scripts\setup_windows_build.ps1"
+		throw "CMake is required. Run .\scripts\setup_windows_build.ps1"
 	}
 	function ConvertTo-BashSingleQuoted([string]$Value) {
 		return "'" + ($Value -replace "'", "'\''") + "'"

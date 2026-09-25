@@ -27,7 +27,7 @@ GitHub Releases ship separate archives (no mixed OS binaries in one zip):
 macOS requires: Xcode CLT, CMake. uhdr_repack links libuhdr and libjpeg-turbo statically,
 so nothing else needs to be installed or bundled at runtime.
 
-Windows requires: Git, CMake 3.31.x, Ninja, and MSVC (Visual Studio 2022 Build Tools, x64).
+Windows requires: Git, CMake, Ninja, and MSVC (Visual Studio 2022 Build Tools, x64).
 One-time setup from repo root:
 
   .\scripts\setup_windows_build.ps1
@@ -38,9 +38,7 @@ One-time setup from repo root:
 
 libjpeg-turbo is built automatically via libultrahdr (UHDR_BUILD_DEPS) during configure.
 CMake 4.x rejects vendored libjpeg-turbo 3.1.0's old cmake_minimum_required(); build_plugin.sh
-works around this on both platforms by exporting CMAKE_POLICY_VERSION_MINIMUM=3.5. The
-Windows CMake 3.31.x pin above predates that workaround and has not been re-verified against
-CMake 4.x — treat it as still required until someone confirms otherwise on Windows.
+works around this on both platforms by exporting CMAKE_POLICY_VERSION_MINIMUM=3.5.
 
 Optional override: UHDR_USE_SYSTEM=1 to link against a preinstalled libultrahdr
 (and UHDR_ROOT=... if CMake cannot find headers/libs).

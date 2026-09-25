@@ -29,7 +29,7 @@ if (Test-QtConfigPresent $Prefix) {
 
 $cmake = Get-CmakeExe
 if (-not $cmake) {
-	throw "CMake 3.31.x is required. Run the workflow Setup CMake step or .\scripts\setup_windows_build.ps1"
+	throw "CMake is required. Run .\scripts\setup_windows_build.ps1"
 }
 if (-not (Import-MsvcDevEnvironment)) {
 	throw "MSVC x64 environment is required. Run the workflow Setup MSVC step or .\scripts\setup_windows_build.ps1"
