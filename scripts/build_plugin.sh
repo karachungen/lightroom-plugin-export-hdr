@@ -11,6 +11,8 @@ REQUIRED_CMAKE_VERSION_PREFIX="3.31."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/qt_kit.sh
+source "$SCRIPT_DIR/qt_kit.sh"
 UHDR_SRC="$REPO_ROOT/tools/uhdr_repack"
 BUILD_DIR="$UHDR_SRC/build"
 PLUGIN_BIN="$REPO_ROOT/ExportHDR.lrplugin/bin"
@@ -228,52 +230,44 @@ resolve_qt_for_build() {
 		return 0
 	fi
 
-	local static_root shared_prefix
-
-	if [[ "${UHDR_STATIC_QT:-ON}" == "0" || "${UHDR_STATIC_QT:-ON}" == "OFF" ]]; then
-		shared_prefix="$(find_qt_shared_prefix || true)"
-		if [[ -z "$shared_prefix" ]]; then
-			echo "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found." >&2
-			echo "Install Qt locally (e.g. brew install qt) or set CMAKE_PREFIX_PATH." >&2
-			exit 1
+	case "$(uname -s)" in
+	Darwin)
+		if [[ "${UHDR_STATIC_QT:-ON}" == "0" || "${UHDR_STATIC_QT:-ON}" == "OFF" ]]; then
+			local shared_prefix
+			shared_prefix="$(find_qt_shared_prefix || true)"
+			if [[ -z "$shared_prefix" ]]; then
+				echo "UHDR_STATIC_QT=OFF but no Qt 6.11+ installation was found." >&2
+				echo "Install Qt locally (e.g. brew install qt) or set CMAKE_PREFIX_PATH." >&2
+				exit 1
+			fi
+			cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
+			echo "==> Using shared Qt at $shared_prefix (development build)"
+			QT_RESOLVED=1
+			return 0
 		fi
-		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
-		echo "==> Using shared Qt at $shared_prefix (development build)"
-		QT_RESOLVED=1
-		return 0
-	fi
-
-	static_root="$(find_qt_static_root || true)"
-	if [[ -z "$static_root" && "$(uname -s)" == "Darwin" ]]; then
-		echo "==> Static Qt kit missing; building ${QT_STATIC_ROOT:-$HOME/Qt/6.11.2-static}"
-		"$SCRIPT_DIR/setup_qt_static.sh"
-		static_root="$(find_qt_static_root || true)"
-	fi
-	if [[ -n "$static_root" ]]; then
+		ensure_qt_kit macos-arm64
+		local static_root
+		static_root="$(qt_prefix_path macos-arm64)"
 		cmake_extra+=("-DQT_STATIC_ROOT=$static_root" "-DUHDR_STATIC_QT=ON" "-DCMAKE_PREFIX_PATH=$static_root")
 		echo "==> Using static Qt at $static_root"
 		QT_RESOLVED=1
-		return 0
-	fi
-
-	if [[ "$(uname -s)" == "Darwin" || "${UHDR_REQUIRE_STATIC_QT:-}" == "1" || "${UHDR_REQUIRE_STATIC_QT:-}" == "ON" ]]; then
-		echo "macOS release builds require a static Qt kit and will not fall back to shared Qt." >&2
-		echo "Run ./scripts/setup_qt_static.sh or set QT_STATIC_ROOT." >&2
-		exit 1
-	fi
-
-	shared_prefix="$(find_qt_shared_prefix || true)"
-	if [[ -n "$shared_prefix" ]]; then
-		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$shared_prefix")
-		echo "==> Using shared Qt at $shared_prefix (local development build)"
-		echo "    For a release single-file binary, run ./scripts/setup_qt_static.sh and export QT_STATIC_ROOT." >&2
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		ensure_qt_kit windows-x64
+		local win_prefix
+		win_prefix="$(qt_prefix_path windows-x64)"
+		cmake_extra+=("-DUHDR_STATIC_QT=OFF" "-DCMAKE_PREFIX_PATH=$win_prefix")
+		if [[ -d "$win_prefix/bin" ]]; then
+			export PATH="$win_prefix/bin:$PATH"
+		fi
+		echo "==> Using shared Qt at $win_prefix"
 		QT_RESOLVED=1
-		return 0
-	fi
-
-	echo "No Qt 6.11+ installation found." >&2
-	echo "Install Qt locally (e.g. brew install qt), or run ./scripts/setup_qt_static.sh for a static release kit." >&2
-	exit 1
+		;;
+	*)
+		echo "No Qt kit for $(uname -s)." >&2
+		exit 1
+		;;
+	esac
 }
 
 assert_cmake_version() {
@@ -291,7 +285,95 @@ assert_cmake_version() {
 	fi
 }
 
+prepend_tool_bin() {
+	export PATH="$(qt_cache_dir)/tool-bin:$PATH"
+}
+
+install_sccache_bin() {
+	local tool_bin dest tmp archive url extracted
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	mkdir -p "$tool_bin"
+	case "$(uname -s)" in
+	Darwin) dest="$tool_bin/sccache" ;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT) dest="$tool_bin/sccache.exe" ;;
+	*)
+		echo "sccache install is not supported on $(uname -s)" >&2
+		exit 1
+		;;
+	esac
+	if [[ -x "$dest" ]] && "$dest" --version 2>/dev/null | grep -q '0.17.0'; then
+		return 0
+	fi
+	tmp="$(mktemp -d)"
+	case "$(uname -s)" in
+	Darwin)
+		url="https://github.com/mozilla/sccache/releases/download/v0.17.0/sccache-v0.17.0-aarch64-apple-darwin.tar.gz"
+		archive="$tmp/sccache.tar.gz"
+		curl --fail --location --retry 3 -o "$archive" "$url"
+		tar -xf "$archive" -C "$tmp"
+		extracted="$(find "$tmp" -type f -name sccache | head -n 1)"
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		url="https://github.com/mozilla/sccache/releases/download/v0.17.0/sccache-v0.17.0-x86_64-pc-windows-msvc.zip"
+		archive="$tmp/sccache.zip"
+		curl --fail --location --retry 3 -o "$archive" "$url"
+		tar -xf "$archive" -C "$tmp"
+		extracted="$(find "$tmp" -type f -name sccache.exe | head -n 1)"
+		;;
+	esac
+	if [[ -z "$extracted" || ! -f "$extracted" ]]; then
+		rm -rf "$tmp"
+		echo "sccache binary not found in archive" >&2
+		exit 1
+	fi
+	cp -f "$extracted" "$dest"
+	rm -rf "$tmp"
+	if [[ "$(uname -s)" == "Darwin" ]]; then
+		chmod +x "$dest"
+	fi
+}
+
+install_windows_zstd() {
+	local tool_bin dest tmp archive url extracted
+	tool_bin="$(qt_cache_dir)/tool-bin"
+	mkdir -p "$tool_bin"
+	dest="$tool_bin/zstd.exe"
+	if command -v zstd >/dev/null 2>&1 && zstd --version 2>/dev/null | grep -q '1.5.7'; then
+		return 0
+	fi
+	tmp="$(mktemp -d)"
+	url="https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-v1.5.7-win64.zip"
+	archive="$tmp/zstd.zip"
+	curl --fail --location --retry 3 -o "$archive" "$url"
+	tar -xf "$archive" -C "$tmp"
+	extracted="$(find "$tmp" -type f -name zstd.exe | head -n 1)"
+	if [[ -z "$extracted" || ! -f "$extracted" ]]; then
+		rm -rf "$tmp"
+		echo "zstd.exe not found in archive" >&2
+		exit 1
+	fi
+	cp -f "$extracted" "$dest"
+	rm -rf "$tmp"
+}
+
+qt_install_kit() {
+	local platform="$1" prefix="$2"
+	case "$platform" in
+	macos-arm64)
+		QT_STATIC_ROOT="$prefix" "$SCRIPT_DIR/setup_qt_static.sh"
+		;;
+	windows-x64)
+		QT_ROOT_DIR="$prefix" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_qt.ps1"
+		;;
+	*)
+		echo "qt_install_kit: unknown platform $platform" >&2
+		exit 1
+		;;
+	esac
+}
+
 cmd_install_deps() {
+	prepend_tool_bin
 	case "$(uname -s)" in
 	Darwin)
 		echo "==> Installing macOS build dependencies (brew)"
@@ -299,15 +381,24 @@ cmd_install_deps() {
 			echo "Homebrew is required. See https://brew.sh" >&2
 			exit 1
 		fi
-		brew install cmake ninja qt
+		brew install cmake ninja qt zstd
+		install_sccache_bin
 		;;
 	MINGW* | MSYS* | CYGWIN* | Windows_NT)
-		if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-			echo "==> Windows CI: dependencies provided by workflow actions (skipping install-deps)"
-			return 0
+		echo "==> Installing Windows build dependencies"
+		local env_file win_env
+		env_file="$(qt_cache_dir)/msvc-env.sh"
+		mkdir -p "$(qt_cache_dir)"
+		win_env="$env_file"
+		if command -v cygpath >/dev/null 2>&1; then
+			win_env="$(cygpath -w "$env_file")"
 		fi
-		echo "==> Installing Windows build dependencies (setup_windows_build.ps1)"
-		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/setup_windows_build.ps1"
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/setup_windows_build.ps1" -EmitBashEnv "$win_env"
+		# shellcheck disable=SC1090
+		source "$env_file"
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/install_windows_webview2.ps1"
+		install_windows_zstd
+		install_sccache_bin
 		;;
 	*)
 		echo "install-deps not supported on $(uname -s)" >&2
@@ -317,8 +408,14 @@ cmd_install_deps() {
 }
 
 cmd_build() {
+	prepend_tool_bin
 	assert_cmake_version
 	resolve_qt_for_build
+	if command -v sccache >/dev/null 2>&1; then
+		export SCCACHE_DIR="$(qt_cache_dir)/sccache"
+		mkdir -p "$SCCACHE_DIR"
+		cmake_extra+=("-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
+	fi
 	if [[ "$CLEAN" -eq 1 ]] && [[ -d "$BUILD_DIR" ]]; then
 		echo "==> Cleaning $BUILD_DIR"
 		rm -rf "$BUILD_DIR"
@@ -677,10 +774,21 @@ cmd_bundle() {
 }
 
 cmd_test() {
+	bash "$SCRIPT_DIR/test_build_cache_contract.sh"
+	bash "$SCRIPT_DIR/test_qt_kit.sh"
 	ctest --test-dir "$BUILD_DIR" --output-on-failure
+	case "$(uname -s)" in
+	Darwin)
+		bash "$SCRIPT_DIR/test_macos_shell_quote.sh"
+		;;
+	MINGW* | MSYS* | CYGWIN* | Windows_NT)
+		powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/test_windows_cmd_quote.ps1"
+		;;
+	esac
 }
 
 cmd_install() {
+	cmd_install_deps
 	cmd_build
 	cmd_bundle
 	cmd_test
@@ -698,6 +806,7 @@ bundle) cmd_bundle ;;
 test) cmd_test ;;
 package) cmd_package ;;
 all)
+	cmd_install_deps
 	cmd_build
 	cmd_bundle
 	cmd_test

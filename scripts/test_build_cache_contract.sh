@@ -35,4 +35,18 @@ fi
 if grep -q 'QT_VERSION:-6.11.2' "$setup"; then
 	fail "setup_qt_static.sh still hardcodes the Qt version"
 fi
+build="$ROOT/scripts/build_plugin.sh"
+grep -q 'sccache-v0.17.0-aarch64-apple-darwin.tar.gz' "$build" || fail "missing macOS sccache URL"
+grep -q 'sccache-v0.17.0-x86_64-pc-windows-msvc.zip' "$build" || fail "missing Windows sccache URL"
+grep -q 'zstd-v1.5.7-win64.zip' "$build" || fail "missing Windows zstd URL"
+grep -q 'ensure_qt_kit' "$build" || fail "build_plugin.sh does not ensure the Qt kit"
+grep -q 'test_macos_shell_quote.sh' "$build" || fail "quote test is not part of test"
+grep -q 'test_windows_cmd_quote.ps1' "$build" || fail "Windows quote test is not part of test"
+if grep -q 'GITHUB_ACTIONS' "$build"; then
+	fail "build_plugin.sh still branches on GITHUB_ACTIONS"
+fi
+fixtures="$ROOT/scripts/copy_ui_fixtures.sh"
+if grep -q 'GITHUB_ACTIONS' "$fixtures"; then
+	fail "copy_ui_fixtures.sh still branches on GITHUB_ACTIONS"
+fi
 echo "ok build cache contract"
