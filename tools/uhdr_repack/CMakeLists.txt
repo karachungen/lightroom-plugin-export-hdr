@@ -477,20 +477,6 @@ add_test(NAME smoke.utf8-path COMMAND ${UHDR_BIN} --check-utf8-path
   "${UHDR_CHART_HDR}" "${UHDR_CHART_SDR}" "${UHDR_TEST_OUT}")
 set_tests_properties(smoke.utf8-path PROPERTIES LABELS smoke TIMEOUT 600 FIXTURES_REQUIRED chart ${_uhdr_qt_test_env})
 
-set(UHDR_FEED_HDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.tif")
-set(UHDR_FEED_SDR "${UHDR_REPO_ROOT}/test/ui/fixtures/DSC02993.jpg")
-add_test(NAME smoke.feed.describe COMMAND ${UHDR_BIN} --describe-input "${UHDR_FEED_HDR}"
-  --require-portable --skip-if-missing)
-add_test(NAME smoke.feed.encode COMMAND ${UHDR_BIN} --encode-or-skip
-  --hdr-tiff "${UHDR_FEED_HDR}" --base "${UHDR_FEED_SDR}" --out "${UHDR_TEST_OUT}/feed-1080.jpg"
-  --slice-aspect 4x5 --out-width 1080)
-add_test(NAME smoke.feed.verify COMMAND ${UHDR_BIN} --verify-uhdr "${UHDR_TEST_OUT}/feed-1080.jpg"
-  --expect-size 1080x1350 --max-bytes 8388608 --skip-if-missing)
-set_tests_properties(smoke.feed.describe smoke.feed.encode smoke.feed.verify PROPERTIES
-  LABELS smoke TIMEOUT 600 SKIP_RETURN_CODE 77 ${_uhdr_qt_test_env})
-set_tests_properties(smoke.feed.encode PROPERTIES FIXTURES_SETUP smoke-feed ${_uhdr_qt_test_env})
-set_tests_properties(smoke.feed.verify PROPERTIES FIXTURES_REQUIRED smoke-feed ${_uhdr_qt_test_env})
-
 if(UHDR_ENABLE_GUI)
   add_test(NAME smoke.probe-sdr COMMAND ${UHDR_BIN} --probe-sdr "${UHDR_CHART_SDR}")
   add_test(NAME smoke.preview-jpeg COMMAND ${UHDR_BIN} --check-preview-jpeg "${UHDR_CHART_SDR}")

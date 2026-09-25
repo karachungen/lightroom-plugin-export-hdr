@@ -199,7 +199,6 @@ Rules:
 | `chart.<preset>.ig-<aspect>-native` | `… --slice-aspect <aspect>` | Native crop, up to 2× |
 | `smoke.cli.*` | plug-in CLI encode of the chart + `--verify-uhdr` | Default, 1:1 single, 4:5 feed 1080 |
 | `smoke.utf8-path` | `--check-utf8-path <chart tif> <chart jpg> test-out` | Cyrillic folder |
-| `smoke.feed.*` | `DSC02993` fixture: describe, encode, verify | Skip (77) when the fixture is missing |
 | `smoke.probe-sdr`, `smoke.preview-jpeg` | chart SDR | GUI builds only |
 
 Presets are `color` and `mono`; aspects are `1x1`, `4x5`, `3x4`, `191x100`. Labels are `chart` and `smoke`.

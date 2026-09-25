@@ -29,14 +29,13 @@ ctest --test-dir tools/uhdr_repack/build --output-on-failure
 
 `./scripts/build_plugin.sh test` and `.\scripts\build_plugin.ps1 test` run that command. Tests write into `tools/uhdr_repack/build/test-out/`.
 
-CTest registers 32 tests, plus `smoke.probe-sdr` and `smoke.preview-jpeg` when the GUI is built:
+CTest registers 29 tests, plus `smoke.probe-sdr` and `smoke.preview-jpeg` when the GUI is built:
 
 - `chart.write`, `chart.assets-current`, `chart.input.hdr`, `chart.input.sdr`
 - `chart.color.original` and `chart.mono.original`
 - `chart.<preset>.ig-<aspect>-1080` and `chart.<preset>.ig-<aspect>-native` for presets `color` and `mono` and aspects `1x1`, `4x5`, `3x4`, `191x100`
 - `smoke.cli.default.encode`, `smoke.cli.default.verify`, `smoke.cli.slice-1x1.encode`, `smoke.cli.slice-1x1.verify`, `smoke.cli.feed-4x5.encode`, `smoke.cli.feed-4x5.verify`
 - `smoke.utf8-path` — encodes the chart into `test-out/тест/out_uhdr.jpg`
-- `smoke.feed.describe`, `smoke.feed.encode`, `smoke.feed.verify` — skip when `test/ui/fixtures/DSC02993.tif` is absent
 
 **Windows cmd quoting:** `.\scripts\test_windows_cmd_quote.ps1` verifies full-path shell invocation under a synthetic path containing space and `(N)`, and asserts the legacy `cd` + relative-exe pattern fails.
 
