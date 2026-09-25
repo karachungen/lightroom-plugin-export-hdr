@@ -249,7 +249,7 @@ endif()
 # Fused multiply-adds change the chart and ICC bytes versus the committed Windows chart.
 # MSVC does not contract these expressions.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-  set_source_files_properties(src/hdr_chart.cpp src/chart_io.cpp src/icc_profile.cpp
+  set_source_files_properties(src/hdr_chart.cpp src/chart_io.cpp src/hdr_scenes.cpp src/icc_profile.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 

@@ -77,8 +77,16 @@ bool encode_jpeg_pixels(const std::vector<uint8_t>& px, int width, int height, i
   JpegErr jerr{};
   cinfo.err = jpeg_std_error(&jerr.pub);
   jerr.pub.error_exit = jpeg_fail;
-  unsigned char* buf = nullptr;
+  unsigned char* volatile buf = nullptr;
   unsigned long size = 0;
+  std::vector<uint8_t> marker;
+  if (icc && !icc->empty()) {
+    const char tag[] = "ICC_PROFILE";
+    marker.insert(marker.end(), tag, tag + 12);
+    marker.push_back(1);
+    marker.push_back(1);
+    marker.insert(marker.end(), icc->begin(), icc->end());
+  }
   if (setjmp(jerr.jump)) {
     jpeg_destroy_compress(&cinfo);
     if (buf) free(buf);
@@ -86,7 +94,7 @@ bool encode_jpeg_pixels(const std::vector<uint8_t>& px, int width, int height, i
     return false;
   }
   jpeg_create_compress(&cinfo);
-  jpeg_mem_dest(&cinfo, &buf, &size);
+  jpeg_mem_dest(&cinfo, (unsigned char**)&buf, &size);
   cinfo.image_width = static_cast<JDIMENSION>(width);
   cinfo.image_height = static_cast<JDIMENSION>(height);
   cinfo.input_components = comps;
@@ -102,13 +110,7 @@ bool encode_jpeg_pixels(const std::vector<uint8_t>& px, int width, int height, i
     cinfo.comp_info[2].v_samp_factor = 1;
   }
   jpeg_start_compress(&cinfo, TRUE);
-  if (icc && !icc->empty()) {
-    std::vector<uint8_t> marker;
-    const char tag[] = "ICC_PROFILE";
-    marker.insert(marker.end(), tag, tag + 12);
-    marker.push_back(1);
-    marker.push_back(1);
-    marker.insert(marker.end(), icc->begin(), icc->end());
+  if (!marker.empty()) {
     jpeg_write_marker(&cinfo, JPEG_APP0 + 2, marker.data(), static_cast<unsigned int>(marker.size()));
   }
   const size_t row_bytes = static_cast<size_t>(width) * static_cast<size_t>(comps);

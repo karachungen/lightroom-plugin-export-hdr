@@ -209,7 +209,7 @@ bool encode_p3_jpeg(const uint8_t* rgba, int width, int height, const std::vecto
   if (setjmp(jerr.jump)) {
     jpeg_destroy_compress(&cinfo);
     if (outbuf) free(outbuf);
-    if (error) *error = "libjpeg failed to compress the chart JPEG";
+    if (error) *error = "libjpeg failed to compress the SDR JPEG";
     return false;
   }
   jpeg_create_compress(&cinfo);
@@ -242,7 +242,7 @@ bool encode_p3_jpeg(const uint8_t* rgba, int width, int height, const std::vecto
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
   if (!outbuf || outsize == 0) {
-    if (error) *error = "libjpeg produced an empty chart JPEG";
+    if (error) *error = "libjpeg produced an empty SDR JPEG";
     return false;
   }
   jpeg->assign(outbuf, outbuf + outsize);

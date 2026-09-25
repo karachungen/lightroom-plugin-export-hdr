@@ -51,7 +51,6 @@ namespace {
 
 constexpr int kWidth = 1440;
 constexpr int kHeight = 1920;
-constexpr int kStripRows = 16;
 constexpr float kBoost = 16.0f;
 constexpr float kEncStop = 0.15f;
 constexpr float kEncHue = 0.05f;
@@ -77,7 +76,6 @@ constexpr int kSharpY = 1520, kSharpH = 210;
 constexpr int kSpecY = 1760, kSpecH = 100;
 
 static_assert(kWidth * 4 == kHeight * 3, "chart must be 3:4");
-static_assert(kHeight % kStripRows == 0, "TIFF strips must cover the height");
 static_assert(kFW % 24 == 0, "hue sweep must be an integer number of bands");
 static_assert(kAX + 14 * kAPatch + 13 * kAGap <= kWidth, "neutral row overflows");
 static_assert(kBY + 12 * kBPatch + 11 * kBGap <= kFRampY, "hue grid overlaps the ramp");

@@ -80,7 +80,6 @@ void put_pixel(std::vector<float>& hdr, std::vector<uint8_t>& sdr, int x, int y,
 }
 
 LinearRgb sunset_pixel(int x, int y) {
-  const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(kW);
   const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(kH);
   const LinearRgb top{0.015f, 0.03f, 0.10f};
   const LinearRgb horizon{1.20f, 0.42f, 0.08f};
@@ -96,7 +95,7 @@ LinearRgb sunset_pixel(int x, int y) {
   const float xf = static_cast<float>(x) + 0.5f;
   const float yr = 0.62f * static_cast<float>(kH) + 40.0f * std::sin(xf / 180.0f) +
                    25.0f * std::sin(xf / 67.0f + 1.3f);
-  const float t = std::clamp(static_cast<float>(y) + 0.5f - yr + 0.5f, 0.0f, 1.0f);
+  const float t = std::clamp(static_cast<float>(y) - yr + 0.5f, 0.0f, 1.0f);
   const LinearRgb hill{0.010f, 0.008f, 0.012f};
   return mix(c, hill, t);
 }
