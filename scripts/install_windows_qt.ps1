@@ -37,7 +37,10 @@ if ((Split-Path -Leaf $versionDir) -ne $stamp["version"]) {
 }
 python -m pip install --upgrade pip "git+https://github.com/miurahr/aqtinstall.git"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-python -m aqt install-qt windows desktop $stamp["version"] $stamp["aqt_arch"] --outputdir $outputDir --external 7z
+# The runner's 7-Zip 26 treats an existing output directory as a fatal error, so the
+# second archive in a parallel extract (qtsvg into C:\Qt\<version>\msvc2022_64) fails.
+# aqt's own py7zr extractor does not.
+python -m aqt install-qt windows desktop $stamp["version"] $stamp["aqt_arch"] --outputdir $outputDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-python -m aqt install-qt windows desktop $stamp["version"] $stamp["aqt_arch"] -m $stamp["modules"] --outputdir $outputDir --external 7z
+python -m aqt install-qt windows desktop $stamp["version"] $stamp["aqt_arch"] -m $stamp["modules"] --outputdir $outputDir
 exit $LASTEXITCODE
